@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Terminal latency spike</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
+<style>
+  body { margin: 0; padding: 16px; background: #15171c; color: #d6d9e0; font: 14px system-ui, sans-serif; }
+  #term { height: 60vh; }
+  pre { white-space: pre-wrap; }
+</style>
+</head>
+<body>
+<p>W0 spike: xterm.js &harr; WebSocket &harr; asyncssh pty on the integration lab. Run <code>bench(200)</code> in the console,
+or click <button id="run">Run 200 keystrokes</button></p>
+<div id="term"></div>
+<pre id="result"></pre>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+<script>
+const term = new Terminal({ cols: 100, rows: 30, fontSize: 13 });
+term.open(document.getElementById('term'));
+const ws = new WebSocket(`ws://${location.host}/term?cols=100&rows=30`);
+ws.binaryType = 'arraybuffer';
+const encoder = new TextEncoder();
+let waiter = null;           // {needle, resolve} while a keystroke is in flight
+ws.onmessage = (event) => {
+  const bytes = new Uint8Array(event.data);
+  const arrived = performance.now();
+  term.write(bytes, () => {
+    const parsed = performance.now();
+    if (waiter && bytes.includes(waiter.needle)) {
+      const w = waiter; waiter = null;
+      requestAnimationFrame(() => w.resolve({ arrived, parsed, painted: performance.now() }));
+    }
+  });
+};
+term.onData((data) => ws.send(encoder.encode(data)));
+term.onResize(({ cols, rows }) => ws.send(JSON.stringify({ type: 'resize', cols, rows })));
+
+function key(text, needle) {
+  return new Promise((resolve) => {
+    const sent = performance.now();
+    waiter = { needle, resolve: (t) => resolve({ sent, ...t }) };
+    ws.send(encoder.encode(text));
+  });
+}
+
+function stats(values) {
+  const s = [...values].sort((a, b) => a - b);
+  const at = (p) => s[Math.min(s.length - 1, Math.floor(p * s.length))];
+  return { median: +at(0.5).toFixed(2), p95: +at(0.95).toFixed(2), max: +s[s.length - 1].toFixed(2) };
+}
+
+// Types a character at the shell prompt (the pty echoes it), then erases it, n times.
+async function bench(n = 200) {
+  const network = [], parsed = [], painted = [];
+  for (let i = 0; i < n; i++) {
+    const t = await key('x', 0x78);
+    network.push(t.arrived - t.sent); parsed.push(t.parsed - t.sent); painted.push(t.painted - t.sent);
+    await key('\x7f', 0x08);       // readline answers a backspace with "\b \b"
+    await new Promise((r) => setTimeout(r, 5));
+  }
+  const result = { n, echoArrivedMs: stats(network), echoParsedMs: stats(parsed), echoPaintedMs: stats(painted),
+                   // A hidden window runs requestAnimationFrame about once a second, which shows up here.
+                   paintsOver50ms: painted.filter((v) => v > 50).length, visibility: document.visibilityState,
+                   userAgent: navigator.userAgent };
+  document.getElementById('result').textContent = JSON.stringify(result, null, 2);
+  return result;
+}
+window.bench = bench;
+document.getElementById('run').onclick = () => bench(200);
+</script>
+</body>
+</html>
