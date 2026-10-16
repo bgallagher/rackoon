@@ -79,3 +79,28 @@ Findings to carry into I3:
 - Network.framework (`NIOTransportServices`) instead of POSIX sockets on iOS, for better behaviour on VPN and cellular changes. POSIX works in the simulator. Decide when testing on a device with Tailscale.
 - S2 (Tailscale SSH `none` auth) against a real server, read-only, once the user supplies a host.
 - On-device run with free personal-team signing (no paid Apple Developer account), including the phone's Tailscale routing.
+
+## Stage I1 result: the app shell (16 Oct 2026)
+
+`apple/Apps/RackoonIOS` is a checked-in Xcode project (objectVersion 77, folder-synchronised groups) on the local package: RackoonCore, RackoonSSHEmbedded and the new shared `RackoonDemo`. It is SwiftUI, iOS 17, Swift 6.
+
+| Feature (spec/features.json) | iOS | Proven by |
+|---|---|---|
+| `themes` | done | `RackoonCoreTests.TerminalThemeTests`, `AppPaletteTests` (run on iOS), `RackoonIOSTests.ThemeTests` (bundled themes.json loads all 45, Automatic follows the system, a choice is kept and forces its appearance, a broken file falls back) |
+| `servers.edit` | done | `RackoonCoreTests.ServerInputTests`, scenario `testServerInput`, `RackoonIOSTests.SavedServersTests` |
+| `servers.menu` | done | `RackoonCoreTests.ServerListTests`, `RackoonIOSTests.SavedServersTests/testReorderAndSearch` |
+| `connect.hostkey` | done | `RackoonSSHEmbeddedTests.HostKeyTests`, `RackoonIOSTests.HostTrustTests` (only the key shown can be trusted; a changed key is blocked and cannot be trusted), lab checks `testHostKeyMismatchBlocked` and `testUnknownHostKeyIsReportedNotTrusted` |
+| `safety.read-only` | done | `RackoonCoreTests.ActionPolicyTests`, `RackoonIOSTests.ReadOnlyTests` (the switch reaches the shared policy, which refuses a confirmed change again at run time) |
+| `demo` | done | `RackoonDemoTests.DemoDataTests` (every canned answer goes through the real parsers), `RackoonIOSTests.DemoModeTests` (demo changes never reach servers.json) |
+| `core.shell-safety` | done | `RackoonCoreTests.ShellQuoteTests` and the shell-quote and template scenarios, run on iOS |
+| `servers.saved` | planned I2 | The saved list is done, but painting the cached snapshot needs the Overview |
+| `connect.keys` | planned I2 | Key import into the Keychain |
+| `safety.confirm` | planned I4 | The first iOS action that changes a server |
+
+How the tests run: the project alone cannot see a local package's test targets (`-only-testing` says the target "isn't a member of the test plan"). `RackoonIOS.xcworkspace` adds the package beside the project, and the test plan then runs `RackoonIOSTests`, `RackoonCoreTests`, `RackoonSSHEmbeddedTests` (lab checks skipped; they run in the Linux lab job) and `RackoonDemoTests` on the simulator: 509 tests. The package's own `Rackoon-Package` scheme cannot be built for iOS, because it includes the Mac-only targets. RackoonCore has 20 tests that prove a command in a real `/bin/sh`, and iOS has neither `Process` nor a shell. `Support.swift` therefore stubs `Process` on iOS so that `run()` skips the test, and the six tests that call the shell inside an `XCTAssert` start with `try requireShell()`. They are reported as skipped on iOS, and still run on macOS and Linux. `tools/xcresult-junit` converts the result bundle into the `<bundle>.<Class>` JUnit naming that SwiftPM uses, so features.json references mean the same tests on mac and ios.
+
+Demo data moved into the `RackoonDemo` library (CryptoKit, so Apple platforms only): `DemoFleet` (servers, transports, fake shell script), `DemoTransport`, `DemoUpdatesTransport`, DemoLibrary/DemoFiles/DemoServices. The Mac keeps only its `enum Demo` wiring (temp folders, terminal script file), its views are untouched, and its demo tests now also `@testable import RackoonDemo`.
+
+Checked by hand in the simulator: demo list (Rackoon Light following the system), a fixed theme (Dracula) driving the whole UI, the empty state, and the Read-only chip. The toolbar draws a `Label` as its icon alone, so the chip is an icon plus "Read-only" text. Not checked by hand: tapping through Add/Edit/Trust (the simulator tool needed the user's approval). Those flows are unit-tested, and XCUITest flows are stage I7.
+
+Not built in I1: an app icon (needs an asset catalog), key sign-in, and anything that reads a server beyond the one-off Test Connection.

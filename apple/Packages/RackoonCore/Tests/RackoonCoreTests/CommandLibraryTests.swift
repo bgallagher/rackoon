@@ -94,6 +94,7 @@ final class CommandLibraryTests: XCTestCase {
     /// A program that lives only in /usr/sbin (as ufw, swapon and fail2ban-client do on Debian) is found even when the ssh
     /// user's PATH has no sbin directory. `chown` is in /usr/sbin on a Mac, so a stripped PATH exercises exactly that.
     func testProgramsInSbinAreFoundWithAMinimalPath() throws {
+        try requireShell()
         func run(needs: String) throws -> String {
             let c = LibraryCommand(id: "x", title: "x", group: "Disk", summary: "x", script: "echo RAN", needs: needs)
             let p = Process()

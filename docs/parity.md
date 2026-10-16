@@ -34,6 +34,13 @@ Every user-facing feature has one entry per platform:
 tools/check-parity --summary mac=apple/build/junit android=android/core/build/test-results/test,android/ssh/build/test-results/test
 ```
 
+The iOS report comes from the simulator: the app's test plan (`apple/Apps/RackoonIOS`, opened through `RackoonIOS.xcworkspace`) runs the app's own tests and the package tests that build for iOS (RackoonCore, RackoonSSHEmbedded, RackoonDemo) on iOS itself, and `tools/xcresult-junit` turns the result bundle into JUnit with the same `<bundle>.<Class>` names, so `RackoonCoreTests.ShellQuoteTests` means the same tests on mac and ios. Core tests that run a command in a real `/bin/sh` are skipped on iOS (no shell there), and a skip never counts.
+
+```bash
+(cd apple/Apps/RackoonIOS && xcodebuild test -workspace RackoonIOS.xcworkspace -scheme RackoonIOS -destination 'platform=iOS Simulator,name=iPhone 17' -resultBundlePath ../../build/ios.xcresult -skipPackagePluginValidation)
+tools/xcresult-junit apple/build/ios.xcresult apple/build/junit-ios/ios.xml
+```
+
 SwiftPM writes XCTest results as xUnit only with `--parallel`, and it reports a skipped XCTest as **passed**. The Swift lab tests are therefore left out of the main report with `--skip LabIntegrationTests` and come only from a run against the lab. Gradle reports skips correctly, and `check-parity` never counts a skip as proof.
 
 ## 2. Golden fixtures: `spec/fixtures/`

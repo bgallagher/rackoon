@@ -13,12 +13,32 @@ let macProducts: [Product] = [
 let macProducts: [Product] = []
 #endif
 
+// Demo mode's made-up servers, shared by the Mac and iOS apps (CryptoKit, so Apple platforms only).
+#if os(macOS)
+let appleProducts: [Product] = [.library(name: "RackoonDemo", targets: ["RackoonDemo"])]
+let appleTargets: [Target] = [
+    .target(
+        name: "RackoonDemo",
+        dependencies: ["RackoonCore"],
+        path: "Packages/RackoonDemo/Sources/RackoonDemo"
+    ),
+    .testTarget(
+        name: "RackoonDemoTests",
+        dependencies: ["RackoonDemo", "RackoonCore"],
+        path: "Packages/RackoonDemo/Tests/RackoonDemoTests"
+    ),
+]
+#else
+let appleProducts: [Product] = []
+let appleTargets: [Target] = []
+#endif
+
 #if os(macOS)
 let macTargets: [Target] = [
     .executableTarget(
         name: "RackoonMac",
         dependencies: [
-            "RackoonCore", "RackoonSSHSystem",
+            "RackoonCore", "RackoonSSHSystem", "RackoonDemo",
             .product(name: "SwiftTerm", package: "SwiftTerm"),
             "RackoonPTY",   // built alongside the app; found next to its executable at run time
         ],
@@ -40,7 +60,7 @@ let macTargets: [Target] = [
     .testTarget(
         // The Mac app's own logic that needs AppKit (icon images on disk, uploads) or its models.
         name: "RackoonMacTests",
-        dependencies: ["RackoonMac", "RackoonCore"],
+        dependencies: ["RackoonMac", "RackoonCore", "RackoonDemo"],
         path: "Apps/RackoonMac/Tests/RackoonMacTests"
     ),
 ]
@@ -55,7 +75,7 @@ let package = Package(
         .library(name: "RackoonCore", targets: ["RackoonCore"]),
         .library(name: "RackoonSSHSystem", targets: ["RackoonSSHSystem"]),
         .library(name: "RackoonSSHEmbedded", targets: ["RackoonSSHEmbedded"]),
-    ] + macProducts,
+    ] + appleProducts + macProducts,
     dependencies: [
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.99.0"),
         .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "1.0.1"),
@@ -93,5 +113,5 @@ let package = Package(
             dependencies: ["RackoonCore"],
             path: "Packages/RackoonCore/Tests/RackoonCoreTests"
         ),
-    ] + macTargets
+    ] + appleTargets + macTargets
 )

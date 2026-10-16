@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Convert an Xcode test result bundle into JUnit XML for tools/check-parity.
+
+    tools/xcresult-junit apple/build/ios.xcresult apple/build/junit-ios/ios.xml
+
+Test cases are named like SwiftPM's xUnit output, `<bundle>.<Class>` / `testMethod`, so a features.json reference such as
+`RackoonCoreTests.SharedScenarioTests/testShellQuote` means the same test on every Apple platform. Reads the result
+bundle with `xcrun xcresulttool get test-results tests` (Xcode 16 or later). A skipped test stays skipped, which
+check-parity never counts as proof; a failed or expected-failure-turned-pass stays failed.
+"""
+import json
+import subprocess
+import sys
+import xml.etree.ElementTree as ET
+
+
+def nodes(bundle):
+    out = subprocess.run(["xcrun", "xcresulttool", "get", "test-results", "tests", "--path", bundle],
+                         check=True, capture_output=True, text=True).stdout
+    return json.loads(out)["testNodes"]
+
+
+def cases(node, bundle=None, suite=None):
+    kind = node.get("nodeType")
+    if kind == "Unit test bundle" or kind == "UI test bundle":
+        bundle = node["name"]
+    elif kind == "Test Suite":
+        suite = node["name"]
+    elif kind == "Test Case":
+        yield bundle, suite, node
+        return
+    for child in node.get("children", []):
+        yield from cases(child, bundle, suite)
+
+
+def main(argv):
+    if len(argv) != 2:
+        raise SystemExit(__doc__)
+    bundle, out = argv
+    root = ET.Element("testsuites")
+    suites = {}
+    for top in nodes(bundle):
+        for test_bundle, suite, case in cases(top):
+            classname = f"{test_bundle}.{suite}" if test_bundle else suite
+            element = suites.get(classname)
+            if element is None:
+                element = suites[classname] = ET.SubElement(root, "testsuite", name=classname)
+            name = case["name"].removesuffix("()")
+            seconds = case.get("durationInSeconds", 0)
+            tc = ET.SubElement(element, "testcase", classname=classname, name=name, time=str(seconds))
+            result = case.get("result", "")
+            if result == "Skipped":
+                ET.SubElement(tc, "skipped")
+            elif result != "Passed":
+                messages = [c.get("name", "") for c in case.get("children", []) if c.get("nodeType") == "Failure Message"]
+                failure = ET.SubElement(tc, "failure", message=(messages[0] if messages else result)[:500])
+                failure.text = "\n".join(messages)
+    for element in suites.values():
+        tests = element.findall("testcase")
+        element.set("tests", str(len(tests)))
+        element.set("failures", str(sum(t.find("failure") is not None for t in tests)))
+        element.set("skipped", str(sum(t.find("skipped") is not None for t in tests)))
+    ET.ElementTree(root).write(out, encoding="utf-8", xml_declaration=True)
+    total = sum(len(e.findall("testcase")) for e in suites.values())
+    print(f"xcresult-junit: {total} test case(s) in {len(suites)} class(es) -> {out}")
+    if total == 0:
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

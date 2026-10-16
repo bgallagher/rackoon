@@ -90,6 +90,42 @@ jobs:
           retention-days: 14
           if-no-files-found: error
 
+  # The iOS app (apple/Apps/RackoonIOS) on the simulator. The workspace holds the app project and the Swift package, so its
+  # test plan runs the app's tests and the shared package tests that build for iOS (RackoonCore, RackoonSSHEmbedded,
+  # RackoonDemo) on iOS itself. The result bundle becomes junit-ios for the parity job.
+  ios:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pick an iPhone simulator
+        run: |
+          UDID="$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          phones = [d for runtime, ds in sorted(devices.items()) if "iOS" in runtime for d in ds if d["name"].startswith("iPhone")]
+          print(phones[-1]["udid"])')"
+          echo "SIMULATOR=$UDID" >> "$GITHUB_ENV"
+      - name: Build and test on the simulator
+        working-directory: apple/Apps/RackoonIOS
+        run: |
+          # -skipPackagePluginValidation: SwiftTerm (a package dependency) has a build-tool plugin xcodebuild would
+          # otherwise refuse to run without someone trusting it in Xcode.
+          xcodebuild test -workspace RackoonIOS.xcworkspace -scheme RackoonIOS -destination "id=$SIMULATOR" \
+            -resultBundlePath "$GITHUB_WORKSPACE/apple/build/ios.xcresult" \
+            -skipPackagePluginValidation -skipMacroValidation CODE_SIGNING_ALLOWED=NO
+      - name: Convert the results to JUnit
+        if: always()
+        run: |
+          mkdir -p apple/build/junit-ios
+          tools/xcresult-junit apple/build/ios.xcresult apple/build/junit-ios/ios.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-ios
+          path: apple/build/junit-ios/*.xml
+          retention-days: 7
+          if-no-files-found: error
+
   # Integration lab (test/lab, docs/parity.md): a throwaway Ubuntu server with Docker in containers on this runner, and
   # every transport's LabIntegrationTests against it. macOS runners have no Docker, so the Mac's OpenSSHTransport runs
   # here on Linux (same code, built in the swift:6.2 image with the repo mounted at the same path).
@@ -124,7 +160,8 @@ jobs:
       # MaxStartups accepts, and it drops some of them.
       - name: iOS (embedded SwiftNIO SSH transport, on Linux) lab checks
         run: |
-          eval "$(tools/lab env)"
+          labenv="$(tools/lab env)"
+          eval "$labenv"
           docker run --rm --network host -v "$PWD:$PWD" -w "$PWD/apple" \
             -e RACKOON_LAB -e RACKOON_LAB_HOST -e RACKOON_LAB_PORT -e RACKOON_LAB_USER -e RACKOON_LAB_SUDO_USER \
             -e RACKOON_LAB_SUDO_PASSWORD -e RACKOON_LAB_KEY -e RACKOON_LAB_KNOWN_HOSTS \
@@ -157,7 +194,7 @@ jobs:
   # Feature parity (docs/parity.md): every test spec/features.json names for a done feature must have run and passed in
   # that platform's JUnit report. Runs even when a test job failed, so the summary names what broke parity.
   parity:
-    needs: [spec, swift-macos, android-core, lab]
+    needs: [spec, swift-macos, android-core, ios, lab]
     if: always() && needs.spec.result == 'success'
     runs-on: ubuntu-latest
     steps:
@@ -167,8 +204,9 @@ jobs:
           pattern: junit-*
           path: junit
       - run: |
-          tools/check-parity --summary --require mac,android \
-            mac=junit/junit-mac,junit/junit-mac-lab android=junit/junit-android,junit/junit-android-lab | tee parity.txt
+          tools/check-parity --summary --require mac,android,ios \
+            mac=junit/junit-mac,junit/junit-mac-lab android=junit/junit-android,junit/junit-android-lab \
+            ios=junit/junit-ios,junit/junit-ios-lab | tee parity.txt
           status=${PIPESTATUS[0]}
           { echo '## Feature parity'; echo; cat parity.txt; } >> "$GITHUB_STEP_SUMMARY"
           exit $status
