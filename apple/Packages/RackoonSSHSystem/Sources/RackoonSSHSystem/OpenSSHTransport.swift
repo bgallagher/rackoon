@@ -21,6 +21,9 @@ public struct OpenSSHTransport: SSHTransport {
     private let port: Int?
     private let identityFile: String?
     private let controlDir: String
+    /// `-o` options put in front of every other option (ssh keeps the first value it sees, so these win). Empty in the app;
+    /// the integration lab's tests use it to point ssh at the lab's own known_hosts instead of ~/.ssh.
+    private let leadingOptions: [String]
 
     public init(server: Server) {
         self.init(destination: server.sshDestination, port: server.port, identityFile: server.identityFile)
@@ -30,11 +33,12 @@ public struct OpenSSHTransport: SSHTransport {
         self.init(destination: host, port: nil, identityFile: nil)
     }
 
-    private init(destination: String, port: Int?, identityFile: String?) {
+    init(destination: String, port: Int?, identityFile: String?, leadingOptions: [String] = []) {
         self.host = destination
         self.port = port
         self.identityFile = identityFile
         self.controlDir = Self.controlDirectory()
+        self.leadingOptions = leadingOptions
     }
 
     /// `-i <file> -o IdentitiesOnly=yes` when the server names a key file, so ssh offers that key and only that key (an
@@ -96,8 +100,10 @@ public struct OpenSSHTransport: SSHTransport {
         return args + identityArguments(server.identityFile) + [server.sshDestination]
     }
 
+    private var portArguments: [String] { port.map { ["-p", String($0)] } ?? [] }
+
     func baseArguments() -> [String] {
-        (port.map { ["-p", String($0)] } ?? []) + [
+        leadingOptions + portArguments + [
             "-o", "BatchMode=yes",
             "-o", "ConnectTimeout=10",
             "-o", "ServerAliveInterval=15",
@@ -142,14 +148,18 @@ public struct OpenSSHTransport: SSHTransport {
     /// It uses its own connection, never the shared ControlMaster socket: a multiplexing client hands its stdin to
     /// whatever answers on that socket.
     public func run(_ command: String, input: String, timeout: TimeInterval) async throws -> CommandResult {
-        let arguments = Arguments((port.map { ["-p", String($0)] } ?? []) + [
+        // Built in steps: one long `+` chain is too slow for the compiler to type-check on Linux.
+        var args: [String] = leadingOptions + portArguments
+        args += [
             "-o", "BatchMode=yes",
             "-o", "ConnectTimeout=10",
             "-o", "ServerAliveInterval=15",
             "-o", "ControlMaster=no",
             "-o", "ControlPath=none",
             "-e", "none",
-        ] + Self.strictHostKeyArguments + Self.identityArguments(identityFile) + [host, command])
+        ]
+        args += Self.strictHostKeyArguments + Self.identityArguments(identityFile) + [host, command]
+        let arguments = Arguments(args)
         do {
             return try await withThrowingTaskGroup(of: CommandResult?.self) { group in
                 group.addTask {
@@ -203,7 +213,8 @@ public struct OpenSSHTransport: SSHTransport {
     }
 
     private func stream(_ command: String, typing: AsyncStream<String>?) -> AsyncThrowingStream<String, Error> {
-        let args = ["-tt"] + (port.map { ["-p", String($0)] } ?? []) + [
+        var built: [String] = ["-tt"] + leadingOptions + portArguments
+        built += [
             "-o", "BatchMode=yes",
             "-o", "ConnectTimeout=10",
             "-o", "ServerAliveInterval=15",
@@ -212,7 +223,10 @@ public struct OpenSSHTransport: SSHTransport {
             // With a pty, ssh reads `~` at the start of a line as its escape character (`~.` drops the connection), which
             // would mangle a typed password starting with `~`. Nothing typed into a stream is meant for ssh itself.
             "-e", "none",
-        ] + (typing == nil ? [] : Self.strictHostKeyArguments) + Self.identityArguments(identityFile) + [host, command]
+        ]
+        if typing != nil { built += Self.strictHostKeyArguments }
+        built += Self.identityArguments(identityFile) + [host, command]
+        let args = built   // a constant: the task below must not capture something mutable
         return AsyncThrowingStream { continuation in
             let input = StdinBox()
             var options = PlatformOptions()

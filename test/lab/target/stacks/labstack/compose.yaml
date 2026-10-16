@@ -1,0 +1,8 @@
+# The lab's one compose stack: a container that prints a line every second, so logs always have something to follow.
+services:
+  ticker:
+    image: busybox:1.36
+    command: ["sh", "-c", "while true; do echo tick $$(date +%s); sleep 1; done"]
+    labels:
+      homepage.name: Ticker
+      homepage.href: http://lab.invalid:8080

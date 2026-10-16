@@ -1,0 +1,21 @@
+{
+  "subject": "shell_quote",
+  "about": "ShellQuote.quote / quotePath: one literal shell word, or null (nothing is sent) for values no word can carry. Every core runs this; there is no feature field because every command depends on it.",
+  "cases": [
+    {"name": "plain word", "fn": "quote", "input": "web", "expect": "'web'"},
+    {"name": "spaces stay one word", "fn": "quote", "input": "my stack", "expect": "'my stack'"},
+    {"name": "embedded single quote", "fn": "quote", "input": "it's", "expect": "'it'\\''s'"},
+    {"name": "command substitution is literal", "fn": "quote", "input": "$(reboot)", "expect": "'$(reboot)'"},
+    {"name": "backticks and semicolons are literal", "fn": "quote", "input": "a;`id`", "expect": "'a;`id`'"},
+    {"name": "leading dash is just text", "fn": "quote", "input": "-rf", "expect": "'-rf'"},
+    {"name": "unicode passes through", "fn": "quote", "input": "café ☕", "expect": "'café ☕'"},
+    {"name": "empty is refused", "fn": "quote", "input": "", "expect": null},
+    {"name": "newline is refused", "fn": "quote", "input": "a\nb", "expect": null},
+    {"name": "carriage return is refused", "fn": "quote", "input": "a\rb", "expect": null},
+    {"name": "NUL is refused", "fn": "quote", "input": "a\u0000b", "expect": null},
+    {"name": "absolute path", "fn": "quotePath", "input": "/srv/my app/compose.yaml", "expect": "'/srv/my app/compose.yaml'"},
+    {"name": "relative path is refused", "fn": "quotePath", "input": "srv/compose.yaml", "expect": null},
+    {"name": "home-relative path is refused", "fn": "quotePath", "input": "~/compose.yaml", "expect": null},
+    {"name": "path with a quote", "fn": "quotePath", "input": "/srv/bob's", "expect": "'/srv/bob'\\''s'"}
+  ]
+}

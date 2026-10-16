@@ -1,0 +1,8 @@
+#!/bin/sh
+# The lab has no systemd. `systemctl reboot` is recorded instead of rebooting (the reboot test checks the marker);
+# everything else answers like a system with no units.
+case "${1:-}" in
+  reboot) mkdir -p /run/rackoon-lab && date +%s > /run/rackoon-lab/reboot-requested; exit 0 ;;
+  show|list-units|list-unit-files) exit 0 ;;
+  *) exit 0 ;;
+esac

@@ -1,3 +1,6 @@
+// Apple-only: the saved sudo password is sealed with the Secure Enclave (CryptoKit, LocalAuthentication). On Linux,
+// where only the integration lab's tests build this module, it is left out.
+#if canImport(CryptoKit) && canImport(LocalAuthentication)
 import Foundation
 import XCTest
 import RackoonCore
@@ -118,3 +121,4 @@ final class SSHResolvedTests: XCTestCase {
         XCTAssertEqual(r, SSHResolved(user: "probe", hostname: "198.51.100.7", port: 2200), "ssh -G applies settings without connecting")
     }
 }
+#endif

@@ -1,0 +1,21 @@
+{
+  "feature": "servers.edit",
+  "subject": "server_input",
+  "about": "ServerInput.problem(host, user, port): whether the connection fields can be saved. Only acceptance is shared (ok true/false); the wording of the problem is each app's own. A blank user or port is fine (the defaults apply).",
+  "cases": [
+    {"name": "hostname", "host": "example.com", "user": "root", "port": "22", "ok": true},
+    {"name": "ssh config alias", "host": "homelab", "user": "", "port": "", "ok": true},
+    {"name": "IPv4 and custom port", "host": "100.64.0.1", "user": "andy", "port": "2222", "ok": true},
+    {"name": "surrounding spaces are trimmed", "host": "  homelab ", "user": " root ", "port": " 22 ", "ok": true},
+    {"name": "empty host", "host": "", "user": "root", "port": "22", "ok": false},
+    {"name": "host that would be an ssh option", "host": "-oProxyCommand=id", "user": "root", "port": "22", "ok": false},
+    {"name": "user that would be an ssh option", "host": "homelab", "user": "-l", "port": "22", "ok": false},
+    {"name": "space inside host", "host": "home lab", "user": "root", "port": "22", "ok": false},
+    {"name": "space inside user", "host": "homelab", "user": "a b", "port": "22", "ok": false},
+    {"name": "user with @", "host": "homelab", "user": "a@b", "port": "22", "ok": false},
+    {"name": "port not a number", "host": "homelab", "user": "root", "port": "ssh", "ok": false},
+    {"name": "port zero", "host": "homelab", "user": "root", "port": "0", "ok": false},
+    {"name": "port too large", "host": "homelab", "user": "root", "port": "65536", "ok": false},
+    {"name": "highest port", "host": "homelab", "user": "root", "port": "65535", "ok": true}
+  ]
+}

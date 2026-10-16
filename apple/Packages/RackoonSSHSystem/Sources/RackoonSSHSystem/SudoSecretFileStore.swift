@@ -1,3 +1,6 @@
+// Apple-only: the saved sudo password is sealed with the Secure Enclave (CryptoKit, LocalAuthentication). On Linux,
+// where only the integration lab's tests build this module, it is left out.
+#if canImport(CryptoKit) && canImport(LocalAuthentication)
 import CryptoKit
 import Foundation
 import LocalAuthentication
@@ -254,3 +257,4 @@ extension OpenSSHTransport {
         return SSHResolved.parse(String(decoding: result.standardOutput, as: UTF8.self))
     }
 }
+#endif

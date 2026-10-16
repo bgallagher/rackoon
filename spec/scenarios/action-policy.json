@@ -1,0 +1,15 @@
+{
+  "feature": "safety.confirm",
+  "subject": "action_policy",
+  "about": "ActionPolicy: a mutation runs only with a confirmation for that exact intent (summary, command, risk and preview), and never while read-only, checked again at run time. Reads always run. 'confirm' is the intent shown to the user (null = never confirmed), 'readOnlyAtRun' flips the switch between confirming and running. Expect ok, read_only or not_confirmed; 'expectConfirm' is what confirming itself gives.",
+  "cases": [
+    {"name": "read runs without confirmation", "readOnly": false, "confirm": null, "run": {"summary": "List", "command": "docker ps", "risk": "read"}, "expect": "ok"},
+    {"name": "read runs while read-only", "readOnly": true, "confirm": null, "run": {"summary": "List", "command": "docker ps", "risk": "read"}, "expect": "ok"},
+    {"name": "confirmed mutation runs", "readOnly": false, "confirm": {"summary": "Restart web", "command": "docker restart abcdef012345", "risk": "mutate"}, "run": {"summary": "Restart web", "command": "docker restart abcdef012345", "risk": "mutate"}, "expect": "ok"},
+    {"name": "unconfirmed mutation is refused", "readOnly": false, "confirm": null, "run": {"summary": "Restart web", "command": "docker restart abcdef012345", "risk": "mutate"}, "expect": "not_confirmed"},
+    {"name": "confirmation for another command is refused", "readOnly": false, "confirm": {"summary": "Restart web", "command": "docker restart abcdef012345", "risk": "mutate"}, "run": {"summary": "Restart web", "command": "docker restart 999999999999", "risk": "mutate"}, "expect": "not_confirmed"},
+    {"name": "confirmation with another preview is refused", "readOnly": false, "confirm": {"summary": "Save", "command": "save", "risk": "mutate", "preview": "- a\n+ b"}, "run": {"summary": "Save", "command": "save", "risk": "mutate", "preview": "- a\n+ c"}, "expect": "not_confirmed"},
+    {"name": "confirming a mutation while read-only fails", "readOnly": true, "confirm": {"summary": "Stop web", "command": "docker stop abcdef012345", "risk": "mutate"}, "expectConfirm": "read_only", "run": {"summary": "Stop web", "command": "docker stop abcdef012345", "risk": "mutate"}, "expect": "read_only"},
+    {"name": "read-only switched on after confirming still refuses", "readOnly": false, "readOnlyAtRun": true, "confirm": {"summary": "Stop web", "command": "docker stop abcdef012345", "risk": "mutate"}, "run": {"summary": "Stop web", "command": "docker stop abcdef012345", "risk": "mutate"}, "expect": "read_only"}
+  ]
+}

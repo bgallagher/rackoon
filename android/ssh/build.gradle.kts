@@ -33,5 +33,11 @@ tasks.test {
     useJUnitPlatform()
     // Tests that need a real server only run when RACKOON_SSH_HOST is set (never in CI).
     environment("RACKOON_SSH_HOST", System.getenv("RACKOON_SSH_HOST") ?: "")
+    // The integration lab (tools/lab up; eval "$(tools/lab env)"). Without it LabIntegrationTests skip themselves.
+    for (name in listOf("RACKOON_LAB", "RACKOON_LAB_HOST", "RACKOON_LAB_PORT", "RACKOON_LAB_USER", "RACKOON_LAB_KEY", "RACKOON_LAB_KNOWN_HOSTS")) {
+        environment(name, System.getenv(name) ?: "")
+    }
+    systemProperty("rackoon.spec", rootProject.projectDir.parentFile.resolve("spec").path)
+    inputs.dir(rootProject.projectDir.parentFile.resolve("spec")).withPropertyName("spec")
     testLogging { events("failed"); exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL }
 }

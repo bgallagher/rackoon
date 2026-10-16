@@ -127,7 +127,106 @@ for t in themes:
     if len(ansi) != 16 or not all(hexre.match(str(c)) for c in ansi):
         errors.append(f"themes.json: {tid}: needs exactly 16 valid ANSI colours")
 
+# Feature parity matrix (docs/parity.md): every feature has an entry for every platform; done names its tests (or says
+# why it has none), planned and na say why; every spec command belongs to a feature. Whether the named tests really ran
+# and passed is tools/check-parity's job, from each platform's JUnit report.
+PLATFORMS = ["mac", "android", "ios", "web"]
+features_doc = load("features.json")
+features = features_doc.get("features", [])
+if features_doc and features_doc.get("platforms") != PLATFORMS:
+    errors.append(f"features.json: platforms must be {PLATFORMS}")
+feature_ids = [f.get("id") for f in features]
+if len(feature_ids) != len(set(feature_ids)):
+    errors.append("features.json: duplicate feature ids")
+idre = re.compile(r"^[a-z][a-z0-9-]*(\.[a-z0-9-]+)*$")
+testre = re.compile(r"^[A-Za-z_][\w.]*(/[\w()\[\] ,.-]+)?$")
+claimed = {}
+untested = 0
+for f in features:
+    fid = f.get("id") or "?"
+    if not idre.match(fid):
+        errors.append(f"features.json: bad feature id {fid!r}")
+    if not f.get("title"):
+        errors.append(f"features.json: {fid} has no title")
+    for cid in f.get("commands", []):
+        if cid not in ids:
+            errors.append(f"features.json: {fid} names unknown command {cid!r}")
+        claimed.setdefault(cid, []).append(fid)
+    entries = f.get("platforms", {})
+    if sorted(entries) != sorted(PLATFORMS):
+        errors.append(f"features.json: {fid} needs exactly one entry per platform {PLATFORMS}, has {sorted(entries)}")
+    for p, e in entries.items():
+        status = e.get("status")
+        where = f"features.json: {fid}/{p}"
+        if status not in ("done", "planned", "na"):
+            errors.append(f"{where}: status must be done, planned or na")
+        elif status == "done":
+            tests = e.get("tests", [])
+            if not tests and not e.get("untested"):
+                errors.append(f"{where}: done needs 'tests', or an 'untested' reason")
+            for t in tests:
+                if not testre.match(t):
+                    errors.append(f"{where}: test {t!r} is not Class or Class/method")
+            if e.get("untested"):
+                untested += 1
+            if e.get("reason"):
+                errors.append(f"{where}: a done entry has no 'reason' (use 'untested' for a missing test)")
+        elif not str(e.get("reason", "")).strip():
+            errors.append(f"{where}: {status} needs a 'reason'")
+# Shared behaviour scenarios (spec/scenarios/*.json): each core runs a file only while its feature is done there, so
+# the feature must exist; a file without a feature runs on every core.
+scenario_subjects = {}
+for path in sorted((spec / "scenarios").glob("*.json")):
+    name = f"scenarios/{path.name}"
+    try:
+        doc = json.loads(path.read_text())
+    except Exception as e:
+        errors.append(f"{name}: {e}")
+        continue
+    if doc.get("feature") is not None and doc["feature"] not in feature_ids:
+        errors.append(f"{name}: unknown feature {doc['feature']!r}")
+    if not re.fullmatch(r"[a-z][a-z0-9_]*", str(doc.get("subject", ""))):
+        errors.append(f"{name}: needs a snake_case 'subject'")
+    elif doc["subject"] in scenario_subjects:
+        errors.append(f"{name}: subject {doc['subject']!r} is already used by {scenario_subjects[doc['subject']]}")
+    else:
+        scenario_subjects[doc["subject"]] = name
+    if not doc.get("about"):
+        errors.append(f"{name}: needs an 'about' saying what is checked")
+    cases = doc.get("cases")
+    if not isinstance(cases, list) or not cases:
+        errors.append(f"{name}: needs a non-empty 'cases' list")
+        continue
+    names = [c.get("name") for c in cases if isinstance(c, dict)]
+    if len(names) != len(cases) or not all(names):
+        errors.append(f"{name}: every case needs a 'name'")
+    elif len(names) != len(set(names)):
+        errors.append(f"{name}: duplicate case names")
+
+# Integration lab checks (spec/integration/checks.json, run against test/lab by every transport): same feature gating.
+integration = load("integration/checks.json")
+check_ids = [c.get("id") for c in integration.get("checks", [])]
+if integration and not check_ids:
+    errors.append("integration/checks.json: no checks")
+if len(check_ids) != len(set(check_ids)):
+    errors.append("integration/checks.json: duplicate check ids")
+for c in integration.get("checks", []):
+    cid = c.get("id") or "?"
+    if not re.fullmatch(r"[a-z][a-z0-9_]*", cid):
+        errors.append(f"integration/checks.json: bad check id {cid!r}")
+    if c.get("feature") not in feature_ids:
+        errors.append(f"integration/checks.json: {cid} names unknown feature {c.get('feature')!r}")
+    if not c.get("about"):
+        errors.append(f"integration/checks.json: {cid} needs an 'about'")
+
+for cid in ids:
+    if cid not in claimed:
+        errors.append(f"features.json: command {cid!r} belongs to no feature")
+    elif len(claimed[cid]) > 1:
+        errors.append(f"features.json: command {cid!r} is claimed by {claimed[cid]}")
+
 if errors:
     print("\n".join(errors))
     sys.exit(1)
-print(f"spec ok: {len(commands)} command(s), {len(themes)} theme(s)")
+print(f"spec ok: {len(commands)} command(s), {len(themes)} theme(s), {len(features)} feature(s)"
+      + (f", {untested} done without a test" if untested else ""))
