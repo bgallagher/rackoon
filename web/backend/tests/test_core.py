@@ -9,7 +9,7 @@ from pathlib import Path
 import jsonschema
 import pytest
 
-from rackoon.core import command_library, docker, overview, remote_files, shell, spec, stream, themes, updates
+from rackoon.core import command_library, docker, overview, remote_files, services, shell, spec, stream, themes, updates
 from rackoon.core.jsonmodel import to_json
 from rackoon.core.models import Server
 from rackoon.core.policy import ActionPolicy, Confirmation, Intent, NotConfirmed, ReadOnly, Risk
@@ -222,3 +222,15 @@ def test_listing_refuses_relative_paths() -> None:
     assert remote_files.list_command("relative") is None
     command = remote_files.list_command("/srv/it's here")
     assert command is not None and command.startswith("cd -P -- '/srv/it'\\''s here' ")
+
+
+def test_service_catalog_comes_from_the_spec() -> None:
+    raw = spec.load_json("service-catalog.json")
+    catalog = services.catalog()
+    assert [p.id for p in catalog.products] == [p["id"] for p in raw["products"]]
+    assert services.product_for("tailscaled.service").id == "tailscale"
+    assert services.product_for("actions.runner.org-repo.box.service").id == "github-runner"
+    assert services.product_for("getty@tty1.service") is None
+    assert services.is_plumbing("getty@tty1.service") and services.is_plumbing("systemd-journald")
+    assert services.is_container_helper("containerd-shim-runc-v2")
+    assert services.process_name("python3.12", "python3.12 /opt/app/paperless.py") == "paperless"

@@ -99,6 +99,53 @@ for c in library.get("commands", []):
 if len(lib_ids) != len(set(lib_ids)):
     errors.append("command-library.json: duplicate ids")
 
+# Service catalog (Services screen): names are compared as base names (lower-case, no .service, no @instance, _ as -),
+# so anything else could never match.
+catalog = load("service-catalog.json")
+basere = re.compile(r"[a-z0-9][a-z0-9.+-]*")
+def base_names(where, values):
+    if not isinstance(values, list) or not values:
+        errors.append(f"service-catalog.json: {where} must be a non-empty list")
+        return []
+    for v in values:
+        if not isinstance(v, str) or not basere.fullmatch(v) or v.endswith(".service"):
+            errors.append(f"service-catalog.json: {where} has {v!r}, which is not a base name")
+    if len(values) != len(set(map(str, values))):
+        errors.append(f"service-catalog.json: {where} has duplicates")
+    return values
+list_keys = ("plumbing", "plumbingPrefixes", "plumbingProcesses", "containerHelpers", "interpreters", "helpers")
+if catalog:
+    extra = set(catalog) - {"about", "products", *list_keys}
+    if extra:
+        errors.append(f"service-catalog.json: unknown keys {sorted(extra)}")
+    for key in list_keys:
+        base_names(key, catalog.get(key))
+    products = catalog.get("products") or []
+    if not products:
+        errors.append("service-catalog.json: no products")
+    owner = {}
+    for p in products:
+        pid = p.get("id") or "?"
+        if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", pid):
+            errors.append(f"service-catalog.json: bad product id {pid!r}")
+        if set(p) - {"id", "name", "icon", "names", "prefixes", "hiddenByDefault"}:
+            errors.append(f"service-catalog.json: {pid} has unknown keys {sorted(set(p) - {'id', 'name', 'icon', 'names', 'prefixes', 'hiddenByDefault'})}")
+        if not isinstance(p.get("name"), str) or not p["name"].strip():
+            errors.append(f"service-catalog.json: {pid} needs a 'name'")
+        if "icon" in p and not (isinstance(p["icon"], str) and basere.fullmatch(p["icon"])):
+            errors.append(f"service-catalog.json: {pid} has a bad icon {p['icon']!r}")
+        if "hiddenByDefault" in p and not isinstance(p["hiddenByDefault"], bool):
+            errors.append(f"service-catalog.json: {pid} hiddenByDefault must be true or false")
+        for n in base_names(f"{pid} names", p.get("names")):
+            if n in owner:   # the first product wins, so the later one could never match it
+                errors.append(f"service-catalog.json: {n!r} is a name of both {owner[n]} and {pid}")
+            owner.setdefault(n, pid)
+        if "prefixes" in p:
+            base_names(f"{pid} prefixes", p["prefixes"])
+    pids = [p.get("id") for p in products]
+    if len(pids) != len(set(pids)):
+        errors.append("service-catalog.json: duplicate product ids")
+
 # Terminal themes (app resource, same rules as ThemeCatalog.validate in Swift)
 import re
 hexre = re.compile(r"^#[0-9A-Fa-f]{6}$")

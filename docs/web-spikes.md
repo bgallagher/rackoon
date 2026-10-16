@@ -97,6 +97,6 @@ Needs a real server that runs Tailscale SSH, run read-only. None was supplied fo
 - **CI:** the `web-core` job runs mypy and pytest (JUnit `junit-web`, refs like `tests.test_shared_scenarios/test_shell_quote`), then the scenarios once more with `RACKOON_PARITY_ALL=1`. The parity job requires `web`. `core.shell-safety` is now done for web.
 
 Notes for later stages:
-- `ServiceCatalog` (product names, plumbing lists) is data only the Swift core had, now copied into `services.py`. It should move to `spec/` so the cores can't drift; the services fixtures cover the names they use, nothing more.
+- `ServiceCatalog` (product names, plumbing lists, interpreters, helpers) now lives in `spec/service-catalog.json`: `services.py` reads it at runtime (`catalog()`), the Swift constants are held equal to it by `ServicesTests.testCatalogMatchesTheSpecFile`, and `tools/check-spec` validates it.
 - The Python `DockerContainer` carries `iconURL` (Unraid template icons) like Swift; the Kotlin core does not have it yet.
 - The CI `lab` job does not run the Python lab checks yet: gated, they would all skip. Add it when the first lab-checked feature (W3's overview) is done for web.

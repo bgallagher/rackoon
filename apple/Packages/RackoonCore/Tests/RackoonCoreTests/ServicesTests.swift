@@ -199,6 +199,30 @@ final class ServicesTests: XCTestCase {
         XCTAssertEqual(Set(ServiceCatalog.products.map(\.id)).count, ServiceCatalog.products.count)
     }
 
+    /// The Swift catalog must equal spec/service-catalog.json, which the other cores read at runtime. Edit the spec
+    /// first, then these constants. Product order matters (the first match wins); the sets are compared as sets.
+    func testCatalogMatchesTheSpecFile() throws {
+        let url = specDir.appendingPathComponent("service-catalog.json")
+        let spec = try XCTUnwrap(JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? [String: Any])
+        let products: [NSDictionary] = ServiceCatalog.products.map { p in
+            var d: [String: Any] = ["id": p.id, "name": p.name, "names": p.names]
+            if let icon = p.icon { d["icon"] = icon }
+            if !p.prefixes.isEmpty { d["prefixes"] = p.prefixes }
+            if p.hiddenByDefault { d["hiddenByDefault"] = true }
+            return d as NSDictionary
+        }
+        XCTAssertEqual(spec["products"] as? [NSDictionary], products)
+        func list(_ key: String) -> [String] { spec[key] as? [String] ?? [] }
+        XCTAssertEqual(Set(list("plumbing")), ServiceCatalog.plumbing)
+        XCTAssertEqual(list("plumbingPrefixes"), ServiceCatalog.plumbingPrefixes)
+        XCTAssertEqual(Set(list("plumbingProcesses")), ServiceCatalog.plumbingProcesses)
+        XCTAssertEqual(list("containerHelpers"), ServiceCatalog.containerHelpers)
+        XCTAssertEqual(list("interpreters"), ServiceDiscovery.interpreters)
+        XCTAssertEqual(Set(list("helpers")), ServiceDiscovery.helpers)
+        // Each set-valued list is held without duplicates, so the comparison as sets loses nothing.
+        for key in ["plumbing", "plumbingProcesses", "helpers"] { XCTAssertEqual(Set(list(key)).count, list(key).count, key) }
+    }
+
     func testPortLinks() {
         XCTAssertEqual(ServicePort(address: "0.0.0.0", port: 80).linkHost(preferred: "100.64.0.10"), "100.64.0.10")
         XCTAssertEqual(ServicePort(address: "*", port: 80).linkHost(preferred: "192.168.1.20"), "192.168.1.20")

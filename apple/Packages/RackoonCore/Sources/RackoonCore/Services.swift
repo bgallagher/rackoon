@@ -185,6 +185,8 @@ public struct ServiceProduct: Sendable, Equatable {
     }
 }
 
+/// Mirrors spec/service-catalog.json (the source of truth the other cores read at runtime): edit the spec first, then
+/// these constants; `ServicesTests.testCatalogMatchesTheSpecFile` holds them equal.
 public enum ServiceCatalog {
     public static let products: [ServiceProduct] = [
         ServiceProduct("tailscale", "Tailscale", icon: "tailscale", names: ["tailscaled", "tailscale"]),
@@ -426,7 +428,7 @@ public enum ServiceDiscovery {
         return .loose(cgroup)
     }
 
-    /// Interpreters and launchers: the program they run says more than their own name.
+    /// Interpreters and launchers: the program they run says more than their own name. (spec/service-catalog.json)
     static let interpreters = ["node", "nodejs", "python", "java", "ruby", "php", "perl", "bun", "deno", "sh", "bash", "dotnet",
                                "npm", "npx", "uv", "uvx", "pnpm", "yarn", "mono", "pwsh", "env"]
     /// Databases and caches an app starts for itself: grouped with that app when it is the only other thing in its session.

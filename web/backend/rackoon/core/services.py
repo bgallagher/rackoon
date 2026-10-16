@@ -5,13 +5,15 @@ One read-only command lists every loaded systemd service (the system's and the s
 TCP sockets and, per listening process, its command line and cgroup. The cgroup ties a port to its unit and tells a
 process started by hand (a login session) from one a unit runs. Containers are left to the Docker screen.
 
-`ServiceCatalog` is data that only Swift had; it is copied here and should move to spec/ (see docs/web-spikes.md).
+Which names are known products, OS plumbing or interpreters is data shared by every core: spec/service-catalog.json,
+read at runtime (`catalog()`).
 """
 
 from __future__ import annotations
 
 import enum
 from dataclasses import dataclass, field
+from functools import cache
 
 from . import spec
 from .text import split_sections, to_float, to_int, trim_blanks
@@ -172,111 +174,40 @@ class ServiceProduct:
     hidden_by_default: bool = False
 
 
-def _p(id: str, name: str, icon: str | None, *names: str, prefixes: tuple[str, ...] = (),
-       hidden: bool = False) -> ServiceProduct:
-    return ServiceProduct(id, name, icon, names, prefixes, hidden)
+@dataclass(frozen=True)
+class ServiceCatalog:
+    """spec/service-catalog.json: known products, OS plumbing and the process names discovery treats specially."""
+    products: tuple[ServiceProduct, ...]
+    plumbing: frozenset[str]
+    plumbing_prefixes: tuple[str, ...]
+    plumbing_processes: frozenset[str]
+    container_helpers: tuple[str, ...]
+    interpreters: tuple[str, ...]
+    helpers: frozenset[str]
 
 
-PRODUCTS: tuple[ServiceProduct, ...] = (
-    _p("tailscale", "Tailscale", "tailscale", "tailscaled", "tailscale"),
-    _p("wazuh-agent", "Wazuh agent", "wazuh", "wazuh-agent"),
-    _p("wazuh-manager", "Wazuh manager", "wazuh", "wazuh-manager"),
-    _p("wazuh-indexer", "Wazuh indexer", "wazuh", "wazuh-indexer"),
-    _p("wazuh-dashboard", "Wazuh dashboard", "wazuh", "wazuh-dashboard"),
-    _p("beszel-agent", "Beszel agent", "beszel", "beszel-agent"),
-    _p("beszel", "Beszel hub", "beszel", "beszel", "beszel-hub"),
-    _p("pi-hole", "Pi-hole", "pi-hole", "pihole-ftl", "pihole", "pi-hole"),
-    _p("hermes-gateway", "Hermes Agent gateway", "hermes", "hermes-gateway"),
-    _p("hermes", "Hermes Agent", "hermes", "hermes", "hermes-agent"),
-    _p("paperclip", "Paperclip", None, "paperclip", "paperclipai"),
-    _p("github-runner", "GitHub Actions runner", "github", "github-runner", prefixes=("actions.runner.",)),
-    _p("gitlab-runner", "GitLab runner", "gitlab", "gitlab-runner"),
-    _p("code-server", "code-server", "code-server", "code-server"),
-    _p("docker", "Docker Engine", "docker", "docker", "dockerd"),
-    _p("containerd", "containerd", None, "containerd", hidden=True),
-    _p("ssh", "OpenSSH server", None, "ssh", "sshd", hidden=True),
-    _p("nginx", "nginx", "nginx", "nginx"),
-    _p("caddy", "Caddy", "caddy", "caddy"),
-    _p("apache", "Apache HTTP Server", "apache", "apache2", "httpd"),
-    _p("haproxy", "HAProxy", "haproxy", "haproxy"),
-    _p("traefik", "Traefik", "traefik", "traefik"),
-    _p("postgresql", "PostgreSQL", "postgresql", "postgresql", "postgres"),
-    _p("mysql", "MySQL", "mysql", "mysql", "mysqld"),
-    _p("mariadb", "MariaDB", "mariadb", "mariadb", "mariadbd"),
-    _p("redis", "Redis", "redis", "redis-server", "redis"),
-    _p("mongodb", "MongoDB", "mongodb", "mongod", "mongodb"),
-    _p("cloudflared", "Cloudflare Tunnel", "cloudflare", "cloudflared"),
-    _p("wireguard", "WireGuard", "wireguard", "wg-quick", "wireguard"),
-    _p("openvpn", "OpenVPN", "openvpn", "openvpn-server", "openvpn-client"),
-    _p("zerotier", "ZeroTier", "zerotier", "zerotier-one"),
-    _p("netbird", "NetBird", "netbird", "netbird"),
-    _p("headscale", "Headscale", "headscale", "headscale"),
-    _p("crowdsec", "CrowdSec", "crowdsec", "crowdsec", "crowdsec-firewall-bouncer"),
-    _p("fail2ban", "Fail2ban", "fail2ban", "fail2ban"),
-    _p("netdata", "Netdata", "netdata", "netdata"),
-    _p("prometheus", "Prometheus", "prometheus", "prometheus"),
-    _p("node-exporter", "Node exporter", "prometheus", "prometheus-node-exporter", "node-exporter"),
-    _p("grafana", "Grafana", "grafana", "grafana-server", "grafana"),
-    _p("loki", "Loki", "loki", "loki"),
-    _p("promtail", "Promtail", "loki", "promtail"),
-    _p("uptime-kuma", "Uptime Kuma", "uptime-kuma", "uptime-kuma"),
-    _p("syncthing", "Syncthing", "syncthing", "syncthing"),
-    _p("samba", "Samba", None, "smbd", "nmbd", "samba"),
-    _p("nfs", "NFS server", None, "nfs-server", "nfs-kernel-server"),
-    _p("jellyfin", "Jellyfin", "jellyfin", "jellyfin"),
-    _p("plex", "Plex", "plex", "plexmediaserver", "plex-media-server"),
-    _p("home-assistant", "Home Assistant", "home-assistant", "home-assistant", "homeassistant"),
-    _p("node-red", "Node-RED", "node-red", "node-red", "nodered"),
-    _p("mosquitto", "Mosquitto", "mosquitto", "mosquitto"),
-    _p("ollama", "Ollama", "ollama", "ollama"),
-    _p("cockpit", "Cockpit", "cockpit", "cockpit"),
-    _p("webmin", "Webmin", "webmin", "webmin"),
-    _p("unbound", "Unbound", "unbound", "unbound"),
-    _p("adguard-home", "AdGuard Home", "adguard-home", "adguardhome", "adguard-home"),
-    _p("minio", "MinIO", "minio", "minio"),
-    _p("k3s", "k3s", None, "k3s", "k3s-agent"),
-    _p("gitea", "Gitea", "gitea", "gitea"),
-    _p("forgejo", "Forgejo", "forgejo", "forgejo"),
-    _p("jenkins", "Jenkins", "jenkins", "jenkins"),
-    _p("vault", "Vault", "vault", "vault"),
-    _p("consul", "Consul", "consul", "consul"),
-    _p("nomad", "Nomad", "nomad", "nomad"),
-    _p("tor", "Tor", "tor", "tor"),
-    _p("frigate", "Frigate", "frigate", "frigate"),
-    _p("zigbee2mqtt", "Zigbee2MQTT", "zigbee2mqtt", "zigbee2mqtt"),
-    _p("ntfy", "ntfy", "ntfy", "ntfy"),
-    _p("gotify", "Gotify", "gotify", "gotify"),
-    _p("authelia", "Authelia", "authelia", "authelia"),
-    _p("restic", "restic", "restic", "restic", "restic-rest-server", "rest-server"),
-    _p("borg", "Borg", "borg", "borgmatic", "borg"),
-)
-
-PLUMBING = frozenset({
-    "dbus", "dbus-broker", "getty", "serial-getty", "user", "user-runtime-dir", "polkit", "udisks2", "upower",
-    "modemmanager", "networkmanager", "networkmanager-wait-online", "networkmanager-dispatcher", "networkd-dispatcher",
-    "wpa-supplicant", "bluetooth", "avahi-daemon", "cups", "cups-browsed", "rtkit-daemon", "iio-sensor-proxy", "bolt",
-    "fwupd", "thermald", "rsyslog", "syslog", "cron", "crond", "anacron", "atd", "chrony", "chronyd", "ntp", "ntpd",
-    "ntpsec", "irqbalance", "multipathd", "snapd", "packagekit", "accounts-daemon", "colord", "gdm", "gdm3", "lightdm",
-    "sddm", "display-manager", "power-profiles-daemon", "switcheroo-control", "kerneloops", "whoopsie", "apport",
-    "unattended-upgrades", "rpcbind", "rpc-statd", "rpc-statd-notify", "open-vm-tools", "vgauth", "qemu-guest-agent",
-    "console-setup", "keyboard-setup", "setvtrgb", "apparmor", "ufw", "mdmonitor", "pipewire", "pipewire-pulse",
-    "wireplumber", "filter-chain", "mpris-proxy", "haveged", "rngd", "kdump-tools", "sysstat", "netplan-configure",
-    "dracut-shutdown", "alsa-restore", "alsa-state", "tuned", "auditd", "mcelog", "acpid", "gpu-manager",
-    "smartmontools", "smartd", "wtmpdb-update-boot", "gpg-agent", "ssh-agent", "p11-kit-server", "obex",
-    "speech-dispatcher", "pulseaudio", "rtkit", "low-memory-monitor", "blk-availability", "emergency", "rescue",
-    "lxd-agent", "hv-kvp-daemon", "iscsid", "open-iscsi", "finalrd",
-})
-PLUMBING_PREFIXES = ("systemd-", "plymouth", "getty", "gnome-", "xdg-", "at-spi", "cloud-", "lvm2-", "apt-", "dpkg-",
-                     "snap.", "ubuntu-", "motd-", "e2scrub", "fstrim", "logrotate", "man-db", "dbus-", "evolution-",
-                     "tracker-", "gvfs-", "pipewire-", "wireplumber", "grub-", "secureboot-", "esm-")
-PLUMBING_PROCESSES = frozenset({"sshd", "systemd-resolve", "systemd-resolved", "cupsd", "avahi-daemon", "rpcbind",
-                                "chronyd", "docker-proxy", "dockerd", "containerd", "rpc.statd", "dhclient"})
-CONTAINER_HELPERS = ("docker-proxy", "containerd-shim", "rootlesskit", "rootlessport", "slirp4netns", "conmon")
+@cache
+def catalog() -> ServiceCatalog:
+    d = spec.load_json("service-catalog.json")
+    try:
+        return ServiceCatalog(
+            products=tuple(ServiceProduct(p["id"], p["name"], p.get("icon"), tuple(p["names"]),
+                                          tuple(p.get("prefixes", ())), bool(p.get("hiddenByDefault", False)))
+                           for p in d["products"]),
+            plumbing=frozenset(d["plumbing"]),
+            plumbing_prefixes=tuple(d["plumbingPrefixes"]),
+            plumbing_processes=frozenset(d["plumbingProcesses"]),
+            container_helpers=tuple(d["containerHelpers"]),
+            interpreters=tuple(d["interpreters"]),
+            helpers=frozenset(d["helpers"]),
+        )
+    except (KeyError, TypeError) as e:
+        raise spec.SpecError(f"spec/service-catalog.json is malformed: {e!r}") from None
 
 
 def is_container_helper(name: str) -> bool:
     n = name.lower()
-    return any(n.startswith(h) for h in CONTAINER_HELPERS)
+    return any(n.startswith(h) for h in catalog().container_helpers)
 
 
 def base_name(name: str) -> str:
@@ -289,12 +220,14 @@ def base_name(name: str) -> str:
 
 def product_for(name: str) -> ServiceProduct | None:
     base = base_name(name)
-    return next((p for p in PRODUCTS if base in p.names or any(base.startswith(x) for x in p.prefixes)), None)
+    return next((p for p in catalog().products if base in p.names or any(base.startswith(x) for x in p.prefixes)),
+                None)
 
 
 def is_plumbing(name: str) -> bool:
     base = base_name(name)
-    return base in PLUMBING or any(base.startswith(p) for p in PLUMBING_PREFIXES)
+    c = catalog()
+    return base in c.plumbing or any(base.startswith(p) for p in c.plumbing_prefixes)
 
 
 # --- Parsing ------------------------------------------------------------------------------------------------------
@@ -432,9 +365,6 @@ def home_of(cgroup: str) -> tuple[str, str]:
     return ("loose", cgroup)
 
 
-INTERPRETERS = ("node", "nodejs", "python", "java", "ruby", "php", "perl", "bun", "deno", "sh", "bash", "dotnet",
-                "npm", "npx", "uv", "uvx", "pnpm", "yarn", "mono", "pwsh", "env")
-HELPERS = frozenset({"postgres", "postgresql", "redis-server", "redis", "mysqld", "mariadbd", "mongod", "memcached"})
 _SCRIPT_EXTENSIONS = (".js", ".mjs", ".cjs", ".ts", ".py", ".rb", ".php", ".pl", ".jar", ".sh")
 
 
@@ -450,7 +380,7 @@ def process_name(comm: str, command_line: str) -> str:
     """A process's name: its own, or for an interpreter the script it runs (`node .../paperclipai` -> paperclipai)."""
     name = comm.lower().replace("-mainthread", "", 1)
     is_interpreter = any(name == i or (name.startswith(i) and all(c.isdigit() or c == "." for c in name[len(i):]))
-                         for i in INTERPRETERS)
+                         for i in catalog().interpreters)
     if not is_interpreter:
         return comm
     args = [a for a in command_line.split(" ") if a][1:]
@@ -549,12 +479,13 @@ def _processes(loose: dict[int, tuple[str, list[ServicePort]]], order: list[int]
     folded into that app."""
     found = [_Found(pid, process_name(loose[pid][0], by_pid[pid].command_line), by_pid[pid], list(loose[pid][1]))
              for pid in order if pid in loose and pid in by_pid]
+    helpers = catalog().helpers
     folded: set[int] = set()
     for helper in found:
-        if helper.name.lower() not in HELPERS:
+        if helper.name.lower() not in helpers:
             continue
         apps = [i for i, f in enumerate(found)
-                if f.proc.cgroup == helper.proc.cgroup and f.name.lower() not in HELPERS]
+                if f.proc.cgroup == helper.proc.cgroup and f.name.lower() not in helpers]
         if len(apps) == 1 and helper.proc.cgroup != "/":
             found[apps[0]].ports += helper.ports
             folded.add(helper.pid)
@@ -574,7 +505,7 @@ def _processes(loose: dict[int, tuple[str, list[ServicePort]]], order: list[int]
     out: list[DiscoveredService] = []
     for f in merged:
         product = product_for(f.name)
-        plumbing = f.name.lower() in PLUMBING_PROCESSES
+        plumbing = f.name.lower() in catalog().plumbing_processes
         ports = dedupe(f.ports)
         sid = "process/" + f.name
         used[sid] = used.get(sid, 0) + 1
