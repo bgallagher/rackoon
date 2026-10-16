@@ -6,18 +6,44 @@
 #   tools/lab env     print the environment the lab tests read (source it: `eval "$(tools/lab env)"`)
 #   tools/lab ssh     open a shell on the lab as rk (handy when a check fails)
 #   tools/lab down    stop it and delete its containers and volumes
+#
+# Each checkout (worktree) gets its own lab: compose project rackoon-lab-<hash of the checkout's path> on a port derived
+# from the same hash (the next free one if that is taken), both recorded in test/lab/.state/env. COMPOSE_PROJECT_NAME
+# and RACKOON_LAB_PORT override them.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
 lab="$root/test/lab"
 state="$lab/.state"
-port="${RACKOON_LAB_PORT:-2222}"
-compose=(docker compose -f "$lab/compose.yaml")
+
+recorded() { [ -f "$state/env" ] && sed -n "s/^export $1=//p" "$state/env" || true; }
+listening() { (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+
+checkout_hash="$(printf %s "$root" | cksum | cut -d' ' -f1)"
+project="${COMPOSE_PROJECT_NAME:-$(recorded RACKOON_LAB_PROJECT)}"
+project="${project:-rackoon-lab-$(printf %06x $((checkout_hash % 16777216)))}"
+compose=(docker compose -p "$project" -f "$lab/compose.yaml")
+
+# Override, else the port this lab already publishes, else the recorded one, else derived from the checkout and moved on
+# past anything already listening (another checkout's lab, say). Only `up` needs to choose.
+choose_port() {
+  if [ -n "${RACKOON_LAB_PORT:-}" ]; then echo "$RACKOON_LAB_PORT"; return; fi
+  local p
+  p="$("${compose[@]}" port target 22 2>/dev/null | sed -n 's/.*:\([0-9][0-9]*\)$/\1/p' | head -n1 || true)"
+  [ -n "$p" ] || p="$(recorded RACKOON_LAB_PORT)"
+  if [ -z "$p" ]; then
+    p=$((20000 + checkout_hash % 10000))
+    while listening "$p"; do p=$((p + 1)); done
+  fi
+  echo "$p"
+}
+port="${RACKOON_LAB_PORT:-$(recorded RACKOON_LAB_PORT)}"
 
 write_env() {
   # shellcheck disable=SC1091
   source "$lab/lab.env"
   cat > "$state/env" <<EOF
 export RACKOON_LAB=1
+export RACKOON_LAB_PROJECT=$project
 export RACKOON_LAB_HOST=127.0.0.1
 export RACKOON_LAB_PORT=$port
 export RACKOON_LAB_USER=$RACKOON_LAB_USER
@@ -29,6 +55,7 @@ EOF
 }
 
 lab_ssh() {
+  [ -n "$port" ] || { echo "lab: not up (tools/lab up)" >&2; exit 1; }
   ssh -p "$port" -i "$state/id_ed25519" -o IdentitiesOnly=yes -o BatchMode=yes \
       -o UserKnownHostsFile="$state/known_hosts" -o StrictHostKeyChecking=yes rk@127.0.0.1 "$@"
 }
@@ -36,6 +63,7 @@ lab_ssh() {
 case "${1:-}" in
   up)
     mkdir -p "$state"
+    port="$(choose_port)"
     [ -f "$state/id_ed25519" ] || ssh-keygen -q -t ed25519 -N '' -C rackoon-lab -f "$state/id_ed25519"
     RACKOON_LAB_PORT="$port" "${compose[@]}" up -d --build --wait
     # The host key is new on every build: scan it fresh, and only from the lab's own loopback port.
@@ -47,7 +75,7 @@ case "${1:-}" in
     done
     lab_ssh 'docker ps --format "{{.Names}}"' | grep -q labstack-ticker || { echo "lab: labstack is not running" >&2; exit 1; }
     write_env
-    echo "lab is up on 127.0.0.1:$port (eval \"\$(tools/lab env)\" to use it)"
+    echo "lab $project is up on 127.0.0.1:$port (eval \"\$(tools/lab env)\" to use it)"
     ;;
   env)
     [ -f "$state/env" ] || { echo "lab: not up (tools/lab up)" >&2; exit 1; }
@@ -62,7 +90,7 @@ case "${1:-}" in
     rm -f "$state/known_hosts" "$state/env"
     ;;
   *)
-    sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+    sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'
     exit 2
     ;;
 esac

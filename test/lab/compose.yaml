@@ -1,6 +1,6 @@
 # Integration lab (docs/parity.md): a disposable Ubuntu server that every platform's SSH transport is tested against,
 # with Docker provided by a dind sidecar. Started and stopped by tools/lab; never reachable from outside this machine.
-name: rackoon-lab
+name: rackoon-lab   # tools/lab replaces this with a per-checkout project name (-p)
 services:
   dind:
     image: docker:27-dind
