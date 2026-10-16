@@ -19,7 +19,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ServerStoreTests", "RackoonCoreTests.CachedSessionTests", "RackoonCoreTests.ServerModelTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ModelsAndSessionTests"]},
         "ios": {"status": "planned", "reason": "stage I1"},
-        "web": {"status": "planned", "reason": "stage W3: servers and snapshots are stored since W2 (tests.test_storage); painting the cached snapshot comes with the Overview"}
+        "web": {"status": "done", "tests": ["tests.test_storage/test_servers_round_trip_and_empty_store_is_empty", "tests.test_storage/test_snapshot_round_trip_and_delete", "tests.test_screens_api/test_the_cached_snapshot_is_shown_stale_until_the_first_poll"]}
       }
     },
     {
@@ -59,7 +59,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ServerListTests"]},
         "android": {"status": "done", "tests": [], "untested": "server switcher list in Compose; no filter/reorder logic to test yet"},
         "ios": {"status": "planned", "reason": "stage I1"},
-        "web": {"status": "planned", "reason": "stage W3"}
+        "web": {"status": "done", "tests": ["tests.test_core_ui/test_server_list_filter_and_move", "tests.test_screens_api/test_server_filter_and_move"]}
       }
     },
     {
@@ -89,7 +89,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ConnectionFailureTests", "RackoonCoreTests.SSHAttemptTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ConnectionFailureTests"]},
         "ios": {"status": "planned", "reason": "stage I2"},
-        "web": {"status": "planned", "reason": "stage W3"}
+        "web": {"status": "done", "tests": ["tests.test_core_ui/test_connection_failures_explained", "tests.test_screens_api/test_a_failed_poll_keeps_the_last_reading_and_explains_the_error", "tests.test_screens_api/test_demo_servers_show_every_kind_of_state"]}
       }
     },
     {
@@ -99,7 +99,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonCoreTests.OverviewIPTests", "RackoonCoreTests.ServerSessionTests", "RackoonSSHSystemTests.LabIntegrationTests/testOverviewParses"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.OverviewTests", "com.bgallagher.rackoon.ssh.LabIntegrationTests/overviewParses"]},
         "ios": {"status": "planned", "reason": "stage I2"},
-        "web": {"status": "planned", "reason": "stage W3"}
+        "web": {"status": "done", "tests": ["tests.test_golden_fixtures/test_golden[overview]", "tests.test_screens_api/test_poll_reads_overview_attention_and_cpu_from_two_readings", "tests.test_screens_api/test_watching_wakes_the_poller_and_sync_follows_the_list", "tests.test_lab_integration/test_overview_parses"]}
       }
     },
     {
@@ -109,7 +109,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.SystemInfoParserTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.OverviewTests"]},
         "ios": {"status": "planned", "reason": "stage I2"},
-        "web": {"status": "planned", "reason": "stage W3"}
+        "web": {"status": "done", "tests": ["tests.test_golden_fixtures/test_golden[overview]", "tests.test_core/test_ipv4_only_accepts_dotted_quads"]}
       }
     },
     {
@@ -119,7 +119,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonCoreTests.RebootOfferTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.AttentionTests", "com.bgallagher.rackoon.core.AttentionPresentationTests"]},
         "ios": {"status": "planned", "reason": "stage I2"},
-        "web": {"status": "planned", "reason": "stage W3"}
+        "web": {"status": "done", "tests": ["tests.test_core_ui/test_attention_from_the_rules", "tests.test_screens_api/test_demo_servers_show_every_kind_of_state"]}
       }
     },
     {
@@ -129,7 +129,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.FleetTests"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
         "ios": {"status": "planned", "reason": "stage I2"},
-        "web": {"status": "planned", "reason": "stage W3"}
+        "web": {"status": "planned", "reason": "stage W5: fleet health and server tiles are built (W3, tests.test_core_ui); the Docker and bookmark pages come with Docker"}
       }
     },
     {
@@ -139,7 +139,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.TerminalThemeTests", "RackoonCoreTests.AppPaletteTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.TerminalThemeTests", "com.bgallagher.rackoon.core.AppPaletteTests"]},
         "ios": {"status": "planned", "reason": "stage I1"},
-        "web": {"status": "planned", "reason": "stage W3"}
+        "web": {"status": "done", "tests": ["tests.test_core_ui/test_every_bundled_theme_meets_the_contrast_floors", "tests.test_core_ui/test_mix_and_contrast", "tests.test_core_ui/test_ensuring_contrast_nudges_toward_the_readable_end", "tests.test_core_ui/test_rackoon_dark_matches_the_design", "tests.test_core/test_themes_load_and_validate", "tests.test_screens_api/test_appearance"]}
       }
     },
     {
@@ -149,7 +149,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ActionPolicyTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ActionPolicyTests", "com.bgallagher.rackoon.core.ReadOnlyAutoTests"]},
         "ios": {"status": "planned", "reason": "stage I1"},
-        "web": {"status": "planned", "reason": "stage W3"}
+        "web": {"status": "done", "tests": ["tests.test_core/test_policy_needs_a_confirmation_for_the_exact_intent", "tests.test_core_ui/test_read_only_turns_itself_back_on_when_idle", "tests.test_screens_api/test_read_only_starts_on_and_turns_itself_back_on", "tests.test_screens_api/test_safety_endpoint"]}
       }
     },
     {
@@ -159,7 +159,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ActionPolicyTests", "RackoonCoreTests.SharedScenarioTests/testActionPolicy"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ActionPolicyTests", "com.bgallagher.rackoon.core.ActionPromptsTests", "com.bgallagher.rackoon.core.SharedScenarioTests/actionPolicy"]},
         "ios": {"status": "planned", "reason": "stage I1"},
-        "web": {"status": "planned", "reason": "stage W3"}
+        "web": {"status": "done", "tests": ["tests.test_screens_api/test_actions_confirm_the_exact_intent", "tests.test_screens_api/test_action_endpoints", "tests.test_shared_scenarios/test_action_policy"]}
       }
     },
     {
@@ -169,7 +169,7 @@
         "mac": {"status": "done", "tests": ["RackoonMacTests.DemoServicesTests", "RackoonMacTests.DemoAlertsTests"]},
         "android": {"status": "done", "tests": [], "untested": "debug-build demo mode; demo data is not unit-tested"},
         "ios": {"status": "planned", "reason": "stage I1"},
-        "web": {"status": "planned", "reason": "stage W3"}
+        "web": {"status": "done", "tests": ["tests.test_screens_api/test_demo_needs_no_sign_in_and_never_uses_the_data_folder", "tests.test_screens_api/test_demo_servers_show_every_kind_of_state"]}
       }
     },
     {

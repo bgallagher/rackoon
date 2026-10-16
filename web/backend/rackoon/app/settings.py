@@ -8,6 +8,8 @@
                                   unset = forward auth off
     RACKOON_FORWARD_AUTH_USERS    optional comma-separated users that header may name; empty = any
     RACKOON_SSH_CONFIG            an ssh_config file to import servers from (mount ~/.ssh/config read-only)
+    RACKOON_STATIC                the built frontend (web/frontend/dist) to serve at /; the image sets it
+    RACKOON_DEMO=1                demo mode: made-up servers, a temporary data folder, nothing is sent anywhere
 """
 
 from __future__ import annotations
@@ -44,6 +46,8 @@ class Settings:
     forward_auth_header: str | None = None
     forward_auth_users: frozenset[str] = frozenset()
     ssh_config: Path | None = None
+    static_dir: Path | None = None
+    demo: bool = False
 
     @classmethod
     def from_env(cls, env: dict[str, str] | None = None) -> Settings:
@@ -55,6 +59,7 @@ class Settings:
                                 "send the header")
         password_file = e.get("RACKOON_ADMIN_PASSWORD_FILE", "").strip()
         ssh_config = e.get("RACKOON_SSH_CONFIG", "").strip()
+        static = e.get("RACKOON_STATIC", "").strip()
         return cls(
             data_dir=Path(e.get("RACKOON_DATA", "/data")),
             admin_password_file=Path(password_file) if password_file else None,
@@ -63,6 +68,8 @@ class Settings:
             forward_auth_users=frozenset(u.strip() for u in e.get("RACKOON_FORWARD_AUTH_USERS", "").split(",")
                                          if u.strip()),
             ssh_config=Path(ssh_config) if ssh_config else None,
+            static_dir=Path(static) if static else None,
+            demo=e.get("RACKOON_DEMO", "").strip() == "1",
         )
 
     def is_trusted_proxy(self, address: str | None) -> bool:

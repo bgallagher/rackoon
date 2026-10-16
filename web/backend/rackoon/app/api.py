@@ -9,9 +9,12 @@ body. Nothing here runs a command on a server: changing a server goes through th
 
 from __future__ import annotations
 
+import asyncio
+import contextlib
 import hashlib
 import hmac
 import logging
+import tempfile
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
@@ -31,10 +34,18 @@ from rackoon.core.jsonmodel import to_json
 from rackoon.core.models import Server, server_input_problem
 from rackoon.ssh import HostKey
 
+from rackoon.core import server_list
+
 from . import security
+from .actions import ActionCenter, ActionError
 from .connections import CheckResult, Connections, Scanner, TrustError, key_id_of
+from .demo import SERVERS as DEMO_SERVERS
+from .demo import DemoConnections
 from .keys import KeyError_, KeyStore
+from .monitor import Monitor
+from .preferences import Preferences
 from .settings import Settings
+from .static import mount_frontend
 from .storage import DataStore, KeyInfo, new_id
 
 log = logging.getLogger("rackoon.api")
@@ -105,6 +116,20 @@ class TrustIn(Body):
     fingerprint: str = Field(max_length=100)
 
 
+class MoveIn(Body):
+    onto: str | None = Field(default=None, max_length=64)
+    by: int | None = Field(default=None, ge=-1000, le=1000)
+
+
+class AppearanceIn(Body):
+    selection: str = Field(max_length=100)
+
+
+class SafetyIn(Body):
+    readOnly: bool | None = None
+    auto: str | None = Field(default=None, max_length=20)
+
+
 class GenerateKeyIn(Body):
     name: str = Field(max_length=200)
 
@@ -121,16 +146,30 @@ class Rackoon:
     def __init__(self, settings: Settings, scanner: Scanner | None, clock: Callable[[], float]) -> None:
         self.settings = settings
         self.clock = clock
-        self.store = DataStore(settings.data_dir)
+        self.demo = settings.demo
+        data_dir = Path(tempfile.mkdtemp(prefix="rackoon-demo-")) if self.demo else settings.data_dir
+        self.store = DataStore(data_dir)
         managed = security.password_from_file(settings.admin_password_file) if settings.admin_password_file else None
         self.account = security.Account(self.store.load_auth(), self.store.save_auth, managed)
         self.sessions = security.SessionStore(clock=clock)
         self.limiter = security.RateLimiter(clock=clock)
         self.secret = self.store.secret()
         self.keys = KeyStore(self.store)
-        self.connections = Connections(self.store, self.keys, scanner) if scanner else Connections(self.store, self.keys)
+        if self.demo:
+            self.connections: Connections = DemoConnections(self.store, self.keys)
+            self.store.save_servers([server for server, _ in DEMO_SERVERS])
+        elif scanner:
+            self.connections = Connections(self.store, self.keys, scanner)
+        else:
+            self.connections = Connections(self.store, self.keys)
+        self.preferences = Preferences(self.store, clock)
+        self.actions = ActionCenter(self.preferences.policy, clock)
+        self.monitor = Monitor(self.store, self.connections, clock)
+        self.monitor.sync(self.store.load_servers())
         self.setup_token: security.SetupToken | None = None
-        if self.account.needs_setup:
+        if self.demo:
+            log.warning("Demo mode: made-up servers in %s; nothing is sent anywhere, and no sign-in is needed.", data_dir)
+        elif self.account.needs_setup:
             self.setup_token = security.SetupToken()
             self.store.write_setup_token(self.setup_token.value)
             log.warning("No admin password is set. Open Rackoon and enter this one-time setup token: %s "
@@ -205,12 +244,26 @@ def _check_json(result: CheckResult) -> dict[str, Any]:
 
 
 def create_app(settings: Settings, scanner: Scanner | None = None,
-               clock: Callable[[], float] = time.time) -> FastAPI:
+               clock: Callable[[], float] = time.time, poll: bool = True) -> FastAPI:
+    """`poll=False` keeps the monitor from contacting servers (tests that use made-up addresses)."""
     rackoon = Rackoon(settings, scanner, clock)
+
+    async def idle_watch() -> None:
+        while True:
+            await asyncio.sleep(15)
+            if rackoon.preferences.check_idle(busy=rackoon.actions.running > 0):
+                log.info("Read-only turned itself back on after %s", rackoon.preferences.auto.label.lower())
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        if poll:
+            rackoon.monitor.start()
+        idle = asyncio.create_task(idle_watch())
         yield
+        idle.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await idle
+        await rackoon.monitor.stop()
         await rackoon.connections.close()
 
     app = FastAPI(title="Rackoon", docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
@@ -249,7 +302,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
 
     def authenticated(request: Request) -> str:
         """The signed-in user; for a change also checks the CSRF header."""
-        forward = rackoon.forward_user(request)
+        forward = "demo" if rackoon.demo else rackoon.forward_user(request)
         if forward is not None:
             expected = rackoon.forward_csrf(forward)
             user = forward
@@ -263,6 +316,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
             sent = request.headers.get(CSRF_HEADER, "")
             if not hmac.compare_digest(sent.encode(), expected.encode()):
                 raise ApiError(403, "csrf", "Missing or wrong CSRF token. Reload the page.")
+            rackoon.preferences.touch()
         return user
 
     Auth = Depends(authenticated)
@@ -292,10 +346,11 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         account = rackoon.account
         state: dict[str, Any] = {"setupRequired": account.needs_setup, "passwordManaged": account.password_managed,
                                  "totpEnabled": account.totp_enabled, "authenticated": False,
-                                 "forwardAuth": rackoon.settings.forward_auth_header is not None}
-        forward = rackoon.forward_user(request)
+                                 "forwardAuth": rackoon.settings.forward_auth_header is not None, "demo": rackoon.demo}
+        forward = "demo" if rackoon.demo else rackoon.forward_user(request)
         if forward is not None:
-            state.update(authenticated=True, user=forward, via="forwardAuth", csrf=rackoon.forward_csrf(forward))
+            state.update(authenticated=True, user=forward, via="demo" if rackoon.demo else "forwardAuth",
+                         csrf=rackoon.forward_csrf(forward), setupRequired=False)
         else:
             session = rackoon.sessions.get(request.cookies.get(COOKIE))
             if session is not None:
@@ -401,14 +456,18 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         return Server(server_id, name, body.host.strip(), user=user, port=body.port, ssh_config_alias=alias,
                       identity_file=identity)
 
+    def saved(servers: list[Server]) -> None:
+        store.save_servers(servers)
+        rackoon.monitor.sync(servers)
+
     @app.get("/api/servers")
-    async def list_servers(_: str = Auth) -> list[dict[str, Any]]:
-        return [_server_json(s, store.keys_dir) for s in store.load_servers()]
+    async def list_servers(query: str = "", _: str = Auth) -> list[dict[str, Any]]:
+        return [_server_json(s, store.keys_dir) for s in server_list.filter_servers(store.load_servers(), query[:200])]
 
     @app.post("/api/servers", status_code=201)
     async def add_server(body: ServerIn, _: str = Auth) -> dict[str, Any]:
         server = server_from(body, new_id(), None)
-        store.save_servers(store.load_servers() + [server])
+        saved(store.load_servers() + [server])
         return _server_json(server, store.keys_dir)
 
     @app.get("/api/servers/{server_id}")
@@ -422,7 +481,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
             raise ApiError(422, "invalid", "Send every server's id exactly once.")
         by_id = {s.id: s for s in servers}
         ordered = [by_id[i] for i in body.ids]
-        store.save_servers(ordered)
+        saved(ordered)
         return [_server_json(s, store.keys_dir) for s in ordered]
 
     @app.put("/api/servers/{server_id}")
@@ -431,7 +490,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         old = find(servers, server_id)
         # The ssh_config link survives only while the host is still what that entry resolved to.
         new = server_from(body, server_id, old.ssh_config_alias if body.host.strip() == old.host else None)
-        store.save_servers([new if s.id == server_id else s for s in servers])
+        saved([new if s.id == server_id else s for s in servers])
         if not new.connects_like(old):
             # A new address or key: the open connection and the cached reading belong to the old one.
             await rackoon.connections.forget(server_id)
@@ -442,7 +501,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
     async def remove_server(server_id: str, _: str = Auth) -> dict[str, Any]:
         servers = store.load_servers()
         find(servers, server_id)
-        store.save_servers([s for s in servers if s.id != server_id])
+        saved([s for s in servers if s.id != server_id])
         await rackoon.connections.forget(server_id)
         store.delete_snapshot(server_id)
         return {"ok": True}
@@ -461,11 +520,93 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         except TrustError as e:
             raise ApiError(e.status, e.code, str(e)) from None
         await rackoon.connections.forget(server_id)
+        await rackoon.monitor.refresh(server_id)
         return {"trusted": {"keyType": key.key_type, "fingerprint": key.fingerprint}}
 
     @app.post("/api/servers/{server_id}/check")
     async def check(server_id: str, _: str = Auth) -> dict[str, Any]:
         return _check_json(await rackoon.connections.check(find(store.load_servers(), server_id)))
+
+    @app.post("/api/servers/{server_id}/move")
+    async def move(server_id: str, body: MoveIn, _: str = Auth) -> list[dict[str, Any]]:
+        servers = store.load_servers()
+        find(servers, server_id)
+        if body.onto is not None:
+            moved = server_list.moving_onto(server_id, body.onto, servers)
+        elif body.by is not None:
+            moved = server_list.moving_by(server_id, body.by, servers)
+        else:
+            raise ApiError(422, "invalid", "Say where to move it: onto another server, or by a number of places.")
+        saved(moved)
+        return [_server_json(s, store.keys_dir) for s in moved]
+
+    # --- readings
+
+    @app.get("/api/servers/{server_id}/state")
+    async def server_state(server_id: str, watch: bool = False, _: str = Auth) -> dict[str, Any]:
+        find(store.load_servers(), server_id)
+        if watch and rackoon.monitor.watch(server_id):
+            await rackoon.monitor.settle(server_id, 2.5)
+        state = rackoon.monitor.state_json(server_id)
+        if state is None:
+            raise ApiError(404, "noSuchServer", "There is no such server.")
+        return state
+
+    @app.post("/api/servers/{server_id}/refresh")
+    async def refresh(server_id: str, _: str = Auth) -> dict[str, Any]:
+        find(store.load_servers(), server_id)
+        await rackoon.connections.forget(server_id)
+        await rackoon.monitor.refresh(server_id)
+        state = rackoon.monitor.state_json(server_id)
+        assert state is not None
+        return state
+
+    @app.get("/api/fleet")
+    async def fleet(_: str = Auth) -> dict[str, Any]:
+        return rackoon.monitor.fleet_json(store.load_servers())
+
+    # --- appearance and safety
+
+    @app.get("/api/appearance")
+    async def appearance(_: str = Auth) -> dict[str, Any]:
+        return rackoon.preferences.appearance_json()
+
+    @app.put("/api/appearance")
+    async def set_appearance(body: AppearanceIn, _: str = Auth) -> dict[str, Any]:
+        try:
+            rackoon.preferences.set_theme(body.selection)
+        except ValueError:
+            raise ApiError(422, "noSuchTheme", "There is no such theme.") from None
+        return rackoon.preferences.appearance_json()
+
+    @app.get("/api/safety")
+    async def safety(_: str = Auth) -> dict[str, Any]:
+        return rackoon.preferences.safety_json()
+
+    @app.put("/api/safety")
+    async def set_safety(body: SafetyIn, _: str = Auth) -> dict[str, Any]:
+        if body.auto is not None:
+            rackoon.preferences.set_auto(body.auto)
+        if body.readOnly is not None:
+            rackoon.preferences.set_read_only(body.readOnly)
+        return rackoon.preferences.safety_json()
+
+    @app.post("/api/activity")
+    async def activity(_: str = Auth) -> dict[str, Any]:
+        return {"readOnly": rackoon.preferences.read_only}  # authenticated() already noted the touch
+
+    # --- confirming an action
+
+    @app.post("/api/actions/{action_id}/confirm")
+    async def confirm_action(action_id: str, _: str = Auth) -> dict[str, Any]:
+        try:
+            return {"ok": True, "result": await rackoon.actions.confirm(action_id)}
+        except ActionError as e:
+            raise ApiError(e.status, e.code, str(e)) from None
+
+    @app.post("/api/actions/{action_id}/cancel")
+    async def cancel_action(action_id: str, _: str = Auth) -> dict[str, Any]:
+        return {"ok": rackoon.actions.cancel(action_id)}
 
     # --- ssh_config import
 
@@ -548,7 +689,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
                         server = replace(server, identity_file=str(store.key_path(key_id)))
             servers.append(server)
             added.append(_server_json(server, store.keys_dir))
-        store.save_servers(servers)
+        saved(servers)
         return {"added": added, "notes": notes}
 
     # --- keys
@@ -580,6 +721,8 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
             raise ApiError(404, "noSuchKey", "There is no such key.")
         return {"ok": True}
 
+    if settings.static_dir is not None:
+        mount_frontend(app, settings.static_dir)
     return app
 
 

@@ -65,6 +65,23 @@ jobs:
           path: web/backend/build/junit/*.xml
           retention-days: 7
           if-no-files-found: error
+  web-frontend:
+    # The self-hosted web version's React + TypeScript UI (web/frontend). It only renders what the backend computes;
+    # this checks the types, runs its few formatting tests and builds the bundle the image will serve.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: web/frontend
+      - run: npm run typecheck
+        working-directory: web/frontend
+      - run: npm test
+        working-directory: web/frontend
+      - run: npx vite build
+        working-directory: web/frontend
   swift-macos:
     # SwiftTerm 1.99 needs Swift 6.2+. On an older toolchain SwiftPM silently picked SwiftTerm 1.20.0, which lacks the
     # APIs the app uses, so CI failed on every push. macos-26 ships Xcode 26 (Swift 6.2+).

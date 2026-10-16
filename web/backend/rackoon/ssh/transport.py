@@ -21,8 +21,10 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import errno
 import hashlib
 import signal
+import socket
 from collections.abc import AsyncIterable, AsyncIterator
 from dataclasses import dataclass, field
 from types import TracebackType
@@ -267,8 +269,25 @@ async def _connect(endpoint: SSHEndpoint, known: KnownHosts) -> tuple[asyncssh.S
     except asyncssh.KeyImportError as e:
         raise AuthFailed(f"the private key could not be read: {e}") from None
     except (OSError, asyncio.TimeoutError, asyncssh.Error) as e:
-        raise Unreachable(str(e) or type(e).__name__) from None
+        raise Unreachable(_describe(e, endpoint)) from None
     return conn, client
+
+
+def _describe(e: BaseException, endpoint: SSHEndpoint) -> str:
+    """The failure in the words ssh would use, so `connection_failure.explain` recognises it on every platform."""
+    where = f"{endpoint.host} port {endpoint.port}"
+    if isinstance(e, ConnectionRefusedError):
+        return f"ssh: connect to host {where}: Connection refused"
+    if isinstance(e, socket.gaierror):
+        return f"ssh: Could not resolve hostname {endpoint.host}: Name or service not known"
+    if isinstance(e, (TimeoutError, asyncio.TimeoutError)):
+        return f"ssh: connect to host {where}: Connection timed out"
+    if isinstance(e, OSError) and e.errno in (errno.EHOSTUNREACH, errno.ENETUNREACH):
+        what = "No route to host" if e.errno == errno.EHOSTUNREACH else "Network is unreachable"
+        return f"ssh: connect to host {where}: {what}"
+    if isinstance(e, (asyncssh.ConnectionLost, asyncssh.DisconnectError, ConnectionResetError, BrokenPipeError)):
+        return f"Connection closed by {where} ({e})"
+    return str(e) or type(e).__name__
 
 
 async def scan_host_key(host: str, port: int = 22) -> HostKey:

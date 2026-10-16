@@ -32,7 +32,7 @@ class FakeScanner:
 
 
 def client_for(settings: Settings, scanner: FakeScanner | None = None, peer: str = "203.0.113.9") -> TestClient:
-    app = create_app(settings, scanner=scanner or FakeScanner())
+    app = create_app(settings, scanner=scanner or FakeScanner(), poll=False)
     return TestClient(app, base_url="https://rackoon.test", client=(peer, 40000))
 
 
@@ -159,7 +159,7 @@ def test_change_password_signs_other_sessions_out(api: TestClient, settings: Set
 
 def test_totp_enrol_sign_in_and_disable(settings: Settings) -> None:
     now = [1_800_000_000.0]
-    app = create_app(settings, scanner=FakeScanner(), clock=lambda: now[0])
+    app = create_app(settings, scanner=FakeScanner(), clock=lambda: now[0], poll=False)
     api = signed_in(TestClient(app, base_url="https://rackoon.test", client=("203.0.113.9", 1)))
     secret = api.post("/api/auth/totp/setup").json()["secret"]
     step = int(now[0] // 30)

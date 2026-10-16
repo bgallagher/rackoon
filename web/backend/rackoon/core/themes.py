@@ -4,6 +4,7 @@ Kotlin cores. The palette derivation (W3) builds on `RGB`."""
 from __future__ import annotations
 
 import json
+import math
 import re
 from dataclasses import dataclass
 from typing import Any
@@ -51,8 +52,38 @@ class RGB:
         return 0.2126 * lin(self.r) + 0.7152 * lin(self.g) + 0.0722 * lin(self.b)
 
     def contrast_ratio(self, other: RGB) -> float:
+        """WCAG contrast ratio, 1 (identical) to 21 (black on white)."""
         a, b = self.luminance, other.luminance
         return (max(a, b) + 0.05) / (min(a, b) + 0.05)
+
+    def mixed(self, other: RGB, amount: float) -> RGB:
+        """Linear blend: 0 gives `self`, 1 gives `other` (rounded half up, like Kotlin's Math.round)."""
+        k = min(1.0, max(0.0, amount))
+
+        def mix(a: int, b: int) -> int:
+            return math.floor(a * (1 - k) + b * k + 0.5)
+        return RGB(mix(self.r, other.r), mix(self.g, other.g), mix(self.b, other.b))
+
+    @property
+    def best_possible_contrast(self) -> float:
+        """The best contrast any colour can have against this one (black or white, whichever is further)."""
+        return max(self.contrast_ratio(BLACK), self.contrast_ratio(WHITE))
+
+    def ensuring_contrast(self, background: RGB, minimum: float) -> RGB:
+        """`self` if it already has `minimum` contrast on `background`; else the closest colour toward white or black
+        that does, or the best that can be had."""
+        if self.contrast_ratio(background) >= minimum:
+            return self
+        target = WHITE if background.contrast_ratio(WHITE) >= background.contrast_ratio(BLACK) else BLACK
+        for step in range(1, 41):
+            c = self.mixed(target, step / 40.0)
+            if c.contrast_ratio(background) >= minimum:
+                return c
+        return target
+
+
+BLACK = RGB(0, 0, 0)
+WHITE = RGB(255, 255, 255)
 
 
 @dataclass(frozen=True)
@@ -72,6 +103,18 @@ class TerminalTheme:
     @property
     def is_dark(self) -> bool:
         return self.appearance == "dark"
+
+    def rgb(self, field: str) -> RGB:
+        """A colour of the theme; cursor and selection fall back to the foreground."""
+        value = getattr(self, field)
+        fallback = RGB(255, 255, 255) if field == "foreground" else RGB(0, 0, 0)
+        if field in ("cursor", "selection") and value is None:
+            return self.rgb("foreground")
+        return RGB.from_hex(value) or fallback
+
+    @property
+    def ansi_rgb(self) -> list[RGB]:
+        return [RGB.from_hex(c) or RGB(128, 128, 128) for c in self.ansi]
 
 
 def _theme(raw: Any) -> TerminalTheme:

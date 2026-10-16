@@ -12,11 +12,13 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Protocol
 
 from rackoon.core.models import Server
 from rackoon.ssh import (
     AsyncSSHTransport,
     AuthFailed,
+    CommandResult,
     HostKey,
     HostKeyChanged,
     HostKeyUnknown,
@@ -32,6 +34,16 @@ from .storage import DataStore, HostKeyConflict
 SCAN_TTL_SECONDS = 600
 
 Scanner = Callable[[str, int], Awaitable[HostKey]]
+
+
+class Transport(Protocol):
+    """What the backend's services need from a server connection (AsyncSSHTransport, or the demo's)."""
+
+    async def run(self, command: str, timeout: float, input: str | None = None) -> CommandResult: ...
+
+    async def connect(self) -> None: ...
+
+    async def close(self) -> None: ...
 
 
 def key_id_of(server: Server, keys_dir: Path) -> str | None:
@@ -77,7 +89,7 @@ class Connections:
         self.scanner = scanner
         self.clock = clock
         self._scans: dict[str, Scan] = {}
-        self._transports: dict[str, AsyncSSHTransport] = {}
+        self._transports: dict[str, Transport] = {}
 
     def endpoint(self, server: Server) -> SSHEndpoint:
         key_id = key_id_of(server, self.store.keys_dir)
@@ -86,8 +98,8 @@ class Connections:
         auth = SSHAuth.key(self.keys.private_key(key_id)) if key_id else SSHAuth.none()
         return SSHEndpoint(server.host, server.user or "root", auth, server.port or 22)
 
-    def transport(self, server: Server) -> AsyncSSHTransport:
-        """The server's shared transport (W3 polls through it)."""
+    def transport(self, server: Server) -> Transport:
+        """The server's shared transport (the monitor polls through it)."""
         t = self._transports.get(server.id)
         if t is None:
             t = AsyncSSHTransport(self.endpoint(server), self.store.known_hosts)
