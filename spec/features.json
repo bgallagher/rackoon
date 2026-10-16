@@ -9,7 +9,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ShellQuoteTests", "RackoonCoreTests.SharedScenarioTests/testShellQuote", "RackoonCoreTests.SharedScenarioTests/testTemplateFill"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.SharedScenarioTests/shellQuote", "com.bgallagher.rackoon.core.SharedScenarioTests/templateFill"]},
         "ios": {"status": "planned", "reason": "stage I1 (shares RackoonCore)"},
-        "web": {"status": "planned", "reason": "stage W1 (Python core)"}
+        "web": {"status": "done", "tests": ["tests.test_shared_scenarios/test_shell_quote", "tests.test_shared_scenarios/test_template_fill", "tests.test_core/test_template_fill_is_one_pass", "tests.test_core/test_no_shell_command_is_copied_into_python"]}
       }
     },
     {

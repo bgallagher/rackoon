@@ -83,3 +83,20 @@ Needs a real server that runs Tailscale SSH, run read-only. None was supplied fo
 - Encrypted private keys, and password auth (asyncssh supports both; W2 decides what is offered, given the PRD's "no password stored in plain text").
 - Keepalive behaviour over a dropped link (W4, with the terminal's auto-reconnect).
 - `tools/lab` clash between worktrees (see S1).
+
+## Stage W1 result: the Python core (16 Oct 2026)
+
+`web/backend/rackoon/core`, pure Python (no SSH, network or database; the only thing it reads is `spec/`), `mypy --strict` clean over the core and its tests. `cd web/backend && uv run pytest` runs it; `uv run mypy` type-checks it.
+
+- **spec/ is the only copy.** `spec.py` reads `commands.json`, `command-library.json` and `themes.json` at runtime (from `$RACKOON_SPEC` / `$RACKOON_THEMES` in the image, else the repository), like the Kotlin core. A test walks every string literal in the core and fails if one holds a whole spec script.
+- **Models** follow `spec/models.schema.json`: `to_json` writes camelCase keys and leaves out unknown optionals; a test validates parsed Overview, DockerSnapshot, UpdatesSnapshot and Server output against the schema with `jsonschema`.
+- **Golden fixtures: every folder passes** (35 files): overview, docker, updates, file_read, listening_ports, files_list, docker_states, services, unraid. Services, Unraid, docker_states and files_list were ported from Swift (the Kotlin core does not have them yet). `licence` is not parsed: supporter keys are `na` for web. A test fails if a new fixture folder has no Python parser test. Number parsing is strict on purpose (Python's `int()`/`float()` accept spaces, `_` and `nan`; Swift and Kotlin do not), and rounding is half-up like theirs.
+- **Shared scenarios:** `tests/test_shared_scenarios.py` implements all seven subjects and is gated by the web column exactly like the Swift and Kotlin runners; a subject with no applicable file is reported as skipped rather than as an empty pass. With `RACKOON_PARITY_ALL=1` every file runs: all pass.
+- **Lab checks** now use the core's parsers and command builders and are gated the same way (all eight pass against the lab with `RACKOON_PARITY_ALL=1`; gated, they skip until their features are done for web). The sudo check still matches sudo's own words; the core's sudo classifier comes with stage W6.
+- **Also in the core** (used from W3 on): the action policy, compose/container command builders and id checks, the stream wrapper and exit-marker parser, connection-field checks, theme loading and validation, the command library with parameter quoting.
+- **CI:** the `web-core` job runs mypy and pytest (JUnit `junit-web`, refs like `tests.test_shared_scenarios/test_shell_quote`), then the scenarios once more with `RACKOON_PARITY_ALL=1`. The parity job requires `web`. `core.shell-safety` is now done for web.
+
+Notes for later stages:
+- `ServiceCatalog` (product names, plumbing lists) is data only the Swift core had, now copied into `services.py`. It should move to `spec/` so the cores can't drift; the services fixtures cover the names they use, nothing more.
+- The Python `DockerContainer` carries `iconURL` (Unraid template icons) like Swift; the Kotlin core does not have it yet.
+- The CI `lab` job does not run the Python lab checks yet: gated, they would all skip. Add it when the first lab-checked feature (W3's overview) is done for web.

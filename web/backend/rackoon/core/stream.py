@@ -1,0 +1,76 @@
+"""Streamed commands: the `stream_wrap` template and the parser that takes its exit marker off the end of the output
+(spec/scenarios/stream-output.json). A streamed ssh gives output but no exit status, so the wrapper prints
+`##rackoon-exit:<n>`; no marker means cancelled or dropped, never success."""
+
+from __future__ import annotations
+
+from . import shell, spec
+
+MARKER = "##rackoon-exit:"
+
+
+def wrap(command: str, cols: int, rows: int) -> str:
+    """`cols`/`rows` are the size of the terminal that shows the output, so redrawing progress lines up. The command
+    must already be vetted."""
+    return shell.fill(spec.script("stream_wrap"), {
+        "cols": str(min(400, max(20, cols))), "rows": str(min(200, max(5, rows))), "command": command})
+
+
+def _leading_int(text: str) -> int | None:
+    """The number at the start of `text`, after any spaces, ignoring what follows it."""
+    digits = ""
+    for c in text.lstrip(" "):
+        if c not in "0123456789":
+            break
+        digits += c
+    if not digits:
+        return None
+    value = int(digits)
+    return value if value <= 2**31 - 1 else None
+
+
+class StreamOutputParser:
+    """Chunks can cut the marker anywhere, so a possible start of it is held back until the next chunk shows what it
+    is. Works on code points, so a `\\r\\n` pair is two characters here as in Kotlin (Swift needed unicode scalars)."""
+
+    def __init__(self) -> None:
+        self._pending = ""
+        self.exit_code: int | None = None
+
+    def push(self, chunk: str) -> str:
+        """Text that is safe to show now."""
+        if self.exit_code is not None:
+            return ""  # nothing follows the marker
+        self._pending += chunk
+        found = self._pending.find(MARKER)
+        if found >= 0:
+            shown = self._pending[:found]
+            rest = self._pending[found + len(MARKER):]
+            end = next((i for i, c in enumerate(rest) if c in "\r\n"), -1)
+            if end >= 0:
+                self.exit_code = _leading_int(rest[:end])
+                self._pending = ""
+            else:
+                self._pending = self._pending[found:]  # the number has not fully arrived
+            return shown
+        hold = 0
+        for length in range(min(len(MARKER) - 1, len(self._pending)), 0, -1):
+            if MARKER.startswith(self._pending[-length:]):
+                hold = length
+                break
+        cut = len(self._pending) - hold
+        shown, self._pending = self._pending[:cut], self._pending[cut:]
+        return shown
+
+    def finish(self) -> tuple[str, int | None]:
+        """At the end: whatever was held back, and the exit code (None if the stream ended before the marker)."""
+        held, self._pending = self._pending, ""
+        if self.exit_code is None:
+            found = held.find(MARKER)
+            if found >= 0:
+                # The marker was the last thing sent, without a trailing newline.
+                code = _leading_int(held[found + len(MARKER):])
+                if code is not None:
+                    self.exit_code = code
+                    return held[:found], code
+        return (held if self.exit_code is None else ""), self.exit_code

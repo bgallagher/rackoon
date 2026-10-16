@@ -41,6 +41,30 @@ jobs:
             android/ssh/build/test-results/test/*.xml
           retention-days: 7
           if-no-files-found: error
+  web-core:
+    # The Python core of the self-hosted web version (web/backend/rackoon/core) and its asyncssh transport. Core reads spec/
+    # directly, so every golden fixture is checked here too; the lab tests skip (no RACKOON_LAB). The second pytest run
+    # also runs the scenarios whose feature is not done on web yet, to keep work ahead of the matrix honest; only the
+    # first run's report counts for parity.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+        working-directory: web/backend
+      - run: uv run mypy
+        working-directory: web/backend
+      - run: uv run pytest --junitxml=build/junit/web.xml
+        working-directory: web/backend
+      - run: RACKOON_PARITY_ALL=1 uv run pytest -q tests/test_shared_scenarios.py
+        working-directory: web/backend
+      - uses: actions/upload-artifact@v4
+        if: always()   # the parity job reports failing tests too
+        with:
+          name: junit-web
+          path: web/backend/build/junit/*.xml
+          retention-days: 7
+          if-no-files-found: error
   swift-macos:
     # SwiftTerm 1.99 needs Swift 6.2+. On an older toolchain SwiftPM silently picked SwiftTerm 1.20.0, which lacks the
     # APIs the app uses, so CI failed on every push. macos-26 ships Xcode 26 (Swift 6.2+).
@@ -136,7 +160,7 @@ jobs:
   # Feature parity (docs/parity.md): every test spec/features.json names for a done feature must have run and passed in
   # that platform's JUnit report. Runs even when a test job failed, so the summary names what broke parity.
   parity:
-    needs: [spec, swift-macos, android-core, lab]
+    needs: [spec, swift-macos, android-core, web-core, lab]
     if: always() && needs.spec.result == 'success'
     runs-on: ubuntu-latest
     steps:
@@ -146,8 +170,9 @@ jobs:
           pattern: junit-*
           path: junit
       - run: |
-          tools/check-parity --summary --require mac,android \
-            mac=junit/junit-mac,junit/junit-mac-lab android=junit/junit-android,junit/junit-android-lab | tee parity.txt
+          tools/check-parity --summary --require mac,android,web \
+            mac=junit/junit-mac,junit/junit-mac-lab android=junit/junit-android,junit/junit-android-lab \
+            web=junit/junit-web | tee parity.txt
           status=${PIPESTATUS[0]}
           { echo '## Feature parity'; echo; cat parity.txt; } >> "$GITHUB_STEP_SUMMARY"
           exit $status

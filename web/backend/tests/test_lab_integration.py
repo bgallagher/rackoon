@@ -1,17 +1,14 @@
-"""The checks in spec/integration/checks.json, run with the real asyncssh transport against the integration lab
-(test/lab; `tools/lab up`, then `eval "$(tools/lab env)"`). Skipped when RACKOON_LAB is unset.
+"""The checks in spec/integration/checks.json, run with the real asyncssh transport and the Python core against the
+integration lab (test/lab; `tools/lab up`, then `eval "$(tools/lab env)"`). Skipped when RACKOON_LAB is unset.
 
-Stage W0 (spike): there is no Python core yet, so the three parse checks read the raw output's sections here and
-assert the same facts the Mac and Android checks assert through their parsers. Stage W1 swaps in the core parsers
-and gates each check on the web column of spec/features.json, like LabIntegrationTests.swift / .kt. Until then every
-check runs. The lab's host key comes from the known_hosts file tools/lab scanned; it is never trusted on first use.
-Commands come from spec/commands.json, never copied.
+Like LabIntegrationTests.swift / .kt, a check runs only while its feature is done for web in spec/features.json
+(`RACKOON_PARITY_ALL=1` runs them all, never as proof). The lab's host key comes from the known_hosts file tools/lab
+scanned; it is never trusted on first use. Every command comes from spec/ through the core.
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import re
 import uuid
@@ -21,6 +18,7 @@ from typing import Any
 
 import pytest
 
+from rackoon.core import docker, overview, spec, stream, updates
 from rackoon.ssh import (
     AsyncSSHTransport,
     AuthFailed,
@@ -30,37 +28,21 @@ from rackoon.ssh import (
     KnownHosts,
     SSHAuth,
     SSHEndpoint,
+    Timeout,
     scan_host_key,
 )
 
-SPEC = Path(__file__).resolve().parents[3] / "spec"
+from .support import PLATFORM, done_features, load, run_everything
 
-
-def _json(name: str) -> Any:
-    return json.loads((SPEC / name).read_text())
-
-
-CHECKS = _json("integration/checks.json")
+CHECKS = load("integration/checks.json")
 FACTS: dict[str, Any] = CHECKS["lab"]
-COMMANDS = {c["id"]: c for c in _json("commands.json")["commands"]}
+IMPLEMENTED = {"overview_parses", "updates_parse", "docker_parses", "stream_exit_status", "logs_cancel_leaves_nothing",
+               "hostkey_mismatch_blocked", "stdin_exact_bytes", "sudo_password_checked"}
 
 
-def script(command_id: str, **values: str) -> str:
-    """A spec command, its `{name}` placeholders filled in one pass (like `Template.fill`)."""
-    text: str = COMMANDS[command_id]["script"]
-    return re.sub(r"\{([a-z_]+)\}", lambda m: values[m.group(1)] if m.group(1) in values else m.group(0), text)
-
-
-def sections(output: str) -> dict[str, list[str]]:
-    """`##name` sections of a batched script's output (W0 stand-in for the core parsers)."""
-    found: dict[str, list[str]] = {}
-    current: list[str] | None = None
-    for line in output.splitlines():
-        if line.startswith("##"):
-            current = found.setdefault(line[2:].strip(), [])
-        elif current is not None:
-            current.append(line)
-    return found
+def applicable_checks() -> set[str]:
+    done = done_features()
+    return {c["id"] for c in CHECKS["checks"] if c["feature"] in done}
 
 
 @dataclass
@@ -81,8 +63,7 @@ class Lab:
                                  known)
 
 
-@pytest.fixture
-def lab() -> Lab:
+def _lab() -> Lab:
     env = os.environ
     if env.get("RACKOON_LAB") != "1":
         pytest.skip('integration lab not configured (tools/lab up, then eval "$(tools/lab env)")')
@@ -94,80 +75,89 @@ def lab() -> Lab:
                Path(env["RACKOON_LAB_KEY"]).read_text(), host_key)
 
 
-async def ps_rows(t: AsyncSSHTransport) -> list[dict[str, Any]]:
-    result = await t.run(script("docker"), timeout=60)
+def check_lab(check: str) -> Lab:
+    lab = _lab()
+    if check not in applicable_checks() and not run_everything():
+        pytest.skip(f"{check}: its feature is not done on {PLATFORM}")
+    return lab
+
+
+@pytest.fixture
+def lab() -> Lab:
+    """For the transport's own spike tests, which are not checks.json checks and run whenever the lab is up."""
+    return _lab()
+
+
+async def lab_stack(t: AsyncSSHTransport) -> docker.DockerStack:
+    result = await t.run(docker.command(), timeout=60)
     assert result.exit_code == 0, result.stderr
-    rows = [json.loads(line) for line in sections(result.stdout)["ps"] if line.startswith("{")]
-    return [r for r in rows if f"com.docker.compose.project={FACTS['stack']}" in r["Labels"]]
+    stack = next((s for s in docker.parse(result.stdout).stacks if s.name == FACTS["stack"]), None)
+    assert stack is not None, "labstack not found"
+    return stack
 
 
-def labels(row: dict[str, Any]) -> dict[str, str]:
-    return dict(pair.split("=", 1) for pair in row["Labels"].split(",") if "=" in pair)
+def test_every_applicable_check_has_a_runner() -> None:
+    for check in applicable_checks():
+        assert check in IMPLEMENTED, f"{check} has no Python lab runner, but its feature is done on web"
 
 
 # --- spec/integration/checks.json ---------------------------------------------------------------------------------
 
 
-async def test_overview_parses(lab: Lab) -> None:
+async def test_overview_parses() -> None:
+    lab = check_lab("overview_parses")
     async with lab.transport() as t:
-        result = await t.run(script("overview"), timeout=30)
+        result = await t.run(overview.command(), timeout=30)
     assert result.exit_code == 0, result.stderr
-    s = sections(result.stdout)
-    assert s["hostname"][0].strip()
-    disks = [ln for ln in s["df"][1:] if ln.strip()]  # first line is df's header
-    assert disks
-    cpu = [int(v) for v in s["stat"][0].split()[1:]]
-    assert sum(cpu) > 0
-    assert s["reboot"][0].strip() == "yes"
-    system = dict(ln.split("=", 1) for ln in s["system"] if "=" in ln)
-    assert system["tailscale_ip"] == FACTS["tailscaleIP"]
-    assert int(s["updates"][0]) == len(FACTS["pending"])
-    assert int(s["security"][0]) == len(FACTS["security"])
+    o = overview.parse(result.stdout)
+    assert o.hostname
+    assert o.disks
+    assert o.cpu.total > 0
+    assert o.reboot_required
+    assert o.tailscale_ip == FACTS["tailscaleIP"]
+    assert o.pending_updates == len(FACTS["pending"])
+    assert o.security_updates == len(FACTS["security"])
 
 
-async def test_updates_parse(lab: Lab) -> None:
+async def test_updates_parse() -> None:
+    lab = check_lab("updates_parse")
     async with lab.transport() as t:
-        result = await t.run(script("updates"), timeout=60)
+        result = await t.run(updates.command(), timeout=60)
     assert result.exit_code == 0, result.stderr
-    s = sections(result.stdout)
-    # `name/suite1,suite2 version arch [upgradable from: ...]`; apt's "Listing..." line has no slash.
-    packages = [ln.split()[0] for ln in s["upgradable"] if "/" in ln.split(" ")[0]]
-    names = sorted(p.split("/")[0] for p in packages)
-    security = sorted(p.split("/")[0] for p in packages if any(x.endswith("-security") for x in p.split("/")[1].split(",")))
-    assert names == sorted(FACTS["pending"])
-    assert security == sorted(FACTS["security"])
-    assert s["reboot"][0].strip() == "yes"
+    snapshot = updates.parse(result.stdout)
+    assert sorted(p.name for p in snapshot.packages) == sorted(FACTS["pending"])
+    assert sorted(p.name for p in snapshot.packages if p.is_security) == sorted(FACTS["security"])
+    assert snapshot.reboot_required
 
 
-async def test_docker_parses(lab: Lab) -> None:
+async def test_docker_parses() -> None:
+    lab = check_lab("docker_parses")
     async with lab.transport() as t:
-        rows = await ps_rows(t)
-    ticker = next(r for r in rows if labels(r).get("com.docker.compose.service") == FACTS["service"])
-    assert ticker["State"] == "running"
-    # A compose command can be built from the labels: an absolute working dir and absolute config files.
-    lab_labels = labels(ticker)
-    assert lab_labels["com.docker.compose.project.working_dir"].startswith("/")
-    assert lab_labels["com.docker.compose.project.config_files"].startswith("/")
+        stack = await lab_stack(t)
+    ticker = next((c for c in stack.containers if c.service == FACTS["service"]), None)
+    assert ticker is not None and ticker.state == "running"
+    assert docker.ComposeAction.UP.command(stack) is not None
 
 
-async def test_stream_exit_status(lab: Lab) -> None:
-    command = script("stream_wrap", cols="80", rows="24", command="echo lab-out; exit 3")
-    async with lab.transport() as t, t.stream(command) as s:
+async def test_stream_exit_status() -> None:
+    lab = check_lab("stream_exit_status")
+    async with lab.transport() as t, t.stream(stream.wrap("echo lab-out; exit 3", 80, 24)) as s:
         text = "".join([chunk async for chunk in s])
-    match = re.search(r"##rackoon-exit:(\d+)", text)
-    assert match and int(match.group(1)) == 3, text
-    assert "lab-out" in text
-    # asyncssh also reports a pty channel's own exit status (the marker stays the cross-platform contract).
-    assert s.exit_status == 0  # the wrapper's last command is `echo`
+    parser = stream.StreamOutputParser()
+    shown = parser.push(text)
+    rest, exit_code = parser.finish()
+    assert exit_code == 3, text
+    assert "lab-out" in shown + rest
 
 
-async def test_logs_cancel_leaves_nothing(lab: Lab) -> None:
+async def test_logs_cancel_leaves_nothing() -> None:
+    lab = check_lab("logs_cancel_leaves_nothing")
     async with lab.transport() as t:
-        container_id = (await ps_rows(t))[0]["ID"]
-        assert re.fullmatch(r"[0-9a-f]{12,64}", container_id)
+        command = docker.logs_command((await lab_stack(t)).containers[0].id)
+        assert command is not None
         seen = ""
         async with asyncio.timeout(30):
-            async with t.stream(script("docker_logs", id=container_id)) as s:
+            async with t.stream(command) as s:
                 async for chunk in s:
                     seen += chunk
                     if "tick" in seen:
@@ -182,7 +172,8 @@ async def test_logs_cancel_leaves_nothing(lab: Lab) -> None:
     assert left == "0", "docker logs is still running on the server after cancelling"
 
 
-async def test_hostkey_mismatch_blocked(lab: Lab) -> None:
+async def test_hostkey_mismatch_blocked() -> None:
+    lab = check_lab("hostkey_mismatch_blocked")
     blob = bytearray(lab.host_key.blob)
     blob[-1] ^= 1
     wrong = HostKey(lab.host_key.key_type, bytes(blob))
@@ -195,7 +186,8 @@ async def test_hostkey_mismatch_blocked(lab: Lab) -> None:
         assert (await t.run(f"test -e {marker} && echo present || echo absent", timeout=15)).stdout.strip() == "absent"
 
 
-async def test_stdin_exact_bytes(lab: Lab) -> None:
+async def test_stdin_exact_bytes() -> None:
+    lab = check_lab("stdin_exact_bytes")
     size = 1 << 20
     async with lab.transport() as t:
         result = await t.run("wc -c", timeout=30, input="r" * size)
@@ -203,27 +195,20 @@ async def test_stdin_exact_bytes(lab: Lab) -> None:
     assert result.stdout.strip() == str(size)
 
 
-async def test_sudo_password_checked(lab: Lab) -> None:
+async def test_sudo_password_checked() -> None:
+    lab = check_lab("sudo_password_checked")
     async with lab.transport(user=lab.sudo_user) as sudo:
         # -k: ignore any cached credential, so the password is really checked each time.
         wrong = await sudo.run("sudo -k -S -p '' id -u", timeout=30, input="not-the-password\n")
         assert wrong.exit_code != 0
-        # W1 classifies this with the core's classifySudoFailure; the lab's sudo says it plainly.
+        # Stage W6 brings the core's classify_sudo_failure; until then sudo's own words.
         assert re.search(r"incorrect password|Sorry, try again|authentication failure", wrong.stderr, re.I), wrong.stderr
         right = await sudo.run("sudo -k -S -p '' id -u", timeout=30, input=lab.sudo_password + "\n")
     assert right.exit_code == 0, right.stderr
     assert right.stdout.strip() == "0"
 
 
-def test_every_check_has_a_runner() -> None:
-    implemented = {
-        "overview_parses", "updates_parse", "docker_parses", "stream_exit_status", "logs_cancel_leaves_nothing",
-        "hostkey_mismatch_blocked", "stdin_exact_bytes", "sudo_password_checked",
-    }
-    assert {c["id"] for c in CHECKS["checks"]} <= implemented
-
-
-# --- W0 spike extras (not in checks.json) -------------------------------------------------------------------------
+# --- The transport's own checks from the W0 spike (not in checks.json) --------------------------------------------
 
 
 async def test_spike_unknown_host_key_is_reported_not_trusted(lab: Lab) -> None:
@@ -242,7 +227,6 @@ async def test_spike_none_auth_refused_by_openssh_is_auth_failed(lab: Lab) -> No
 
 
 async def test_spike_exit_codes_and_timeout(lab: Lab) -> None:
-    from rackoon.ssh import Timeout
     async with lab.transport() as t:
         assert (await t.run("exit 7", timeout=15)).exit_code == 7
         assert (await t.run("kill -TERM $$", timeout=15)).exit_code == 15
@@ -253,8 +237,7 @@ async def test_spike_exit_codes_and_timeout(lab: Lab) -> None:
 
 async def test_spike_utf8_split_across_reads(lab: Lab) -> None:
     # 200k three-byte characters arrive in many reads; none may be cut in half.
-    command = script("stream_wrap", cols="80", rows="24",
-                     command="python3 -c 'print(\"€\" * 200000)' 2>/dev/null || printf '€%.0s' $(seq 1 200000)")
+    command = stream.wrap("python3 -c 'print(\"€\" * 200000)' 2>/dev/null || printf '€%.0s' $(seq 1 200000)", 80, 24)
     async with lab.transport() as t, t.stream(command) as s:
         text = "".join([chunk async for chunk in s])
     assert "�" not in text
@@ -266,8 +249,7 @@ async def test_spike_shell_resize_and_echo(lab: Lab) -> None:
         shell = await t.open_shell(100, 30)
         try:
             shell.write(b"stty size; echo rk-$((40+2))\n")
-            out = await _read_until(shell, b"rk-42")
-            assert b"30 100" in out
+            assert b"30 100" in await _read_until(shell, b"rk-42")
             shell.resize(132, 43)
             shell.write(b"stty size\n")
             assert b"43 132" in await _read_until(shell, b"43 132")
@@ -284,3 +266,8 @@ async def _read_until(shell: Any, needle: bytes, seconds: float = 10) -> bytes:
                 break
             data += chunk
     return data
+
+
+def test_commands_used_here_exist_in_spec() -> None:
+    for cid in ("overview", "updates", "docker", "docker_logs", "stream_wrap"):
+        assert spec.script(cid)
