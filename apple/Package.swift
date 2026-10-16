@@ -54,10 +54,13 @@ let package = Package(
     products: [
         .library(name: "RackoonCore", targets: ["RackoonCore"]),
         .library(name: "RackoonSSHSystem", targets: ["RackoonSSHSystem"]),
+        .library(name: "RackoonSSHEmbedded", targets: ["RackoonSSHEmbedded"]),
     ] + macProducts,
     dependencies: [
         .package(url: "https://github.com/migueldeicaza/SwiftTerm.git", from: "1.99.0"),
         .package(url: "https://github.com/swiftlang/swift-subprocess.git", from: "1.0.1"),
+        // Exactly 0.12.0: 0.12.1 moved its NIOSSH dependency to an unrelated individual's fork (docs/ios-spikes.md).
+        .package(url: "https://github.com/orlandos-nl/Citadel.git", exact: "0.12.0"),
     ],
     targets: [
         .target(
@@ -73,6 +76,17 @@ let package = Package(
             name: "RackoonSSHSystemTests",
             dependencies: ["RackoonSSHSystem"],
             path: "Packages/RackoonSSHSystem/Tests/RackoonSSHSystemTests"
+        ),
+        .target(
+            // The SSH transport for platforms without /usr/bin/ssh (iOS; later the App Store build), on SwiftNIO SSH.
+            name: "RackoonSSHEmbedded",
+            dependencies: ["RackoonCore", .product(name: "Citadel", package: "Citadel")],
+            path: "Packages/RackoonSSHEmbedded/Sources/RackoonSSHEmbedded"
+        ),
+        .testTarget(
+            name: "RackoonSSHEmbeddedTests",
+            dependencies: ["RackoonSSHEmbedded"],
+            path: "Packages/RackoonSSHEmbedded/Tests/RackoonSSHEmbeddedTests"
         ),
         .testTarget(
             name: "RackoonCoreTests",

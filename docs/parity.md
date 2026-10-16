@@ -67,7 +67,7 @@ eval "$(tools/lab env)"
 tools/lab down
 ```
 
-- Every transport runs the same checks with its real SSH code: `LabIntegrationTests` in `RackoonSSHSystemTests` and in `android/ssh`. The checks cover parsing real output, streamed exit status, a cancelled `docker logs` leaving nothing behind, a changed host key blocked, exact stdin bytes, and sudo password checking.
+- Every transport runs the same checks with its real SSH code: `LabIntegrationTests` in `RackoonSSHSystemTests` and in `android/ssh`, and for iOS in `RackoonSSHEmbeddedTests` (the SwiftNIO SSH transport; it runs every check, because the transport and core already exist while the iOS screens come later; `docs/ios-spikes.md`). The checks cover parsing real output, streamed exit status, a cancelled `docker logs` leaving nothing behind, a changed host key blocked, exact stdin bytes, and sudo password checking.
 - Feature gating works as for the scenarios. The tests skip themselves when the lab isn't configured, so a normal `swift test` is unaffected.
 - The Mac transport is pointed at the lab with `-F /dev/null` and the lab's own known_hosts. Nothing in `~/.ssh` is read or written.
 - In CI, the `lab` job runs on Linux, because macOS runners have no Docker. It runs the Kotlin checks there, and the Mac's `OpenSSHTransport` in the `swift:6.2` image. `RackoonCore` and `RackoonSSHSystem` therefore build on Linux; the Secure Enclave secret store is compiled only on Apple platforms.
