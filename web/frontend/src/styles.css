@@ -199,6 +199,24 @@ input:focus, select:focus, textarea:focus { border-color: var(--accent); outline
 .pick-list label { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .notes { margin: 0; padding-left: 18px; }
 
+/* Terminal */
+.terminal-page { display: flex; flex-direction: column; gap: 10px; height: 100%; padding: 12px 16px 16px; }
+.terminal-tabs { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.terminal-tab { display: flex; align-items: center; border: 1px solid var(--border); border-radius: 8px; background: var(--card); }
+.terminal-tab.selected { border-color: var(--accent); background: var(--selection); }
+.terminal-tab-name { display: flex; align-items: center; gap: 7px; background: none; border: 0; color: var(--text); padding: 6px 4px 6px 10px; font: inherit; cursor: pointer; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.terminal-tab input { width: 160px; margin: 3px; padding: 3px 6px; }
+.terminal-tab-close { background: none; border: 0; color: var(--muted); padding: 4px 9px; cursor: pointer; font-size: 15px; }
+.terminal-tab-close:hover { color: var(--danger-label); }
+.terminal-tab-add { width: 30px; height: 30px; border-radius: 8px; border: 1px dashed var(--border); background: none; color: var(--text); cursor: pointer; font-size: 16px; }
+.terminal-tab-add:disabled { opacity: .4; cursor: default; }
+.terminal-tabs-spacer { flex: 1; }
+.toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--text-2); font-size: 13px; }
+.terminal-frame { position: relative; flex: 1; min-height: 240px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.terminal-host, .terminal-surface { position: absolute; inset: 0; }
+.terminal-surface { padding: 6px 0 0 8px; }
+.terminal-overlay { position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--warn-border); box-shadow: 0 10px 30px rgba(0,0,0,.35); max-width: calc(100% - 32px); flex-wrap: wrap; }
+
 /* Sheets */
 .scrim { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: grid; place-items: center; z-index: 30; padding: 16px; }
 .sheet { width: min(520px, 100%); max-height: calc(100vh - 32px); overflow: auto; background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px; box-shadow: 0 24px 64px rgba(0,0,0,.4); }

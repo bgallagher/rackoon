@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, setCsrf, whenSignedOut } from "./api";
 import { Sidebar } from "./components/Sidebar";
 import { Empty, Spinner } from "./components/ui";
@@ -8,6 +8,8 @@ import { DashboardScreen } from "./screens/Dashboard";
 import { OverviewScreen } from "./screens/Overview";
 import { SettingsScreen } from "./screens/Settings";
 import { SignInScreen } from "./screens/SignIn";
+// xterm.js is most of the bundle: load it only when a terminal is opened.
+const TerminalScreen = lazy(() => import("./screens/Terminal").then((m) => ({ default: m.TerminalScreen })));
 import { applyAppearance } from "./theme";
 import type { Appearance, AuthState, Fleet, Safety, Server } from "./types";
 
@@ -79,7 +81,7 @@ function Shell(props: { auth: AuthState; onSignedOut: () => void }) {
     },
   }), [props, servers, fleet, safety, appearance, reloadServers, reloadFleet, setAppearance, go]);
 
-  // Routes: /dashboard, /servers/<id>, /settings/<tab>[/<sub>]; "/" opens the last server or the dashboard.
+  // Routes: /dashboard, /servers/<id>[/terminal], /settings/<tab>[/<sub>]; "/" opens the last server or the dashboard.
   const parts = route.split("/").filter(Boolean);
   useEffect(() => {
     if (!servers || parts.length > 0) return;
@@ -95,7 +97,9 @@ function Shell(props: { auth: AuthState; onSignedOut: () => void }) {
   const server = serverId ? servers!.find((s) => s.id === serverId) : undefined;
   let screen;
   if (parts[0] === "servers") {
-    screen = server ? <OverviewScreen key={server.id} server={server} />
+    screen = server && parts[2] === "terminal"
+      ? <Suspense fallback={<div className="page"><Spinner /></div>}><TerminalScreen key={server.id} server={server} /></Suspense>
+           : server ? <OverviewScreen key={server.id} server={server} />
                     : <div className="page"><Empty title="No such server"><a href="#/dashboard">Back to the dashboard</a></Empty></div>;
   } else if (parts[0] === "settings") {
     screen = <SettingsScreen tab={parts[1] ?? "servers"} sub={parts[2]} />;

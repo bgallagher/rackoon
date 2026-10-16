@@ -179,7 +179,7 @@
         "mac": {"status": "done", "tests": [], "untested": "SwiftTerm view; verified by hand"},
         "android": {"status": "done", "tests": [], "untested": "termlib view; verified by hand"},
         "ios": {"status": "planned", "reason": "stage I3"},
-        "web": {"status": "planned", "reason": "stage W4"}
+        "web": {"status": "done", "tests": ["tests.test_terminals_api/test_type_read_highlight_resize_and_replay", "tests.test_terminals_api/test_rename_list_close_and_remove_the_server", "tests.test_terminals_api/test_read_only_gates_new_tabs", "tests.test_terminals_api/test_read_only_refuses_keystrokes_but_keeps_the_session", "tests.test_terminals_api/test_the_socket_needs_this_pages_origin", "tests.test_api_lab/test_lab_terminal_over_the_websocket"]}
       }
     },
     {
@@ -189,7 +189,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.TerminalOutputFilterTests", "RackoonCoreTests.OutputHighlighterTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.TerminalOutputFilterTests", "com.bgallagher.rackoon.core.OutputHighlighterTests"]},
         "ios": {"status": "planned", "reason": "stage I3"},
-        "web": {"status": "planned", "reason": "stage W4"}
+        "web": {"status": "done", "tests": ["tests.test_terminal", "tests.test_terminals_api/test_type_read_highlight_resize_and_replay", "tests.test_api_lab/test_lab_terminal_over_the_websocket"]}
       }
     },
     {
@@ -199,7 +199,7 @@
         "mac": {"status": "done", "tests": [], "untested": "TerminalTab.ended retry; verified by hand with Wi-Fi off/on"},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ReconnectPolicyTests"]},
         "ios": {"status": "planned", "reason": "stage I3"},
-        "web": {"status": "planned", "reason": "stage W4"}
+        "web": {"status": "done", "tests": ["tests.test_terminal/test_backs_off_through_five_attempts_then_gives_up", "tests.test_terminal/test_only_a_lost_connection_is_retried", "tests.test_terminal/test_a_session_that_lasted_ten_seconds_earns_a_fresh_budget", "tests.test_terminals_api/test_a_lost_connection_reconnects_and_an_exit_is_final", "tests.test_terminals_api/test_refused_logins_are_not_retried_and_unreachable_ones_are"]}
       }
     },
     {

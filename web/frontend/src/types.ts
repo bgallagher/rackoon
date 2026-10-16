@@ -176,6 +176,7 @@ export interface ResolvedTheme {
 
 export interface Appearance {
   selection: string;
+  highlightOutput: boolean;
   themes: { id: string; name: string; family: string; appearance: "dark" | "light" }[];
   dark: ResolvedTheme;
   light: ResolvedTheme;
@@ -222,4 +223,15 @@ export interface PendingAction {
   command: string;
   risk: "read" | "mutate";
   destructive: boolean;
+}
+
+export interface TerminalTab {
+  id: string;
+  serverId: string;
+  title: string;
+  state: "starting" | "connected" | "reconnecting" | "disconnected" | "exited";
+  attempt?: number;
+  of?: number;
+  delay?: number;
+  exitCode?: number | null;
 }

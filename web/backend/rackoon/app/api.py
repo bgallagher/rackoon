@@ -13,6 +13,7 @@ import asyncio
 import contextlib
 import hashlib
 import hmac
+import json
 import logging
 import tempfile
 import time
@@ -24,10 +25,11 @@ from typing import Any
 
 import asyncssh
 
-from fastapi import Depends, FastAPI, Request, Response
+from fastapi import Depends, FastAPI, Request, Response, WebSocket, WebSocketDisconnect
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
+from starlette.requests import HTTPConnection
 
 from rackoon.core import ssh_config
 from rackoon.core.jsonmodel import to_json
@@ -47,6 +49,7 @@ from .preferences import Preferences
 from .settings import Settings
 from .static import mount_frontend
 from .storage import DataStore, KeyInfo, new_id
+from .terminals import TerminalManager
 
 log = logging.getLogger("rackoon.api")
 
@@ -122,7 +125,17 @@ class MoveIn(Body):
 
 
 class AppearanceIn(Body):
-    selection: str = Field(max_length=100)
+    selection: str | None = Field(default=None, max_length=100)
+    highlightOutput: bool | None = None
+
+
+class TerminalIn(Body):
+    cols: int = Field(default=80, ge=1, le=1000)
+    rows: int = Field(default=24, ge=1, le=1000)
+
+
+class TitleIn(Body):
+    title: str = Field(max_length=200)
 
 
 class SafetyIn(Body):
@@ -166,6 +179,8 @@ class Rackoon:
         self.actions = ActionCenter(self.preferences.policy, clock)
         self.monitor = Monitor(self.store, self.connections, clock)
         self.monitor.sync(self.store.load_servers())
+        self.terminals = TerminalManager(self.connections.open_shell, lambda: self.preferences.read_only,
+                                         self.preferences.touch, lambda: self.preferences.highlight_output)
         self.setup_token: security.SetupToken | None = None
         if self.demo:
             log.warning("Demo mode: made-up servers in %s; nothing is sent anywhere, and no sign-in is needed.", data_dir)
@@ -179,7 +194,7 @@ class Rackoon:
 
     # --- who is asking
 
-    def client_address(self, request: Request) -> str:
+    def client_address(self, request: HTTPConnection) -> str:
         """The peer, or the last address before our trusted proxies in X-Forwarded-For."""
         peer = request.client.host if request.client else ""
         if not self.settings.is_trusted_proxy(peer):
@@ -190,7 +205,7 @@ class Rackoon:
                 return hop
         return peer
 
-    def forward_user(self, request: Request) -> str | None:
+    def forward_user(self, request: HTTPConnection) -> str | None:
         header = self.settings.forward_auth_header
         if not header:
             return None
@@ -209,7 +224,7 @@ class Rackoon:
         return hmac.new(self.secret, f"csrf:{user}".encode(), hashlib.sha256).hexdigest()
 
 
-def _same_origin(request: Request, rackoon: Rackoon) -> bool:
+def _same_origin(request: HTTPConnection, rackoon: Rackoon) -> bool:
     origin = request.headers.get("origin")
     if origin is None:
         return True
@@ -263,6 +278,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         idle.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await idle
+        await rackoon.terminals.close_all()
         await rackoon.monitor.stop()
         await rackoon.connections.close()
 
@@ -299,6 +315,16 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         if request.url.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
         return response
+
+    def identify(request: HTTPConnection) -> tuple[str, str]:
+        """The signed-in user and the CSRF token they must send, or 401."""
+        forward = "demo" if rackoon.demo else rackoon.forward_user(request)
+        if forward is not None:
+            return forward, rackoon.forward_csrf(forward)
+        session = rackoon.sessions.get(request.cookies.get(COOKIE))
+        if session is None:
+            raise ApiError(401, "signedOut", "Sign in first.")
+        return session.user, session.csrf
 
     def authenticated(request: Request) -> str:
         """The signed-in user; for a change also checks the CSRF header."""
@@ -492,7 +518,8 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         new = server_from(body, server_id, old.ssh_config_alias if body.host.strip() == old.host else None)
         saved([new if s.id == server_id else s for s in servers])
         if not new.connects_like(old):
-            # A new address or key: the open connection and the cached reading belong to the old one.
+            # A new address or key: the open connection, its terminals and the cached reading belong to the old one.
+            await rackoon.terminals.close_server(server_id)
             await rackoon.connections.forget(server_id)
             store.delete_snapshot(server_id)
         return _server_json(new, store.keys_dir)
@@ -502,6 +529,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         servers = store.load_servers()
         find(servers, server_id)
         saved([s for s in servers if s.id != server_id])
+        await rackoon.terminals.close_server(server_id)
         await rackoon.connections.forget(server_id)
         store.delete_snapshot(server_id)
         return {"ok": True}
@@ -573,10 +601,14 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
 
     @app.put("/api/appearance")
     async def set_appearance(body: AppearanceIn, _: str = Auth) -> dict[str, Any]:
-        try:
-            rackoon.preferences.set_theme(body.selection)
-        except ValueError:
-            raise ApiError(422, "noSuchTheme", "There is no such theme.") from None
+        if body.selection is not None:
+            try:
+                rackoon.preferences.set_theme(body.selection)
+            except ValueError:
+                raise ApiError(422, "noSuchTheme", "There is no such theme.") from None
+        if body.highlightOutput is not None:
+            rackoon.preferences.set_highlight_output(body.highlightOutput)
+            rackoon.terminals.set_highlight(body.highlightOutput)  # open tabs switch at once
         return rackoon.preferences.appearance_json()
 
     @app.get("/api/safety")
@@ -594,6 +626,96 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
     @app.post("/api/activity")
     async def activity(_: str = Auth) -> dict[str, Any]:
         return {"readOnly": rackoon.preferences.read_only}  # authenticated() already noted the touch
+
+    # --- terminals
+
+    def tab_of(tab_id: str) -> Any:
+        tab = rackoon.terminals.tabs.get(tab_id)
+        if tab is None:
+            raise ApiError(404, "noSuchTerminal", "That terminal tab is closed.")
+        return tab
+
+    @app.get("/api/servers/{server_id}/terminals")
+    async def list_terminals(server_id: str, _: str = Auth) -> list[dict[str, Any]]:
+        find(store.load_servers(), server_id)
+        return [t.json() for t in rackoon.terminals.for_server(server_id)]
+
+    @app.post("/api/servers/{server_id}/terminals", status_code=201)
+    async def open_terminal(server_id: str, body: TerminalIn, _: str = Auth) -> dict[str, Any]:
+        server = find(store.load_servers(), server_id)
+        try:
+            return rackoon.terminals.open(server, body.cols, body.rows).json()
+        except PermissionError as e:
+            raise ApiError(409, "readOnly", str(e)) from None
+        except OverflowError as e:
+            raise ApiError(409, "tooManyTabs", str(e)) from None
+
+    @app.put("/api/terminals/{tab_id}")
+    async def rename_terminal(tab_id: str, body: TitleIn, _: str = Auth) -> dict[str, Any]:
+        tab_of(tab_id)
+        return rackoon.terminals.rename(tab_id, body.title).json()
+
+    @app.post("/api/terminals/{tab_id}/reconnect")
+    async def reconnect_terminal(tab_id: str, _: str = Auth) -> dict[str, Any]:
+        tab_of(tab_id)
+        if rackoon.preferences.read_only:
+            raise ApiError(409, "readOnly", "Read-only is on. Turn it off to reconnect a shell.")
+        return rackoon.terminals.reconnect(tab_id).json()
+
+    @app.delete("/api/terminals/{tab_id}")
+    async def close_terminal(tab_id: str, _: str = Auth) -> dict[str, Any]:
+        tab_of(tab_id)
+        await rackoon.terminals.close(tab_id)
+        return {"ok": True}
+
+    @app.websocket("/api/terminals/{tab_id}/ws")
+    async def terminal_socket(ws: WebSocket, tab_id: str) -> None:
+        # A WebSocket can't carry the CSRF header, so the Origin must be this page's (browsers always send it), on
+        # top of the SameSite=Strict cookie; a missing Origin is refused too.
+        if ws.headers.get("origin") is None or not _same_origin(ws, rackoon):
+            await ws.close(code=4403)
+            return
+        try:
+            identify(ws)
+        except ApiError:
+            await ws.close(code=4401)
+            return
+        if tab_id not in rackoon.terminals.tabs:
+            await ws.close(code=4404)
+            return
+        await ws.accept()
+        tab, client = rackoon.terminals.attach(tab_id)
+
+        async def writer() -> None:
+            while (frame := await client.queue.get()) is not None:
+                if isinstance(frame, bytes):
+                    await ws.send_bytes(frame)
+                else:
+                    await ws.send_text(frame)
+            await ws.close()
+
+        sending = asyncio.create_task(writer())
+        try:
+            while True:
+                message = await ws.receive()
+                if message["type"] == "websocket.disconnect":
+                    break
+                if message.get("bytes") is not None:
+                    rackoon.terminals.input(tab, client, message["bytes"][:65536])
+                elif message.get("text") is not None:
+                    try:
+                        control = json.loads(message["text"])
+                    except ValueError:
+                        continue
+                    if isinstance(control, dict) and control.get("type") == "resize":
+                        rackoon.terminals.resize(tab, int(control.get("cols", 80)), int(control.get("rows", 24)))
+        except (WebSocketDisconnect, RuntimeError):
+            pass
+        finally:
+            rackoon.terminals.detach(tab, client)
+            sending.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await sending
 
     # --- confirming an action
 

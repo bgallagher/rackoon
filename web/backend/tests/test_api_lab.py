@@ -117,3 +117,43 @@ def test_lab_sign_in_with_a_generated_key(api: TestClient, lab: dict[str, str]) 
     finally:
         asyncio.run(_authorized_keys(lab, remove))
     assert api.post(f"/api/servers/{server['id']}/check").json()["status"] == "authFailed", "removed again"
+
+
+def test_lab_terminal_over_the_websocket(api: TestClient, lab: dict[str, str]) -> None:
+    """A real shell on the lab's sshd, through the API and its WebSocket: typing, a highlighted IP, a resize the
+    shell sees, and exit ending the tab."""
+    import json as jsonlib
+    import time
+    key = api.post("/api/keys/import", json={"name": "lab", "privateKey": Path(lab["RACKOON_LAB_KEY"]).read_text()})
+    server = add_lab_server(api, lab, key.json()["id"])
+    trust_lab(api, server, lab)
+    api.put("/api/safety", json={"readOnly": False})
+    tab = api.post(f"/api/servers/{server['id']}/terminals", json={"cols": 100, "rows": 30}).json()
+
+    def until(ws: Any, needle: str) -> str:
+        seen, deadline = "", time.monotonic() + 20
+        while needle not in seen:
+            assert time.monotonic() < deadline, seen[-500:]
+            m = ws.receive()
+            if m.get("bytes") is not None:
+                seen += m["bytes"].decode("utf-8", "replace")
+            elif m.get("text") is not None:
+                seen += f"<<{jsonlib.loads(m['text']).get('state', '')}>>"
+        return seen
+
+    # What a browser sends with the upgrade: this page's Origin and the session cookie. (The test client's sockets
+    # always go to "testserver", so the cookie set for rackoon.test is passed by hand.)
+    headers = {"origin": "https://testserver", "cookie": f"__Host-rackoon={api.cookies.get('__Host-rackoon')}"}
+    with api.websocket_connect(f"/api/terminals/{tab['id']}/ws", headers=headers) as ws:
+        until(ws, "<<connected>>")
+        ws.send_bytes(b"echo rk-$((6*7)) at 10.20.30.40 here\r")
+        # Typed echo is never coloured, so this only appears in the command's output, highlighted.
+        out = until(ws, "rk-42 at \x1b[35m10.20.30.40\x1b[39m here")
+        assert "rk-42" in out
+        ws.send_text(jsonlib.dumps({"type": "resize", "cols": 120, "rows": 40}))
+        ws.send_bytes(b"stty size\r")
+        assert "40 120" in until(ws, "40 120")
+        ws.send_bytes(b"exit 3\r")
+        assert "<<exited>>" in until(ws, "<<exited>>")
+    tabs = api.get(f"/api/servers/{server['id']}/terminals").json()
+    assert tabs[0]["state"] == "exited" and tabs[0]["exitCode"] == 3

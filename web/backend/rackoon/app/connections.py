@@ -25,6 +25,7 @@ from rackoon.ssh import (
     SSHAuth,
     SSHEndpoint,
     SSHError,
+    ShellSession,
     scan_host_key,
 )
 
@@ -105,6 +106,13 @@ class Connections:
             t = AsyncSSHTransport(self.endpoint(server), self.store.known_hosts)
             self._transports[server.id] = t
         return t
+
+    async def open_shell(self, server: Server, cols: int, rows: int) -> ShellSession:
+        """A terminal tab's interactive pty, on the server's shared connection (like the Mac's tabs over ControlMaster)."""
+        t = self.transport(server)
+        if not isinstance(t, AsyncSSHTransport):
+            raise TypeError("this transport has no shell")
+        return await t.open_shell(cols, rows)
 
     async def forget(self, server_id: str) -> None:
         """Drop the server's open connection (its address or key changed, or it was removed)."""

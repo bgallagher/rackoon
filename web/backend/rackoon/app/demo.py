@@ -152,6 +152,13 @@ class DemoConnections(Connections):
     async def scan(self, server: Server) -> CheckResult:
         return CheckResult("ok", "The host key is trusted.", DEMO_KEY, DEMO_KEY)
 
+    async def open_shell(self, server: Server, cols: int, rows: int) -> DemoShell:  # type: ignore[override]
+        profile = self.profiles.get(server.id, NUC)
+        await self.transport(server).connect()  # the unreachable and refusing servers fail here, as a real one would
+        shell = DemoShell(profile, server.user or "root")
+        shell.resize(cols, rows)
+        return shell
+
     async def check(self, server: Server) -> CheckResult:
         try:
             await self.transport(server).connect()
@@ -160,3 +167,99 @@ class DemoConnections(Connections):
         except Unreachable as e:
             return CheckResult("unreachable", str(e))
         return CheckResult("ok", "Connected and signed in.")
+
+
+class DemoShell:
+    """A scripted pretend shell for terminal tabs in demo mode: a login banner, a prompt, a few canned answers, line
+    editing and Ctrl-C. Whatever is typed is never run anywhere."""
+
+    def __init__(self, profile: DemoProfile, user: str) -> None:
+        self.profile = profile
+        self.user = user
+        self.line = ""
+        self.out: asyncio.Queue[bytes] = asyncio.Queue()
+        self._exit: int | None = None
+        self.cols, self.rows = 80, 24
+        banner = (f"Welcome to {profile.pretty_name} (GNU/Linux {profile.kernel} x86_64)\r\n\r\n"
+                  f"  System load:  0.48           Usage of /:   {int(profile.disk_used_fraction * 100)}% of "
+                  f"{profile.disk_total // 10**9} GB\r\n  IPv4 address for eth0: {profile.ip}\r\n"
+                  + (f"  IPv4 address for tailscale0: {profile.tailscale_ip}\r\n" if profile.tailscale_ip else "")
+                  + "\r\nThis is Rackoon's demo: nothing you type is sent anywhere. Try: help\r\n\r\n")
+        self.out.put_nowait(banner.encode() + self._prompt())
+
+    def _prompt(self) -> bytes:
+        return f"\x1b[1;32m{self.user}@{self.profile.hostname}\x1b[0m:\x1b[1;34m~\x1b[0m$ ".encode()
+
+    async def read(self) -> bytes:
+        return await self.out.get()
+
+    def write(self, data: bytes) -> None:
+        for ch in data.decode("utf-8", "replace"):
+            if ch in "\r\n" and self.line.strip() == "drop":
+                # Pretend the link went away (no exit status), to show the terminal reconnecting.
+                self.line = ""
+                self.out.put_nowait(b"\r\n")
+                self.out.put_nowait(b"")
+                return
+            if ch in "\r\n":
+                self.out.put_nowait(b"\r\n" + self._answer(self.line.strip()))
+                self.line = ""
+                if self._exit is not None:
+                    self.out.put_nowait(b"")
+                    return
+                self.out.put_nowait(self._prompt())
+            elif ch == "\x03":
+                self.line = ""
+                self.out.put_nowait(b"^C\r\n" + self._prompt())
+            elif ch in "\x7f\x08":
+                if self.line:
+                    self.line = self.line[:-1]
+                    self.out.put_nowait(b"\b \b")
+            elif ch == "\x04" and not self.line:
+                self._exit = 0
+                self.out.put_nowait(b"logout\r\n")
+                self.out.put_nowait(b"")
+            elif ch >= " ":
+                self.line += ch
+                self.out.put_nowait(ch.encode())
+
+    def _answer(self, command: str) -> bytes:
+        p = self.profile
+        word = command.split(" ")[0] if command else ""
+        answers = {
+            "": "",
+            "help": "Demo commands: ls, uptime, df -h, ip -4 a, whoami, hostname, size, echo, clear, drop (lose the "
+                    "connection), exit",
+            "ls": "compose  notes.txt  stacks",
+            "whoami": self.user,
+            "hostname": p.hostname,
+            "uptime": f" 10:42:07 up {int(p.uptime_days)} days,  2 users,  load average: 0.48, 0.51, 0.48",
+            "df": (f"Filesystem      Size  Used Avail Use% Mounted on\r\n/dev/nvme0n1p2  {p.disk_total // 10**9}G  "
+                   f"{int(p.disk_total * p.disk_used_fraction) // 10**9}G  "
+                   f"{int(p.disk_total * (1 - p.disk_used_fraction)) // 10**9}G  {int(p.disk_used_fraction * 100)}% /\r\n"
+                   "/dev/nvme0n1p1  1.1G  6.3M  1.1G   1% /boot/efi\r\n/dev/sdb1       2.0T  1.9T  0.1T  95% /mnt/backup"),
+            "ip": (f"2: eth0    inet {p.ip}/24 brd 192.168.1.255 scope global eth0"
+                   + (f"\r\n3: tailscale0    inet {p.tailscale_ip}/32 scope global tailscale0" if p.tailscale_ip else "")),
+            "size": f"{self.cols} columns x {self.rows} rows",
+            "clear": "\x1b[H\x1b[2J",
+        }
+        if word == "exit":
+            self._exit = 0
+            return b"logout\r\n"
+        if word == "echo":
+            return command[5:].encode() + b"\r\n"
+        if word in answers:
+            text = answers[word]
+            return (text + ("\r\n" if text and word != "clear" else "")).encode()
+        return f"{word}: not run (this is the demo; nothing is sent anywhere)\r\n".encode()
+
+    def resize(self, cols: int, rows: int) -> None:
+        self.cols, self.rows = cols, rows
+
+    @property
+    def exit_status(self) -> int | None:
+        return self._exit
+
+    async def close(self) -> None:
+        self._exit = self._exit if self._exit is not None else 0
+        self.out.put_nowait(b"")

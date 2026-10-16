@@ -134,7 +134,8 @@ export function Sidebar(props: { route: string; selected?: string }) {
       ) : (
         <a className="nav" href="#/settings/servers/new">+ Add a server</a>
       )}
-      {server && nav(`/servers/${server.id}`, "Overview", props.route.startsWith(`/servers/${server.id}`))}
+      {server && nav(`/servers/${server.id}`, "Overview", props.route === `/servers/${server.id}`)}
+      {server && nav(`/servers/${server.id}/terminal`, "Terminal", props.route.startsWith(`/servers/${server.id}/terminal`))}
       <div className="sidebar-spacer" />
       {nav("/settings/servers", "Settings", props.route.startsWith("/settings"))}
       <ReadOnlySwitch />

@@ -93,9 +93,18 @@ class Preferences:
             }
         return cached
 
+    @property
+    def highlight_output(self) -> bool:
+        """Colour IPs, errors and high percentages in terminal output (the Mac's Highlight output switch)."""
+        return self._raw.get("highlightOutput", True) is not False
+
+    def set_highlight_output(self, on: bool) -> None:
+        self._raw["highlightOutput"] = on
+        self._save()
+
     def appearance_json(self) -> dict[str, Any]:
         """Both resolutions, so the browser follows its own light/dark setting without asking again."""
-        return {"selection": self.theme_selection,
+        return {"selection": self.theme_selection, "highlightOutput": self.highlight_output,
                 "themes": [{"id": t.id, "name": t.name, "family": t.family, "appearance": t.appearance}
                            for t in self.themes],
                 "dark": self._resolved(True), "light": self._resolved(False)}
