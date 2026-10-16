@@ -159,9 +159,7 @@ struct SearchPanel: View {
                     }
                     .padding(.bottom, 8)
                 }
-                // Hugs a short list, scrolls a long one.
-                .frame(height: min(460, CGFloat(rows.count) * 47 + CGFloat(results.sections.count) * 40
-                    + CGFloat(results.sections.filter { $0.items.count > Self.perGroup && !search.expanded.contains($0.group) }.count) * 28 + 12))
+                .frame(height: listHeight(results, rows: rows))
                 .onChange(of: search.highlighted) { _, i in
                     if rows.indices.contains(i) { proxy.scrollTo(rows[i].id) }
                 }
@@ -184,6 +182,15 @@ struct SearchPanel: View {
         Text(text).font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(20)
+    }
+
+    /// Hugs a short list, scrolls a long one: rows, section headers and "Show all" buttons, at most 460 pt.
+    private func listHeight(_ results: SearchResults, rows: [SearchItem]) -> CGFloat {
+        let collapsed = results.sections.filter { $0.items.count > Self.perGroup && !search.expanded.contains($0.group) }.count
+        let rowsHeight = CGFloat(rows.count) * 47
+        let headers = CGFloat(results.sections.count) * 40
+        let buttons = CGFloat(collapsed) * 28
+        return min(460, rowsHeight + headers + buttons + 12)
     }
 
     // MARK: behaviour
