@@ -4,7 +4,10 @@ version = "0.0.0"
 description = "Rackoon's self-hosted web backend: the Python core and the asyncssh transport"
 requires-python = ">=3.12"
 dependencies = [
-    "asyncssh>=2.21",
+    "asyncssh[bcrypt]>=2.21",
+    "argon2-cffi>=23.1",
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
 ]
 
 [dependency-groups]
@@ -14,10 +17,9 @@ dev = [
     "mypy>=1.15",
     "jsonschema>=4.23",
     "types-jsonschema>=4.23",
+    "httpx>=0.28",
 ]
 spike = [
-    "fastapi>=0.115",
-    "uvicorn[standard]>=0.34",
     "websockets>=14",
 ]
 

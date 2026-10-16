@@ -140,6 +140,13 @@ jobs:
             -e RACKOON_LAB_SUDO_PASSWORD -e RACKOON_LAB_KEY -e RACKOON_LAB_KNOWN_HOSTS \
             swift:6.2 bash -c 'apt-get update -qq && apt-get install -y -qq openssh-client >/dev/null &&
               swift test --filter LabIntegrationTests --parallel --xunit-output build/junit-lab/swift.xml'
+      - uses: astral-sh/setup-uv@v6
+      - name: Web (asyncssh) lab checks
+        run: |
+          eval "$(tools/lab env)"
+          uv sync --locked
+          uv run pytest tests/test_lab_integration.py tests/test_api_lab.py --junitxml=build/junit-lab/web.xml
+        working-directory: web/backend
       - if: always()
         run: tools/lab down
       - uses: actions/upload-artifact@v4
@@ -154,6 +161,13 @@ jobs:
         with:
           name: junit-mac-lab
           path: apple/build/junit-lab/*.xml
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-web-lab
+          path: web/backend/build/junit-lab/*.xml
           retention-days: 7
           if-no-files-found: error
 
@@ -172,7 +186,7 @@ jobs:
       - run: |
           tools/check-parity --summary --require mac,android,web \
             mac=junit/junit-mac,junit/junit-mac-lab android=junit/junit-android,junit/junit-android-lab \
-            web=junit/junit-web | tee parity.txt
+            web=junit/junit-web,junit/junit-web-lab | tee parity.txt
           status=${PIPESTATUS[0]}
           { echo '## Feature parity'; echo; cat parity.txt; } >> "$GITHUB_STEP_SUMMARY"
           exit $status

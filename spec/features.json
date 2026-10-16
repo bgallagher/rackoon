@@ -19,7 +19,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ServerStoreTests", "RackoonCoreTests.CachedSessionTests", "RackoonCoreTests.ServerModelTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ModelsAndSessionTests"]},
         "ios": {"status": "planned", "reason": "stage I1"},
-        "web": {"status": "planned", "reason": "stage W2"}
+        "web": {"status": "planned", "reason": "stage W3: servers and snapshots are stored since W2 (tests.test_storage); painting the cached snapshot comes with the Overview"}
       }
     },
     {
@@ -29,7 +29,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ServerInputTests", "RackoonCoreTests.SharedScenarioTests/testServerInput"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ServerInputTests", "com.bgallagher.rackoon.core.ServerConnectsLikeTests", "com.bgallagher.rackoon.core.SharedScenarioTests/serverInput"]},
         "ios": {"status": "planned", "reason": "stage I1"},
-        "web": {"status": "planned", "reason": "stage W2"}
+        "web": {"status": "done", "tests": ["tests.test_api/test_servers_add_edit_reorder_remove", "tests.test_shared_scenarios/test_server_input"]}
       }
     },
     {
@@ -39,7 +39,17 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.SSHConfigParserTests"]},
         "android": {"status": "na", "reason": "a phone has no ~/.ssh/config"},
         "ios": {"status": "na", "reason": "a phone has no ~/.ssh/config"},
-        "web": {"status": "planned", "reason": "stage W2: read a mounted ~/.ssh/config"}
+        "web": {"status": "done", "tests": ["tests.test_storage/test_ssh_config_parses_concrete_hosts_and_skips_wildcards", "tests.test_storage/test_ssh_config_import_shapes", "tests.test_api/test_ssh_config_import"]}
+      }
+    },
+    {
+      "id": "web.sign-in", "title": "Sign in to the self-hosted web app: password, setup token, TOTP, forward auth, CSRF",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "na", "reason": "a native app has no web sign-in"},
+        "android": {"status": "na", "reason": "a native app has no web sign-in"},
+        "ios": {"status": "na", "reason": "a native app has no web sign-in"},
+        "web": {"status": "done", "tests": ["tests.test_security", "tests.test_api/test_setup_needs_the_token_and_a_strong_password", "tests.test_api/test_login_logout_and_rate_limit", "tests.test_api/test_changes_need_csrf_same_origin_and_json", "tests.test_api/test_password_file_manages_the_password", "tests.test_api/test_change_password_signs_other_sessions_out", "tests.test_api/test_totp_enrol_sign_in_and_disable", "tests.test_api/test_forward_auth_only_from_trusted_proxies", "tests.test_api/test_rate_limit_uses_the_forwarded_address_only_from_trusted_proxies"]}
       }
     },
     {
@@ -59,7 +69,7 @@
         "mac": {"status": "done", "tests": ["RackoonSSHSystemTests.HostKeyVerifierTests", "RackoonSSHSystemTests.LabIntegrationTests/testHostKeyMismatchBlocked"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.ssh.HostKeyTests", "com.bgallagher.rackoon.ssh.LabIntegrationTests/hostKeyMismatchBlocked"]},
         "ios": {"status": "planned", "reason": "stage I1"},
-        "web": {"status": "planned", "reason": "stage W2"}
+        "web": {"status": "done", "tests": ["tests.test_storage/test_known_hosts_persist_and_never_replace_a_different_key", "tests.test_api/test_host_key_trust_only_the_scanned_fingerprint", "tests.test_api/test_a_scan_is_for_one_server_and_address", "tests.test_api/test_a_different_trusted_key_is_never_replaced", "tests.test_lab_integration/test_hostkey_mismatch_blocked", "tests.test_api_lab/test_lab_trust_then_sign_in_then_changed_key_blocked"]}
       }
     },
     {
@@ -69,7 +79,7 @@
         "mac": {"status": "done", "tests": ["RackoonSSHSystemTests.OpenSSHArgumentsTests", "RackoonSSHSystemTests.ControlDirectoryTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.ssh.KeyLoadingTests", "com.bgallagher.rackoon.ssh.EndpointTests"]},
         "ios": {"status": "planned", "reason": "stage I1"},
-        "web": {"status": "planned", "reason": "stage W2"}
+        "web": {"status": "done", "tests": ["tests.test_storage/test_keys_generate_import_and_delete", "tests.test_api/test_keys_api", "tests.test_api_lab/test_lab_sign_in_with_a_generated_key"]}
       }
     },
     {
