@@ -79,6 +79,7 @@ struct Sidebar: View {
     /// Screens that mean nothing on the selected server (Updates on Unraid, which has no apt).
     var hiddenScreens: Set<String> = []
     let onAddServer: () -> Void
+    var onSearch: () -> Void = {}
 
     private var selected: Server? { servers.first { $0.id == selectedID } }
 
@@ -88,6 +89,7 @@ struct Sidebar: View {
             ScrollView(.vertical, showsIndicators: false) {
                 VStack(alignment: .leading, spacing: 4) {
                     if servers.count > 0 {
+                        SidebarSearchButton(action: onSearch).padding(.bottom, 8)
                         NavRow(screen: .dashboard, selected: selection == .dashboard, alerts: allAlerts) { selection = .dashboard }
                             .help("Every server at once: health, servers, Docker, services, alerts and bookmarks (⌘0)")
                             .padding(.bottom, 10)

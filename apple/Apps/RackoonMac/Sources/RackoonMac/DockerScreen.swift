@@ -55,6 +55,11 @@ final class DockerWorkspace {
     /// (which holds its connection) is rebuilt.
     @ObservationIgnored private var modelKeys: [String: String] = [:]
 
+    /// The server's Docker model if one was made (a screen showed its Docker data), without making one.
+    func existingModel(for server: Server) -> DockerModel? {
+        modelKeys[server.id] == DockerElevation.shared.key(server) ? models[server.id] : nil
+    }
+
     func model(for server: Server) -> DockerModel {
         let key = DockerElevation.shared.key(server)
         if let existing = models[server.id], modelKeys[server.id] == key { return existing }

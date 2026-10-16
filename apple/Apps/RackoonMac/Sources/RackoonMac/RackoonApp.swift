@@ -107,6 +107,8 @@ struct AppActions {
     var forgetSudoPassword: (() -> Void)?
     var refresh: () -> Void
     var openTerminalHere: () -> Void
+    /// Opens the search panel.
+    var search: () -> Void = {}
     var ipAddress: String?
     var tailscaleIP: String?
 }
@@ -191,6 +193,9 @@ struct GoCommands: Commands {
                     .disabled(actions == nil || actions?.servers.isEmpty == true)
             }
             Divider()
+            Button("Search…") { actions?.search() }
+                .keyboardShortcut("f")
+                .disabled(actions?.servers.isEmpty ?? true)
             Button("Switch Server…") { actions?.switchServer() }
                 .keyboardShortcut("k")
                 .disabled(actions?.servers.isEmpty ?? true)
@@ -321,6 +326,7 @@ struct ContentView: View {
     @State private var dockerWorkspace = DockerWorkspace()
     @State private var showingAdd = false
     @State private var switcher = ServerSwitcherState()
+    @State private var search = SearchState()
     /// The server whose connection details are being edited (the Edit Connection sheet).
     @State private var editing: Server?
     @Environment(\.openWindow) private var openWindow
@@ -332,7 +338,7 @@ struct ContentView: View {
                     switcher: switcher, updates: updateBadge,
                     alerts: alertBadge(server: model.selectedID), allAlerts: alertBadge(server: nil),
                     hiddenScreens: model.state.overview.map { ServerKind.detect($0.os).hiddenScreens } ?? [],
-                    onAddServer: { showingAdd = true })
+                    onAddServer: { showingAdd = true }, onSearch: { switcher.close(); search.open() })
             Divider()
             // The pane takes all the room that is left, whatever it shows. Without this an empty state shrank the whole row to
             // its own size and floated it in the middle of a wider window, with the window background showing at both sides.
@@ -340,6 +346,13 @@ struct ContentView: View {
         }
         .frame(minWidth: 1080, maxWidth: .infinity, minHeight: 600, maxHeight: .infinity)
         .coordinateSpace(name: ServerSwitcherState.space)
+        .overlay {
+            if search.isOpen {
+                SearchPanel(search: search,
+                            items: { SearchIndex.items(rows: model.fleetRows, workspace: dockerWorkspace) },
+                            open: openSearchResult)
+            }
+        }
         .overlay {
             // The open server menu floats over the whole window, so it can reach past the sidebar and close on any click.
             if switcher.isOpen {
@@ -451,6 +464,7 @@ struct ContentView: View {
                 terminals.newTab(for: server)
                 selection = .terminal
             },
+            search: { switcher.close(); search.open() },
             ipAddress: model.state.overview?.ipAddress,
             tailscaleIP: model.state.overview?.tailscaleIP)
     }
@@ -467,6 +481,31 @@ struct ContentView: View {
         if server.id != model.selectedID { model.select(server) }
         if fix.screen == "docker", let stack = fix.target { dockerWorkspace.openStack[server.id] = stack }
         selection = Screen(rawValue: fix.screen).flatMap { $0.isAvailable ? $0 : nil } ?? .overview
+    }
+
+    /// Goes where a search result lives.
+    private func openSearchResult(_ item: SearchItem) {
+        func show(_ serverID: String, _ screen: Screen) {
+            guard let server = model.servers.first(where: { $0.id == serverID }) else { return }
+            if server.id != model.selectedID { model.select(server) }
+            selection = screen
+        }
+        switch item.target {
+        case .server(let id): show(id, .overview)
+        case .stack(let server, let stack):
+            dockerWorkspace.openStack[server] = stack
+            show(server, .docker)
+        case .service(let server, _):
+            ServicesFocus.shared.pending[server] = item.title
+            show(server, .services)
+        case .bookmark(let server, _): show(server, .bookmarks)
+        case .alert(let server, _): show(server, .alerts)
+        case .command(let id):
+            guard let server = model.selected ?? model.servers.first else { return }
+            if server.id != model.selectedID { model.select(server) }
+            dockerWorkspace.commandsModel(for: server).select(.library(id))
+            selection = .command
+        }
     }
 
     private var updateBadge: UpdateBadge? {

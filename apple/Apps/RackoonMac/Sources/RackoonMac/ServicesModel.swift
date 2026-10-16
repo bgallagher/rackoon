@@ -88,6 +88,9 @@ final class ServicesStore {
     static let shared = ServicesStore()
     private var models: [String: ServicesModel] = [:]
 
+    /// The server's model if one was made, without making one.
+    func existingModel(for server: Server) -> ServicesModel? { models[server.connectionKey] }
+
     func model(for server: Server) -> ServicesModel {
         if let model = models[server.connectionKey] { return model }
         let model = ServicesModel(server: server)

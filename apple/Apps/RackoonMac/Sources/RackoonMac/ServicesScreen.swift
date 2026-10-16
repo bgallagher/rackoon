@@ -47,12 +47,24 @@ struct ServicesScreen: View {
         }
         .foregroundStyle(Theme.textPrimary)
         .focusedSceneValue(\.screenRefresh, { model.refresh() })
-        .onAppear { model.attach() }
+        .onAppear {
+            model.attach()
+            takeFocus()
+        }
+        // A search result for a service on this server: show it in the search box.
+        .onChange(of: ServicesFocus.shared.pending[server.id]) { _, _ in takeFocus() }
         .onDisappear { model.detach() }
         // A change finished: read again so the card shows the new state.
         .onChange(of: model.runner.isRunning) { _, running in if !running { model.refresh() } }
         .confirmAction(Binding(get: { model.runner.pending }, set: { model.runner.pending = $0 }))
         .sudoPassword(Binding(get: { model.runner.sudoRequest }, set: { model.runner.sudoRequest = $0 }))
+    }
+
+    private func takeFocus() {
+        guard let text = ServicesFocus.shared.pending[server.id] else { return }
+        ServicesFocus.shared.pending[server.id] = nil
+        query = text
+        filter = nil
     }
 
     // MARK: header

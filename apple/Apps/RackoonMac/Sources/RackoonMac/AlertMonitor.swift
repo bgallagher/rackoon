@@ -149,6 +149,9 @@ final class AlertMonitor {
         certificates[server.id] = (checks, Date())
     }
 
+    /// The last background container reading of a server (search uses it when the Docker screen has none).
+    func containerReading(for serverID: String) -> DockerStatesReading? { containerReadings[serverID]?.0 }
+
     // MARK: what the screens do
 
     func acknowledge(_ alert: ServerAlert, _ seen: Bool = true) { book.acknowledge(alert.id, seen); save() }
