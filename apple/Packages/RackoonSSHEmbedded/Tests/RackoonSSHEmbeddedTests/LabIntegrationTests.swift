@@ -1,3 +1,4 @@
+import Citadel
 import Crypto
 import Foundation
 @preconcurrency import NIOSSH
@@ -200,6 +201,23 @@ final class LabIntegrationTests: XCTestCase {
         }
         let scanned = try await EmbeddedSSHTransport.scanHostKey(host: lab.host, port: lab.port)
         XCTAssertEqual(scanned, lab.hostKey)
+    }
+
+    /// A key the server does not know is refused, and the refusal is explained as a sign-in problem, not a network one.
+    func testARefusedKeyIsExplained() async throws {
+        let lab = try lab()
+        let stranger = Curve25519.Signing.PrivateKey().makeSSHRepresentation()
+        let known = InMemoryKnownHosts()
+        known.trust(host: lab.host, port: lab.port, key: lab.hostKey)
+        let transport = EmbeddedSSHTransport(endpoint: SSHEndpoint(host: lab.host, port: lab.port, user: lab.user, auth: .privateKey(stranger)),
+                                             knownHosts: known, connectTimeout: 20)
+        do {
+            _ = try await transport.run("true", timeout: 10)
+            XCTFail("an unknown key must be refused")
+        } catch let error as EmbeddedSSHError {
+            guard case .authFailed = error else { return XCTFail("expected a refused sign-in, got \(error)") }
+            XCTAssertEqual(ConnectionFailure.explain(error.localizedDescription, signIn: .key, device: "iPhone")?.kind, .authRefused)
+        }
     }
 
     /// A shell gets a pty of the size asked for, follows a resize, and reports its exit status.

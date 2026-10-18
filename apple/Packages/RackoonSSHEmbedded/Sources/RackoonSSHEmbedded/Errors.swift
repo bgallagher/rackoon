@@ -15,12 +15,15 @@ public enum EmbeddedSSHError: Error, LocalizedError, Equatable {
     /// A command did not finish in time.
     case timeout(TimeInterval)
 
+    /// What a changed host key reads as once it has become text (a poll's error), so it can be recognised.
+    public static let hostKeyChangedDescription = "The host key changed since it was trusted. Connection blocked."
+
     public var errorDescription: String? {
         switch self {
         case .unreachable(let detail): "Could not reach the server: \(detail)"
         case .authFailed(let detail): "Sign-in was refused: \(detail)"
         case .hostKeyUnknown: "This server's host key is not trusted yet."
-        case .hostKeyChanged: "The host key changed since it was trusted. Connection blocked."
+        case .hostKeyChanged: Self.hostKeyChangedDescription
         case .connectionLost(let detail): "Connection lost: \(detail)"
         case .timeout(let seconds): "The command did not finish within \(Int(seconds)) s."
         }

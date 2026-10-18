@@ -6,7 +6,7 @@ import XCTest
 
 /// A UserDefaults domain and a data folder of the test's own, so nothing touches the app's real settings or servers.
 @MainActor
-private final class Sandbox {
+final class Sandbox {
     let suite = "rackoon-ios-tests-\(UUID().uuidString)"
     let defaults: UserDefaults
     let directory = FileManager.default.temporaryDirectory.appendingPathComponent("rackoon-ios-\(UUID().uuidString)", isDirectory: true)
@@ -18,9 +18,11 @@ private final class Sandbox {
         try? FileManager.default.removeItem(at: directory)
     }
 
+    let secrets = MemorySecretStore()
+
     func app(demo: Bool = false, systemIsDark: Bool = true) -> AppModel {
         AppModel(appearance: AppearanceStore(themesData: Self.themes, defaults: defaults, systemIsDark: systemIsDark),
-                 safety: SafetyStore(defaults: defaults), defaults: defaults, dataDirectory: directory, demo: demo)
+                 safety: SafetyStore(defaults: defaults), defaults: defaults, dataDirectory: directory, secrets: secrets, demo: demo)
     }
 
     /// The themes.json the app bundles (the Mac's own file, referenced by the project).
@@ -167,6 +169,22 @@ final class HostTrustTests: XCTestCase {
         XCTAssertNil(trust.knownHosts.lookup(host: "box", port: 22), "trust is per host and port")
     }
 
+    /// The sheet's Trust works even if a re-check started meanwhile: it trusts the key last read, not the screen's state.
+    func testTrustingWhileARecheckRunsStillTrustsTheShownKey() async {
+        let calls = Counter()
+        let shown = key
+        let trust = HostTrustModel(knownHosts: InMemoryKnownHosts(), scan: { _, _ in
+            if calls.next() == 1 { return shown }
+            throw EmbeddedSSHError.unreachable("timed out")
+        })
+        let server = Server(name: "box", host: "box")
+        await trust.check(server)
+        await trust.check(server)
+        guard case .failed = trust.state(for: server) else { return XCTFail("the second check failed") }
+        XCTAssertTrue(trust.trust(key, for: server))
+        XCTAssertNotNil(trust.knownHosts.lookup(host: "box", port: 22))
+    }
+
     func testAChangedKeyIsBlockedAndCannotBeTrusted() async {
         let store = InMemoryKnownHosts()
         store.trust(host: "box", port: 22, key: key)
@@ -206,8 +224,11 @@ final class DemoModeTests: XCTestCase {
         XCTAssertEqual(app.servers.servers.map(\.name), ["homelab", "garage-nuc"])
         let homelab = app.servers.servers[0]
         XCTAssertEqual(app.trust.state(for: homelab), .demo)
-        await app.checkConnection(homelab)
-        XCTAssertEqual(app.checks[homelab.id].map { if case .answered(let h, _, _) = $0 { h } else { "" } }, "homelab")
+        app.fleet.attach(homelab.id, fast: true)
+        await app.fleet.refresh(homelab.id)
+        try await waitUntil { app.fleet.states[homelab.id]?.overview?.hostname == "homelab" }
+        XCTAssertFalse(app.fleet.state(for: homelab.id).attention.isEmpty, "the demo shows the attention strip")
+        app.fleet.detach(homelab.id, fast: true)
     }
 
     func testSwitchingDemoOffBringsBackTheRealListUntouched() {
@@ -226,4 +247,24 @@ final class DemoModeTests: XCTestCase {
         XCTAssertEqual(app.servers.servers.map(\.host), ["real.example"], "demo changes never reach servers.json")
         XCTAssertFalse(FileManager.default.fileExists(atPath: sandbox.directory.appendingPathComponent("known_hosts.json").path))
     }
+}
+
+/// Waits (briefly) for something the fleet's listener task delivers on the main actor.
+@MainActor
+func waitUntil(_ timeout: TimeInterval = 5, _ condition: () -> Bool) async throws {
+    let deadline = Date().addingTimeInterval(timeout)
+    while !condition() {
+        if Date() > deadline { throw WaitTimeout() }
+        try await Task.sleep(nanoseconds: 20_000_000)
+    }
+}
+
+struct WaitTimeout: Error, CustomStringConvertible {
+    var description: String { "the condition did not become true in time" }
+}
+
+final class Counter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var n = 0
+    func next() -> Int { lock.withLock { n += 1; return n } }
 }

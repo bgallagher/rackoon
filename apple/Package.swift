@@ -105,7 +105,7 @@ let package = Package(
         ),
         .testTarget(
             name: "RackoonSSHEmbeddedTests",
-            dependencies: ["RackoonSSHEmbedded"],
+            dependencies: ["RackoonSSHEmbedded", .product(name: "Citadel", package: "Citadel")],
             path: "Packages/RackoonSSHEmbedded/Tests/RackoonSSHEmbeddedTests"
         ),
         .testTarget(

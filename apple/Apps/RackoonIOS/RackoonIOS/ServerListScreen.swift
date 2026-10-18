@@ -37,8 +37,9 @@ struct ServerListScreen: View {
                 if model.servers.servers.isEmpty { EmptyServers(add: { adding = true }) }
             }
             .searchable(text: $query, prompt: "Search servers")
+            .watching(model.servers.servers.map(\.id), fast: false)
             .navigationTitle("Servers")
-            .navigationDestination(for: String.self) { id in ServerDetailScreen(serverID: id) }
+            .navigationDestination(for: String.self) { id in OverviewScreen(serverID: id) }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) { ReadOnlyChip() }
                 ToolbarItemGroup(placement: .topBarTrailing) {
@@ -67,29 +68,45 @@ private struct ServerRow: View {
 
     var body: some View {
         let t = model.tokens
+        let state = model.fleet.state(for: server.id)
         HStack(spacing: 12) {
-            HostKeyDot(state: model.trust.state(for: server))
+            StatusLight(server: server, state: state)
             VStack(alignment: .leading, spacing: 2) {
                 Text(server.name).font(.body.weight(.semibold)).foregroundStyle(t.text)
                 Text(server.addressLine).font(.footnote.monospaced()).foregroundStyle(t.secondary)
+            }
+            Spacer()
+            if !state.attention.isEmpty {
+                Text("\(state.attention.count)")
+                    .font(.caption.weight(.bold)).foregroundStyle(t.warn)
+                    .padding(.horizontal, 7).padding(.vertical, 2)
+                    .background(Capsule().strokeBorder(t.warn))
+                    .accessibilityLabel("\(state.attention.count) need attention")
             }
         }
         .padding(.vertical, 2)
     }
 }
 
-/// The server's host-key standing at a glance: green trusted, grey not checked, amber asks, red blocked.
-struct HostKeyDot: View {
+/// A server at a glance. With a trusted key: green answering, red not answering, grey not read live yet. Otherwise the
+/// host key's standing: amber asks to be trusted, red is blocked, grey not checked.
+struct StatusLight: View {
     @Environment(AppModel.self) private var model
-    let state: HostTrustModel.State
+    let server: Server
+    let state: ServerState
 
     var body: some View {
         let t = model.tokens
-        let color: Color = switch state {
-        case .trusted, .demo: t.ok
+        let color: Color = switch model.trust.state(for: server) {
+        case .trusted, .demo:
+            switch Liveness(state) {
+            case .up: t.ok
+            case .down: t.danger
+            case .unknown: t.idle
+            }
         case .unknown: t.warn
-        case .changed, .failed: t.danger
-        case .unchecked, .checking: t.idle
+        case .changed: t.danger
+        case .failed, .unchecked, .checking: t.idle
         }
         Circle().fill(color).frame(width: 10, height: 10).accessibilityHidden(true)
     }

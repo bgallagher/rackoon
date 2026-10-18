@@ -184,3 +184,62 @@ public enum ServerInput {
         return nil
     }
 }
+
+/// How an app with its own SSH client (iOS; Android has the same choice in Kotlin) signs in to a server. The Mac has no
+/// such setting: its ssh decides from keys, ssh-agent and ~/.ssh/config.
+public enum SignInMethod: String, Sendable, Codable, CaseIterable {
+    /// Tailscale SSH: the tailnet identifies the device, so SSH `none` authentication is accepted.
+    case tailscale
+    case key
+    case password
+}
+
+extension ConnectionFailure {
+    /// The same explanations for an embedded SSH client, which has no `ssh -v` to ask which keys were offered: a refused
+    /// login is explained from how the server is signed in to. Matches the messages of `EmbeddedSSHError` and of the
+    /// network errors under it, and the rules of Android's `ConnectionFailure`. `device` names the device in the advice
+    /// ("iPhone", "iPad"). Nil when the message is not one we know; the card then shows the raw text alone.
+    public static func explain(_ raw: String, signIn: SignInMethod?, device: String) -> ConnectionFailure? {
+        let text = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        func has(_ needles: [String]) -> Bool { needles.contains { text.range(of: $0, options: .caseInsensitive) != nil } }
+        if has(["Sign-in was refused", "Permission denied", "Authentication failed", "Exhausted available authentication"]) {
+            return embeddedAuthRefused(signIn, device: device)
+        }
+        if has(["Unable to resolve host", "nodename nor servname provided", "Name or service not known",
+                "Temporary failure in name resolution", "No address associated with hostname"]) {
+            return ConnectionFailure(
+                kind: .unresolved, headline: "The server's name could not be looked up.",
+                advice: "This \(device) does not know that name. Check the spelling under Edit, or use the IP address. A Tailscale name only resolves while Tailscale is connected.")
+        }
+        if has(["Connection refused", "ECONNREFUSED"]) {
+            return ConnectionFailure(
+                kind: .unreachable, headline: "Nothing accepts SSH at that address and port.",
+                advice: "The machine answered, but no SSH service is listening there. Check the port under Edit and that sshd is running on the server.")
+        }
+        if has(["Connection closed", "Connection reset", "Connection lost", "the server closed the connection", "Broken pipe"]) {
+            return ConnectionFailure(
+                kind: .unreachable, headline: "The server dropped the connection.",
+                advice: "It may be rate-limiting this \(device) (fail2ban), restarting, or not an SSH server at all. Try again in a minute; if it keeps happening, check the address and port under Edit.")
+        }
+        if has(["No route to host", "Network is unreachable", "timed out", "Network is down", "ENETUNREACH", "EHOSTUNREACH"]) {
+            return ConnectionFailure(
+                kind: .unreachable, headline: "Can't reach the server.",
+                advice: "Check that the server is on and that this \(device) is on the same network or VPN (Tailscale), then try again. The address and port can be changed under Edit.")
+        }
+        return nil
+    }
+
+    private static func embeddedAuthRefused(_ signIn: SignInMethod?, device: String) -> ConnectionFailure {
+        let advice = switch signIn {
+        case .tailscale:
+            "Tailscale SSH did not let this user in. Check that this \(device) is connected to Tailscale, that your tailnet policy allows SSH to this server as this user, and that the user name is right (Edit). Or choose a key or a password under Sign-in."
+        case .key:
+            "The server did not accept the saved key for this user. Check the user name under Edit and that the key's public half is in the server's ~/.ssh/authorized_keys, or choose another key under Sign-in."
+        case .password:
+            "The server did not accept the saved password for this user. Check the user name and password under Edit. Many servers also turn password login off (PasswordAuthentication no) and only take keys."
+        case nil:
+            "Check the user name under Edit, and the sign-in method: Tailscale SSH, a private key or a password."
+        }
+        return ConnectionFailure(kind: .authRefused, headline: "The server refused the login.", advice: advice)
+    }
+}

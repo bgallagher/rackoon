@@ -1,9 +1,10 @@
 import RackoonCore
 import SwiftUI
+import UIKit
 
 @main
 struct RackoonIOSApp: App {
-    @State private var model = AppModel.live()
+    @State private var model = AppModel.live(deviceName: UIDevice.current.model)
 
     var body: some Scene {
         WindowGroup {
@@ -17,11 +18,24 @@ struct RackoonIOSApp: App {
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
+    @AppStorage("rootTab") private var tab = "dashboard"
 
     var body: some View {
         let palette = model.appearance.palette
-        ServerListScreen()
+        TabView(selection: $tab) {
+            DashboardScreen()
+                .tabItem { Label("Dashboard", systemImage: "square.grid.2x2") }
+                .tag("dashboard")
+            ServerListScreen()
+                .tabItem { Label("Servers", systemImage: "server.rack") }
+                .tag("servers")
+        }
             .tint(Color(palette.accent))
+            .onChange(of: scenePhase) { _, phase in
+                // Polls stop in the background (iOS suspends the app soon anyway) and resume on return.
+                if phase == .background { model.fleet.pause() } else if phase == .active { model.fleet.resume() }
+            }
             .preferredColorScheme(model.appearance.fixedColorScheme)
             .onAppear { model.appearance.setSystemIsDark(colorScheme == .dark) }
             .onChange(of: colorScheme) { _, scheme in

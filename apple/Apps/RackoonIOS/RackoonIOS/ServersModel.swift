@@ -54,9 +54,9 @@ final class ServersModel {
 
     /// Adds a server, or returns why it can't be saved.
     @discardableResult
-    func add(_ draft: Draft) -> String? {
+    func add(_ draft: Draft, id: String = UUID().uuidString) -> String? {
         if let problem = draft.problem { return problem }
-        servers.append(draft.applied(to: nil))
+        servers.append(draft.applied(to: Server(id: id, name: "", host: "")))
         save()
         return nil
     }

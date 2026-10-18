@@ -156,3 +156,40 @@ final class ServerInputTests: XCTestCase {
         XCTAssertEqual(seen, NSString(string: "~/.ssh/k").expandingTildeInPath)
     }
 }
+
+/// The explanations for an embedded SSH client (iOS), from its own messages and the sign-in method in use.
+final class EmbeddedConnectionFailureTests: XCTestCase {
+    private func explain(_ raw: String, _ signIn: SignInMethod? = nil) -> ConnectionFailure? {
+        ConnectionFailure.explain(raw, signIn: signIn, device: "iPhone")
+    }
+
+    func testARefusedLoginIsExplainedFromTheSignInMethod() throws {
+        let raw = "Sign-in was refused: the server refused it (it accepts: publickey)"
+        XCTAssertEqual(explain(raw, .tailscale)?.kind, .authRefused)
+        XCTAssertTrue(try XCTUnwrap(explain(raw, .tailscale)).advice.contains("Tailscale SSH did not let this user in"))
+        XCTAssertTrue(try XCTUnwrap(explain(raw, .key)).advice.contains("authorized_keys"))
+        XCTAssertTrue(try XCTUnwrap(explain(raw, .password)).advice.contains("PasswordAuthentication no"))
+        XCTAssertTrue(try XCTUnwrap(explain(raw)).advice.contains("sign-in method"))
+    }
+
+    func testNetworkFailures() {
+        XCTAssertEqual(explain("Could not reach the server: Unable to resolve host box.tailnet.ts.net")?.kind, .unresolved)
+        XCTAssertEqual(explain("Could not reach the server: connect(descriptor:addr:size:): Connection refused (errno: 61)")?.headline,
+                       "Nothing accepts SSH at that address and port.")
+        XCTAssertEqual(explain("Connection lost: the server closed the connection")?.headline, "The server dropped the connection.")
+        XCTAssertEqual(explain("Could not reach the server: timed out")?.headline, "Can't reach the server.")
+        XCTAssertEqual(explain("Could not reach the server: connect(descriptor:addr:size:): No route to host (errno: 65)")?.kind, .unreachable)
+    }
+
+    func testTheDeviceIsNamedAndUnknownTextIsLeftAlone() throws {
+        XCTAssertTrue(try XCTUnwrap(ConnectionFailure.explain("Could not reach the server: timed out", signIn: nil, device: "iPad")).advice.contains("this iPad"))
+        XCTAssertNil(explain("Command failed (exit 2)"))
+        XCTAssertNil(explain(""))
+    }
+
+    func testTheMacExplanationIsUnchanged() {
+        // The OpenSSH wording still goes through the Mac's own rules.
+        XCTAssertEqual(ConnectionFailure.explain("user@host: Permission denied (publickey).")?.kind, .authRefused)
+        XCTAssertTrue(ConnectionFailure.explain("user@host: Permission denied (publickey).")?.advice.contains("ssh") == true)
+    }
+}

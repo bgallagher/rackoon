@@ -104,3 +104,26 @@ Demo data moved into the `RackoonDemo` library (CryptoKit, so Apple platforms on
 Checked by hand in the simulator: demo list (Rackoon Light following the system), a fixed theme (Dracula) driving the whole UI, the empty state, and the Read-only chip. The toolbar draws a `Label` as its icon alone, so the chip is an icon plus "Read-only" text. Not checked by hand: tapping through Add/Edit/Trust (the simulator tool needed the user's approval). Those flows are unit-tested, and XCUITest flows are stage I7.
 
 Not built in I1: an app icon (needs an asset catalog), key sign-in, and anything that reads a server beyond the one-off Test Connection.
+
+## Stage I2 result: Overview, attention, dashboard, key sign-in (18 Oct 2026)
+
+| Feature | iOS | Proven by |
+|---|---|---|
+| `overview` | done | Core `OverviewTests`, `OverviewIPTests`, `ServerSessionTests` (run on iOS), lab `testOverviewParses`, `RackoonIOSTests.FleetTests` |
+| `overview.system-info` | done | Core `SystemInfoParserTests`, `RackoonIOSTests.PresentTests` (the server's clock ticks on in its own zone) |
+| `attention` | done | Core `OverviewTests`, `RackoonDemoTests` (the demo's reading raises attention items), `RackoonIOSTests.DemoModeTests` |
+| `connect.failure-explained` | done | Core `EmbeddedConnectionFailureTests`, `RackoonSSHEmbeddedTests.ErrorExplanationTests`, lab `testARefusedKeyIsExplained`, `RackoonIOSTests.FleetTests` |
+| `servers.saved` | done | Core store tests, `RackoonIOSTests.SavedServersTests`, and the cached snapshot painted first and marked stale (`FleetTests`) |
+| `connect.keys` | done (Ed25519 only) | `RackoonSSHEmbeddedTests.KeyLoadingTests`, `RackoonIOSTests.SignInTests` (Keychain round trip included), lab `testOverviewParses` (signs in with the lab's key) |
+| `fleet.dashboard` | planned I4 | The health and server pages are built; the Docker and bookmark pages need Docker |
+
+- **Polling (`FleetModel`)** runs one Core `ServerSession` per watched server: every 5 s while its Overview is open, once a minute for the dashboard and the server list, with a second reading 3 s after a slow session starts so CPU shows at once. It stops in the background. The cached snapshot is painted first (marked "Saved reading from …"), and every good reading replaces it. `HealthHistory` feeds the heartbeat bar and sparklines.
+- **Host-key gate.** A server is polled only once its host key is trusted. A server not checked yet this run is checked first (like the Mac's `FleetMonitor`). A poll that hits a changed key stops polling, re-checks, and the Overview shows "Blocked" with both fingerprints. The trusted fingerprint is computed from the stored key, never taken from the stored text. Checked by hand: an edited known_hosts.json blocked the lab exactly so.
+- **Sign-in (`SignInStore`).** Tailscale SSH (`none`, the default), a private key (pasted with SwiftUI's `PasteButton`, which shows no "Allow Paste" prompt, or chosen from Files, with an optional passphrase), or a password. The method goes in `sign-in.json` beside servers.json. The key, passphrase or password goes in the Keychain only: generic password, `AfterFirstUnlockThisDeviceOnly`, never synced or backed up. A key is read and its passphrase checked before anything is saved, and a missing secret blocks polling with a reason instead of trying something else.
+- **Failures** are explained by a new Core rule, `ConnectionFailure.explain(_:signIn:device:)`. It is the Kotlin rule set, since both apps have an embedded client and no `ssh -v`, worded for "this iPhone"/"iPad". The Mac's OpenSSH explanation is unchanged.
+- **Checked by hand in the simulator against the lab.** Add Server, then paste the lab key, Save, open it: the first-contact sheet showed SHA256:ebrZ+…S3c4, the same as `ssh-keygen -lf`. Trust, and the live Overview came up (Ubuntu 24.04.5, 18 cores, 1 security update, reboot required). The demo's dashboard and Overview were checked too.
+- **Fixed along the way.**
+  - The trust sheet closed itself as it opened, because its state lived in a List row that SwiftUI recreates. It is now held by the screen.
+  - The fingerprint wrapped with an inserted hyphen, a fake character in a value people compare by eye. It is now kept on one line and shrunk to fit.
+  - Trusting no longer depends on the screen's momentary state, only on the key last read from the server.
+- **Not built:** reboot from the attention strip (I5), the attention items' links to Docker/Updates (those screens come in I4/I5), RSA/ECDSA keys, and the dashboard's Docker and bookmark pages.

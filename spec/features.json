@@ -18,7 +18,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ServerStoreTests", "RackoonCoreTests.CachedSessionTests", "RackoonCoreTests.ServerModelTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ModelsAndSessionTests"]},
-        "ios": {"status": "planned", "reason": "stage I2: the saved list is done (RackoonIOSTests.SavedServersTests); painting the cached snapshot comes with the Overview"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.ServerStoreTests", "RackoonCoreTests.CachedSessionTests", "RackoonCoreTests.ServerModelTests", "RackoonIOSTests.SavedServersTests", "RackoonIOSTests.FleetTests/testTheSavedSnapshotIsPaintedFirstAndMarkedStale"]},
         "web": {"status": "planned", "reason": "stage W2"}
       }
     },
@@ -68,7 +68,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonSSHSystemTests.OpenSSHArgumentsTests", "RackoonSSHSystemTests.ControlDirectoryTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.ssh.KeyLoadingTests", "com.bgallagher.rackoon.ssh.EndpointTests"]},
-        "ios": {"status": "planned", "reason": "stage I2: importing a key into the Keychain (RackoonSSHEmbedded already loads Ed25519 keys; RSA and ECDSA are open, docs/ios-spikes.md)"},
+        "ios": {"status": "done", "tests": ["RackoonSSHEmbeddedTests.KeyLoadingTests", "RackoonIOSTests.SignInTests", "RackoonSSHEmbeddedTests.LabIntegrationTests/testOverviewParses"]},
         "web": {"status": "planned", "reason": "stage W2"}
       }
     },
@@ -78,7 +78,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ConnectionFailureTests", "RackoonCoreTests.SSHAttemptTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ConnectionFailureTests"]},
-        "ios": {"status": "planned", "reason": "stage I2"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.EmbeddedConnectionFailureTests", "RackoonSSHEmbeddedTests.ErrorExplanationTests", "RackoonSSHEmbeddedTests.LabIntegrationTests/testARefusedKeyIsExplained", "RackoonIOSTests.FleetTests/testAFailedPollKeepsTheLastReadingAndIsExplained"]},
         "web": {"status": "planned", "reason": "stage W3"}
       }
     },
@@ -88,7 +88,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonCoreTests.OverviewIPTests", "RackoonCoreTests.ServerSessionTests", "RackoonSSHSystemTests.LabIntegrationTests/testOverviewParses"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.OverviewTests", "com.bgallagher.rackoon.ssh.LabIntegrationTests/overviewParses"]},
-        "ios": {"status": "planned", "reason": "stage I2"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonCoreTests.OverviewIPTests", "RackoonCoreTests.ServerSessionTests", "RackoonSSHEmbeddedTests.LabIntegrationTests/testOverviewParses", "RackoonIOSTests.FleetTests"]},
         "web": {"status": "planned", "reason": "stage W3"}
       }
     },
@@ -98,7 +98,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.SystemInfoParserTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.OverviewTests"]},
-        "ios": {"status": "planned", "reason": "stage I2"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.SystemInfoParserTests", "RackoonIOSTests.PresentTests"]},
         "web": {"status": "planned", "reason": "stage W3"}
       }
     },
@@ -108,7 +108,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonCoreTests.RebootOfferTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.AttentionTests", "com.bgallagher.rackoon.core.AttentionPresentationTests"]},
-        "ios": {"status": "planned", "reason": "stage I2"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonDemoTests.DemoDataTests/testOverviewParsesWithAttentionItems", "RackoonIOSTests.DemoModeTests/testDemoShowsTheSharedDemoServersAndAnswersWithoutANetwork"]},
         "web": {"status": "planned", "reason": "stage W3"}
       }
     },
@@ -118,7 +118,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.FleetTests"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
-        "ios": {"status": "planned", "reason": "stage I2"},
+        "ios": {"status": "planned", "reason": "stage I4: the health and server pages are built (RackoonCoreTests.FleetTests, RackoonIOSTests.FleetTests); the Docker and bookmark pages need the Docker screens"},
         "web": {"status": "planned", "reason": "stage W3"}
       }
     },

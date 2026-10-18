@@ -24,6 +24,8 @@ final class HostTrustModel {
     typealias Scanner = @Sendable (_ host: String, _ port: Int) async throws -> HostKeyInfo
 
     private(set) var states: [String: State] = [:]
+    /// The key each server presented at its last check, when nothing was trusted for it.
+    @ObservationIgnored private var presented: [String: HostKeyInfo] = [:]
     @ObservationIgnored let knownHosts: any KnownHostsStore
     @ObservationIgnored private let scan: Scanner
     @ObservationIgnored private let isDemo: Bool
@@ -49,17 +51,18 @@ final class HostTrustModel {
         guard !isDemo else { return }
         states[server.id] = .checking
         do {
-            let presented = try await scan(server.host, Self.port(server))
-            switch knownHosts.verdict(host: server.host, port: Self.port(server), presented: presented) {
+            let read = try await scan(server.host, Self.port(server))
+            switch knownHosts.verdict(host: server.host, port: Self.port(server), presented: read) {
             case .trusted:
-                states[server.id] = knownHosts.lookup(host: server.host, port: Self.port(server)).map(State.trusted) ?? .unknown(presented)
+                states[server.id] = knownHosts.lookup(host: server.host, port: Self.port(server)).map(State.trusted) ?? .unknown(read)
             case .unknown(let key):
+                presented[server.id] = key
                 states[server.id] = .unknown(key)
             case .changed(let trusted, let key):
                 states[server.id] = .changed(trusted: trusted, presented: key)
             }
-        } catch EmbeddedSSHError.hostKeyChanged(let trusted, let presented) {
-            states[server.id] = .changed(trusted: trusted, presented: presented)
+        } catch EmbeddedSSHError.hostKeyChanged(let trusted, let changed) {
+            states[server.id] = .changed(trusted: trusted, presented: changed)
         } catch {
             states[server.id] = .failed(error.localizedDescription)
         }
@@ -69,7 +72,9 @@ final class HostTrustModel {
     /// never be accepted through here.
     @discardableResult
     func trust(_ key: HostKeyInfo, for server: Server) -> Bool {
-        guard case .unknown(let shown) = state(for: server), shown == key,
+        // The key last read from this server (kept while a re-check is running, so a tap during it still works), and
+        // nothing trusted for it yet: a changed key can never be replaced through here.
+        guard presented[server.id] == key,
               knownHosts.lookup(host: server.host, port: Self.port(server)) == nil else { return false }
         knownHosts.trust(host: server.host, port: Self.port(server), key: key)
         states[server.id] = knownHosts.lookup(host: server.host, port: Self.port(server)).map(State.trusted)
@@ -78,5 +83,20 @@ final class HostTrustModel {
 
     /// An edit moved the server to another address: forget the last reading, so the next check is about the new one.
     /// Trusted keys stay keyed by address, so another saved server at the old address keeps its trust.
-    func reset(_ server: Server) { states[server.id] = nil }
+    func reset(_ server: Server) {
+        states[server.id] = nil
+        presented[server.id] = nil
+    }
+}
+
+extension HostTrustModel.State {
+    var isChanged: Bool {
+        if case .changed = self { return true }
+        return false
+    }
+}
+
+extension TrustedHostKey {
+    /// Worked out from the stored key itself, never taken from the stored text, so an edited file can't show a false one.
+    var computedFingerprint: String { HostKeyInfo(keyType: keyType, blob: blob).fingerprint }
 }
