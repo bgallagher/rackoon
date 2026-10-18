@@ -228,8 +228,10 @@ def test_service_catalog_comes_from_the_spec() -> None:
     raw = spec.load_json("service-catalog.json")
     catalog = services.catalog()
     assert [p.id for p in catalog.products] == [p["id"] for p in raw["products"]]
-    assert services.product_for("tailscaled.service").id == "tailscale"
-    assert services.product_for("actions.runner.org-repo.box.service").id == "github-runner"
+    tailscale = services.product_for("tailscaled.service")
+    runner = services.product_for("actions.runner.org-repo.box.service")
+    assert tailscale is not None and tailscale.id == "tailscale"
+    assert runner is not None and runner.id == "github-runner"
     assert services.product_for("getty@tty1.service") is None
     assert services.is_plumbing("getty@tty1.service") and services.is_plumbing("systemd-journald")
     assert services.is_container_helper("containerd-shim-runc-v2")
