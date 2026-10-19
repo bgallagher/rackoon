@@ -399,7 +399,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ServicesTests", "RackoonMacTests.DemoServicesTests", "RackoonMacTests.ServiceVisibilityStoreTests"]},
         "android": {"status": "planned", "reason": "core on feature/android-services-alerts; no screen yet"},
         "ios": {"status": "planned", "reason": "stage I6"},
-        "web": {"status": "planned", "reason": "stage W7"}
+        "web": {"status": "done", "tests": ["tests.test_golden_fixtures/test_golden[services]", "tests.test_w7_core/test_service_actions_build_safe_commands", "tests.test_w7_core/test_service_visibility", "tests.test_w7_api/test_services_scan_show_hide_and_act", "tests.test_w7_api_lab/test_lab_services_commands_nas_files_and_the_sweep"]}
       }
     },
     {
@@ -409,7 +409,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.AlertsTests", "RackoonMacTests.DemoAlertsTests"]},
         "android": {"status": "planned", "reason": "core on feature/android-services-alerts; no screen yet"},
         "ios": {"status": "planned", "reason": "stage I6 (foreground only)"},
-        "web": {"status": "planned", "reason": "stage W7"}
+        "web": {"status": "done", "tests": ["tests.test_golden_fixtures/test_golden[docker_states]", "tests.test_w7_core/test_the_first_reading_is_a_baseline_then_new_alerts_notify", "tests.test_w7_core/test_getting_worse_notifies_and_clears_the_seen_mark", "tests.test_w7_core/test_a_reading_only_resolves_its_own_source_and_coming_back_is_new", "tests.test_w7_core/test_muted_and_info_alerts_are_never_counted_or_notified", "tests.test_w7_core/test_ordering_forget_history_limits_and_json", "tests.test_w7_core/test_connection_rules", "tests.test_w7_core/test_service_container_overview_storage_and_certificate_rules", "tests.test_w7_api/test_the_sweep_finds_problems_and_the_first_reading_is_a_baseline", "tests.test_w7_api/test_certificates_are_read_from_a_handshake_without_trusting_them", "tests.test_w7_api_lab/test_lab_services_commands_nas_files_and_the_sweep"]}
       }
     },
     {
@@ -419,7 +419,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.AlertsTests"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
         "ios": {"status": "planned", "reason": "needs a push relay: an iPhone cannot poll while asleep"},
-        "web": {"status": "planned", "reason": "stage W7: Web Push, ntfy or webhook"}
+        "web": {"status": "done", "tests": ["tests.test_w7_api/test_new_alerts_are_delivered_to_ntfy_and_a_signed_webhook", "tests.test_w7_api/test_web_push_key_and_subscriptions"]}
       }
     },
     {
@@ -429,7 +429,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.SearchTests"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
         "ios": {"status": "planned", "reason": "stage I6"},
-        "web": {"status": "planned", "reason": "stage W7"}
+        "web": {"status": "done", "tests": ["tests.test_w7_core/test_search_needs_two_letters_and_keeps_its_group_order", "tests.test_w7_core/test_every_group_is_reachable_and_titles_rank_first", "tests.test_w7_core/test_hidden_services_are_not_searched_and_full_docker_readings_have_stacks", "tests.test_w7_api/test_search_everything_the_backend_holds"]}
       }
     },
     {
@@ -439,7 +439,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.CommandLibraryTests", "RackoonCoreTests.NoServerChangeGuardTests"]},
         "android": {"status": "planned", "reason": "core has CommandLibrary; no screen yet"},
         "ios": {"status": "planned", "reason": "stage I6"},
-        "web": {"status": "planned", "reason": "stage W7"}
+        "web": {"status": "done", "tests": ["tests.test_core/test_command_library_loads_every_entry", "tests.test_core/test_library_params_are_validated_and_quoted", "tests.test_w7_core/test_readable_scripts_and_password_variants", "tests.test_w7_api/test_the_library_reads_at_once_and_changes_ask_with_their_dry_run", "tests.test_w7_api_lab/test_lab_services_commands_nas_files_and_the_sweep"]}
       }
     },
     {
@@ -449,7 +449,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.RemoteFilesTests", "RackoonCoreTests.FileTransferTests", "RackoonCoreTests.FileOperationTests", "RackoonSSHSystemTests.LabIntegrationTests/testStdinExactBytes"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
         "ios": {"status": "planned", "reason": "stage I6"},
-        "web": {"status": "planned", "reason": "stage W7"}
+        "web": {"status": "done", "tests": ["tests.test_golden_fixtures/test_golden_files_list", "tests.test_w7_core/test_paths_names_and_keep_both", "tests.test_w7_core/test_folder_deletes_are_refused_high_up_and_for_settings_and_service_data", "tests.test_w7_core/test_the_real_commands_in_a_shell", "tests.test_w7_api/test_files_list_upload_download_and_change", "tests.test_lab_integration/test_stdin_exact_bytes", "tests.test_w7_api_lab/test_lab_services_commands_nas_files_and_the_sweep"]}
       }
     },
     {
@@ -459,7 +459,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.UnraidTests", "RackoonCoreTests.UnraidEdgeCaseTests", "RackoonMacTests.NASModelTests"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
         "ios": {"status": "planned", "reason": "stage I6"},
-        "web": {"status": "planned", "reason": "stage W7"}
+        "web": {"status": "done", "tests": ["tests.test_golden_fixtures/test_golden[unraid]", "tests.test_unraid_view"]}
       }
     },
     {

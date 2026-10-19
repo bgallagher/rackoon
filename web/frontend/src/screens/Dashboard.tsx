@@ -6,9 +6,11 @@ import { useApp } from "../context";
 import { ago, bytes, fraction, percent } from "../format";
 import { useNow, usePoll } from "../hooks";
 import type { FleetDocker, FleetRow } from "../types";
+import { AlertsView } from "./Alerts";
 import { BookmarkRow, groupsOf } from "./Bookmarks";
 
-const PAGES: [string, string][] = [["health", "Health"], ["servers", "Servers"], ["docker", "Docker"], ["bookmarks", "Bookmarks"]];
+const PAGES: [string, string][] = [["health", "Health"], ["servers", "Servers"], ["docker", "Docker"], ["bookmarks", "Bookmarks"],
+  ["alerts", "Alerts"]];
 
 /** Every answering server's Docker (the backend skips unanswering and untrusted ones), polled while this page shows. */
 function useFleetDocker() {
@@ -140,6 +142,7 @@ export function DashboardScreen(props: { page?: string }) {
       </nav>
       {page === "docker" && <DockerPage />}
       {page === "bookmarks" && <BookmarksPage />}
+      {page === "alerts" && <AlertsView />}
       {(page === "health" || page === "servers") && <Totals />}
       {page === "health" && <Card title="Health">
         <div className="health-wrap">

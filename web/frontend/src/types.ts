@@ -233,6 +233,8 @@ export interface PendingAction {
   /** The command that follows once this one succeeded (the `up -d` after a save). */
   then: string | null;
   target: string | null;
+  /** A dry run's output (what a Commands entry would affect). */
+  details: string | null;
 }
 
 export interface TerminalTab {
@@ -460,4 +462,139 @@ export interface UpdatesState {
   securityHint: string | null;
   run: Run | null;
   reboot: RebootState | null;
+}
+
+// --- Stage W7 ---------------------------------------------------------------------------------------------------
+
+export interface LibraryParam { id: string; label: string; kind: "container" | "hostname"; placeholder: string }
+
+export interface LibraryCommand {
+  id: string;
+  title: string;
+  group: string;
+  summary: string;
+  risk: "read" | "mutate";
+  root: boolean;
+  needs: string | null;
+  warning: string | null;
+  interactive: boolean;
+  params: LibraryParam[];
+  readable: string;
+  readablePreview: string | null;
+  full: string | null;
+}
+
+export interface Service {
+  id: string;
+  kind: "system" | "user" | "process";
+  unit: string | null;
+  name: string;
+  detail: string;
+  product: string | null;
+  status: "running" | "starting" | "restarting" | "stopping" | "stopped" | "failed";
+  subState: string;
+  result: string | null;
+  enabledAtBoot: boolean | null;
+  activeSeconds: number | null;
+  memoryBytes: number | null;
+  restarts: number;
+  ports: { address: string; port: number }[];
+  path: string | null;
+  isPlumbing: boolean;
+  visibleByDefault: boolean;
+  visible: boolean;
+  chosen: boolean;
+  isProblem: boolean;
+  actions: string[];
+  canFollow: boolean;
+  links: string[];
+}
+
+export interface ServicesState {
+  serverId: string;
+  status: "ready" | "failed" | "loading";
+  error: string | null;
+  updatedAt: number;
+  isRoot: boolean | null;
+  hasSystemd: boolean | null;
+  services: Service[];
+  runs: Record<string, Run>;
+}
+
+export interface FileEntry {
+  name: string;
+  kind: "file" | "directory" | "symlink" | "other";
+  linkTarget: string | null;
+  linksToDirectory: boolean;
+  size: number;
+  modified: number;
+  permissions: string;
+  owner: string;
+  isDirectory: boolean;
+  deleteProblem: string | null;
+}
+
+export interface Listing {
+  path: string;
+  parent: string | null;
+  truncated: boolean;
+  crumbs: { name: string; path: string }[];
+  entries: FileEntry[];
+}
+
+export interface Alert {
+  id: string;
+  serverId: string;
+  serverName: string;
+  source: string;
+  key: string;
+  category: string;
+  severity: "info" | "warning" | "critical";
+  title: string;
+  detail: string | null;
+  fix: { screen: string; target: string | null } | null;
+  firstSeen: number;
+  lastSeen: number;
+  resolvedAt: number | null;
+  acknowledged: boolean;
+  muted: boolean;
+}
+
+export interface NotificationSettings {
+  enabled: boolean;
+  ntfyUrl: string;
+  hasNtfyToken: boolean;
+  webhookUrl: string;
+  hasWebhookSecret: boolean;
+  publicUrl: string;
+  pushSubscriptions: number;
+  lastError: string | null;
+}
+
+export interface AlertsState {
+  active: Alert[];
+  muted: Alert[];
+  history: Alert[];
+  unseen: number;
+  worst: "warning" | "critical" | null;
+  lastSweep: number | null;
+  sweeping: boolean;
+  notifications: NotificationSettings;
+}
+
+export interface AlertSummary {
+  servers: Record<string, { unseen: number; worst: string | null }>;
+  unseen: number;
+  worst: string | null;
+}
+
+export interface SearchItem {
+  group: string;
+  id: string;
+  title: string;
+  subtitle: string;
+  serverName: string | null;
+  target: { kind: "server" | "stack" | "service" | "bookmark" | "command" | "alert"; server: string; id: string };
+  tone: string | null;
+  link: string | null;
 }

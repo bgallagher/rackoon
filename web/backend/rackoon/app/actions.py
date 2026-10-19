@@ -39,6 +39,8 @@ class PendingAction:
     typed: str | None = None
     then: str | None = None
     target: str | None = None
+    details: str | None = None
+    """A dry run's output (what a Commands entry would affect), shown under the command."""
 
     def json(self) -> dict[str, Any]:
         """What the confirm sheet shows. `command` is the readable preview when there is one."""
@@ -47,7 +49,7 @@ class PendingAction:
                 "isPreview": self.intent.preview is not None,
                 "risk": self.intent.risk.value, "destructive": self.destructive, "title": self.title or
                 self.intent.summary, "message": self.message, "typed": self.typed, "then": self.then,
-                "target": self.target}
+                "target": self.target, "details": self.details}
 
 
 class ActionError(Exception):
@@ -66,14 +68,14 @@ class ActionCenter:
 
     def propose(self, intent: Intent, run: Runner, destructive: bool = False, title: str | None = None,
                 message: str | None = None, typed: str | None = None, then: str | None = None,
-                target: str | None = None) -> PendingAction:
+                target: str | None = None, details: str | None = None) -> PendingAction:
         """Nothing runs yet. A change is refused up front while Read-only is on, so the user sees why."""
         if intent.risk is Risk.MUTATE and self.policy.is_read_only:
             raise ActionError(409, "readOnly", str(ReadOnly()))
         now = self.clock()
         self._pending = {k: v for k, v in self._pending.items() if v.expires > now}
         pending = PendingAction(secrets.token_urlsafe(16), intent, destructive, run, now + EXPIRES_SECONDS, title,
-                                message, typed, then, target)
+                                message, typed, then, target, details)
         self._pending[pending.id] = pending
         return pending
 

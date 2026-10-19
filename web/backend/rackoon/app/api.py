@@ -40,7 +40,8 @@ from rackoon.core import server_list
 
 from . import security
 from .actions import ActionCenter, ActionError
-from . import docker_api, updates_api
+from . import alerts_api, docker_api, files_api, system_api, updates_api
+from .alert_monitor import AlertMonitor
 from .connections import CheckResult, Connections, Scanner, Transport, TrustError, key_id_of
 from .docker_hub import DockerHub
 from .elevation import DockerElevation
@@ -183,6 +184,10 @@ class Rackoon:
         self.runs = RunManager(self.preferences.touch, clock)
         self.favicons = FaviconStore(self.store.root / "favicons")
         self.reboots = updates_api.RebootWatch(self._transport_by_id, self.monitor.refresh, clock)
+        self.services = system_api.ServicesStore(self.store.root / "services", clock)
+        self.nas = system_api.NASStore(clock)
+        self.monitor.nas_for = self.nas.snapshot
+        self.alerts = AlertMonitor(self, clock)
         self.terminals = TerminalManager(self.connections.open_shell, lambda: self.preferences.read_only,
                                          self.preferences.touch, lambda: self.preferences.highlight_output)
         self.setup_token: security.SetupToken | None = None
@@ -286,6 +291,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         if poll:
             rackoon.monitor.start()
+            rackoon.alerts.start()
         idle = asyncio.create_task(idle_watch())
         yield
         idle.cancel()
@@ -294,6 +300,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         await rackoon.terminals.close_all()
         await rackoon.runs.close_all()
         await rackoon.reboots.stop()
+        await rackoon.alerts.stop()
         await rackoon.docker.stop()
         await rackoon.monitor.stop()
         await rackoon.connections.close()
@@ -318,6 +325,13 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
             if not _same_origin(request, rackoon):
                 return JSONResponse({"error": "crossOrigin", "message": "Cross-origin requests are refused."}, 403)
             length = request.headers.get("content-length")
+            upload = request.method == "PUT" and request.url.path.startswith(files_api.UPLOAD_PREFIX)
+            if upload:
+                # Raw file bytes; the endpoint checks the size against the confirmed upload.
+                response = await call_next(request)
+                response.headers["X-Content-Type-Options"] = "nosniff"
+                response.headers.setdefault("Cache-Control", "no-store")
+                return response
             if length and (not length.isdigit() or int(length) > MAX_BODY):
                 return JSONResponse({"error": "tooLarge", "message": "The request is too large."}, 413)
             if length not in (None, "0"):
@@ -554,6 +568,8 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         rackoon.docker.forget(server_id)
         rackoon.elevation.lock(server_id)
         rackoon.reboots.forget(server_id)
+        rackoon.services.forget(server_id)
+        rackoon.alerts.forget(server_id)
         await rackoon.connections.forget(server_id)
         store.delete_snapshot(server_id)
         return {"ok": True}
@@ -870,6 +886,9 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
 
     docker_api.register(app, rackoon, authenticated, identify, lambda r: _same_origin(r, rackoon), find)
     updates_api.register(app, rackoon, authenticated, find)
+    system_api.register(app, rackoon, authenticated, find)
+    files_api.register(app, rackoon, authenticated, find)
+    alerts_api.register(app, rackoon, authenticated, find)
 
     if settings.static_dir is not None:
         mount_frontend(app, settings.static_dir)

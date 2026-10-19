@@ -79,9 +79,26 @@ class LibraryCommand:
             out += f"command -v {self.needs} >/dev/null 2>&1 || {{ echo '{self.needs} is not installed on this server.'; exit 0; }}; "
         return out + shell.fill(body if body is not None else self.script, filled)
 
+    def readable_script(self, body: str | None = None, params: dict[str, str] | None = None) -> str:
+        """The script as a person reads it: no PATH and "not installed" guards, `$S` shown as `sudo`, each parameter
+        quoted or `<label>` while it is missing or invalid. Never run this: `full_script` is what runs."""
+        filled = {p.id: p.quoted((params or {}).get(p.id, "")) or f"<{p.label.lower()}>" for p in self.params}
+        text = body if body is not None else self.script
+        if self.root:
+            text = text.replace("$S ", "sudo ")
+        return shell.fill(text, filled)
+
     def intent(self, params: dict[str, str] | None = None, preview: str | None = None) -> Intent | None:
         script = self.full_script(params=params)
         return Intent(self.title, script, self.risk, preview) if script is not None else None
+
+    def password_intent(self, nonce: str, params: dict[str, str] | None = None,
+                        preview: str | None = None) -> Intent | None:
+        """The same entry for a user whose sudo wants a password, or None for entries that don't use sudo."""
+        from .sudo import with_password
+        plain = self.intent(params, preview) if self.root else None
+        script = with_password(plain.command, nonce) if plain else None
+        return Intent(self.title + " (with sudo password)", script, self.risk, preview) if script else None
 
 
 def custom_intent(text: str) -> Intent | None:

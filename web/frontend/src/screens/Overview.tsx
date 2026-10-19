@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { api } from "../api";
 import { HostKeyDialog } from "../components/HostKeyDialog";
+import { NASOverview } from "../components/NAS";
 import { RebootBanner, useReboot } from "../components/root";
 import { Button, Card, CopyButton, Empty, Meter, Notice, Spinner } from "../components/ui";
 import { useApp } from "../context";
@@ -156,8 +157,9 @@ function OverviewBody(props: { server: Server; state: ServerState; now: number; 
                 `${o.pendingUpdates} update${o.pendingUpdates === 1 ? "" : "s"} pending, ${o.securityUpdates} security`}</p>
             </Card>
           </div>
+          {state.isUnraid && <NASOverview serverId={props.server.id} />}
           <div className="columns">
-            <Card title="Disks">
+            {!state.isUnraid && <Card title="Disks">
               <ul className="disks">
                 {o.disks.map((d) => (
                   <li key={d.mount}>
@@ -170,7 +172,7 @@ function OverviewBody(props: { server: Server; state: ServerState; now: number; 
                   </li>
                 ))}
               </ul>
-            </Card>
+            </Card>}
             <SystemInfo state={state} now={now} />
           </div>
         </>

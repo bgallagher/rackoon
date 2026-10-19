@@ -143,8 +143,7 @@ class RunManager:
             if run.running and run.task is not None:
                 run.cancelling = True
                 run.task.cancel()
-                with contextlib.suppress(asyncio.CancelledError, Exception):
-                    await run.task
+                await asyncio.gather(run.task, return_exceptions=True)
             self.runs.pop(run.id, None)
 
     async def close_all(self) -> None:

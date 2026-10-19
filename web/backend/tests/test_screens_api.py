@@ -271,7 +271,7 @@ def test_actions_confirm_the_exact_intent(tmp_path: Path) -> None:
     pending = center.propose(intent, run, destructive=True)
     assert pending.json() == {"id": pending.id, "summary": intent.summary, "command": intent.command, "risk": "mutate",
                               "destructive": True, "isPreview": False, "title": intent.summary, "message": None,
-                              "typed": None, "then": None, "target": None}
+                              "typed": None, "then": None, "target": None, "details": None}
     assert asyncio.run(center.confirm(pending.id)) == "restarted" and len(ran) == 1
     with pytest.raises(ActionError, match="expired"):
         asyncio.run(center.confirm(pending.id))  # used once

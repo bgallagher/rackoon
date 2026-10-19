@@ -2,9 +2,9 @@
 // when sudo wants one) and the banner that follows a reboot until the server is back with a new boot id.
 import { useEffect, useState, type ReactNode } from "react";
 import { api } from "../api";
-import type { PendingAction, RebootState, Server } from "../types";
+import type { PendingAction, RebootState, Run, Server } from "../types";
 import { ConfirmSheet } from "./ConfirmSheet";
-import { errorText } from "./docker";
+import { errorText, outputSize } from "./docker";
 import { Button, Modal, Notice, Spinner } from "./ui";
 import { useApp } from "../context";
 
@@ -107,4 +107,57 @@ export function RebootBanner(props: { server: Server; reboot: RebootState | null
   }
   return <Notice tone="warn" title={`${props.server.name} has not come back`} actions={dismiss}>
     <p>Ten minutes passed without a new boot id. Check the server's console.</p></Notice>;
+}
+
+/** Runs a command-like action: reads start at once, changes show the backend's sheet; when the run ends saying sudo
+ * wants a password, the password sheet opens and the same request goes again with it (and is confirmed again). */
+export function useRootAction(server: Server, onRun: (run: Run) => void, onTab?: () => void): {
+  request: (path: string, body: Record<string, unknown>) => Promise<void>;
+  runEnded: (run: Run) => void;
+  sheets: ReactNode;
+  error: string | undefined;
+} {
+  const [pending, setPending] = useState<PendingAction>();
+  const [asking, setAsking] = useState<{ error: string | null }>();
+  const [error, setError] = useState<string>();
+  const [last, setLast] = useState<{ path: string; body: Record<string, unknown> }>();
+  const request = async (path: string, body: Record<string, unknown>) => {
+    setError(undefined);
+    setLast({ path, body });
+    try {
+      const r = await api.post<{ pending?: PendingAction; run?: Run; tab?: unknown }>(path, { ...outputSize, ...body });
+      if (r.pending) setPending(r.pending);
+      if (r.run) onRun(r.run);
+      if (r.tab) onTab?.();
+    } catch (e) {
+      setError(errorText(e));
+    }
+  };
+  const runEnded = (run: Run) => {
+    if (run.phase !== "running" && run.needsPassword && last) {
+      setAsking({ error: run.sudo === "rejected" ? "The server did not accept that password." : null });
+    }
+  };
+  const sheets = (
+    <>
+      {pending && (
+        <ConfirmSheet action={pending} onCancel={() => setPending(undefined)}
+                      onDone={(result) => {
+                        setPending(undefined);
+                        const r = result as { run?: Run };
+                        if (r.run) onRun(r.run);
+                      }} />
+      )}
+      {asking && !pending && last && (
+        <PasswordSheet server={server} error={asking.error}
+                       why={`sudo on ${server.name} wants ${server.user ?? "this user"}'s password for this.`}
+                       onCancel={() => setAsking(undefined)}
+                       onSubmit={(pw) => {
+                         setAsking(undefined);
+                         void request(last.path, { ...last.body, password: pw });
+                       }} />
+      )}
+    </>
+  );
+  return { request, runEnded, sheets, error };
 }

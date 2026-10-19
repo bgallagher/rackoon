@@ -391,6 +391,55 @@ class AsyncSSHTransport:
             raise ConnectionLost("the connection closed before the command finished")
         return CommandResult(_decode(stdout), _decode(stderr), _exit_code(process))
 
+    async def upload(self, command: str, chunks: AsyncIterable[bytes], timeout: float) -> CommandResult:
+        """Feeds `chunks` to the command's standard input (file content never travels in a command), then EOF, on the
+        shared connection. Cancelling closes the channel; the command sees a short input and changes nothing."""
+        conn = await self._connection()
+        try:
+            process = await conn.create_process(command, encoding=None)
+        except (asyncssh.ChannelOpenError, asyncssh.ConnectionLost, asyncssh.DisconnectError, OSError) as e:
+            await self._invalidate(conn)
+            raise ConnectionLost(str(e)) from None
+        try:
+            async with asyncio.timeout(timeout):
+                async for chunk in chunks:
+                    process.stdin.write(chunk)
+                    await process.stdin.drain()
+                process.stdin.write_eof()
+                stdout, stderr = await asyncio.gather(process.stdout.read(), process.stderr.read())
+                await process.wait_closed()
+        except TimeoutError:
+            raise Timeout(timeout) from None
+        except (asyncssh.ConnectionLost, asyncssh.DisconnectError, BrokenPipeError) as e:
+            raise ConnectionLost(str(e)) from None
+        finally:
+            process.close()
+        return CommandResult(_decode(stdout), _decode(stderr), _exit_code(process))
+
+    async def download(self, command: str) -> AsyncIterator[bytes]:
+        """The command's standard output as it arrives, on the shared connection. Raises `SSHError` at the end when the
+        command failed (with its stderr), so a partial download is never mistaken for a whole one."""
+        conn = await self._connection()
+        try:
+            process = await conn.create_process(command, encoding=None)
+        except (asyncssh.ChannelOpenError, asyncssh.ConnectionLost, asyncssh.DisconnectError, OSError) as e:
+            await self._invalidate(conn)
+            raise ConnectionLost(str(e)) from None
+        try:
+            while True:
+                chunk = await process.stdout.read(65536)
+                if not chunk:
+                    break
+                yield chunk
+            stderr = await process.stderr.read()
+            await process.wait_closed()
+            if _exit_code(process) != 0:
+                raise SSHError(_decode(stderr).strip() or f"the server answered with status {_exit_code(process)}")
+        except (asyncssh.ConnectionLost, asyncssh.DisconnectError) as e:
+            raise ConnectionLost(str(e)) from None
+        finally:
+            process.close()
+
     def stream(self, command: str, input: AsyncIterable[str] | None = None,
                cols: int = 80, rows: int = 24) -> Stream:
         """Output of `command` over a pty on its own connection. Use as `async with t.stream(c) as s: async for ...`.

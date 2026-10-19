@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
 import { useApp } from "../context";
 import { destination } from "../format";
-import type { Connection, Safety, Server } from "../types";
+import { usePoll } from "../hooks";
+import type { AlertSummary, Connection, Safety, Server } from "../types";
+import { SearchPanel } from "./SearchPanel";
 import { StatusDot } from "./ui";
 
 function connectionOf(id: string, rows: { id: string; connection: Connection; isStale: boolean }[] | undefined) {
@@ -109,6 +111,17 @@ function ReadOnlySwitch() {
 export function Sidebar(props: { route: string; selected?: string }) {
   const app = useApp();
   const [open, setOpen] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const { data: summary } = usePoll(() => api.get<AlertSummary>("/api/alerts/summary"), 20_000, []);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      const typing = e.target instanceof HTMLElement && e.target.closest("input, textarea, [contenteditable], .xterm");
+      if (e.key === "/" && !typing) { e.preventDefault(); setSearching(true); }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); setSearching(true); }
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, []);
   const server = app.servers.find((s) => s.id === props.selected) ?? app.servers[0];
   const down = app.fleet?.servers.filter((r) => r.connection !== "ok" && r.connection !== "connecting").length ?? 0;
   const nav = (to: string, label: string, active: boolean) => (
@@ -121,6 +134,9 @@ export function Sidebar(props: { route: string; selected?: string }) {
         <span>Rackoon</span>
         {app.auth.demo && <span className="badge">Demo</span>}
       </div>
+      <button type="button" className="search-box" onClick={() => setSearching(true)} title="Search everything (/)">
+        Search…
+      </button>
       {nav("/dashboard", "Dashboard", props.route.startsWith("/dashboard"))}
       <div className="sidebar-heading">
         <span>Servers</span>
@@ -145,6 +161,16 @@ export function Sidebar(props: { route: string; selected?: string }) {
                                                                   props.route.startsWith(`/servers/${server.id}/updates`))}
       {server && nav(`/servers/${server.id}/docker`, "Docker", props.route.startsWith(`/servers/${server.id}/docker`))}
       {server && nav(`/servers/${server.id}/bookmarks`, "Bookmarks", props.route.startsWith(`/servers/${server.id}/bookmarks`))}
+      {server && nav(`/servers/${server.id}/services`, "Services", props.route.startsWith(`/servers/${server.id}/services`))}
+      {server && nav(`/servers/${server.id}/commands`, "Commands", props.route.startsWith(`/servers/${server.id}/commands`))}
+      {server && nav(`/servers/${server.id}/files`, "Files", props.route.startsWith(`/servers/${server.id}/files`))}
+      {server && (
+        <a href={`#/servers/${server.id}/alerts`} className={`nav${props.route.startsWith(`/servers/${server.id}/alerts`) ? " active" : ""}`}>
+          Alerts {(summary?.servers[server.id]?.unseen ?? 0) > 0 && (
+            <span className={`badge ${summary?.servers[server.id]?.worst === "critical" ? "badge-danger" : "badge-warn"}`}>
+              {summary?.servers[server.id]?.unseen}</span>)}
+        </a>
+      )}
       <div className="sidebar-spacer" />
       {nav("/settings/servers", "Settings", props.route.startsWith("/settings"))}
       <ReadOnlySwitch />
@@ -155,6 +181,7 @@ export function Sidebar(props: { route: string; selected?: string }) {
         )}
       </div>
       {open && <ServerSwitcher selected={server?.id} onClose={() => setOpen(false)} />}
+      {searching && <SearchPanel selected={server?.id} onClose={() => setSearching(false)} />}
     </aside>
   );
 }

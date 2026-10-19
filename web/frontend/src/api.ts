@@ -14,6 +14,11 @@ export function setCsrf(token: string | undefined): void {
   csrf = token;
 }
 
+/** For requests that can't go through `api` (an upload with progress). */
+export function csrfToken(): string | undefined {
+  return csrf;
+}
+
 export function whenSignedOut(handler: () => void): void {
   onSignedOut = handler;
 }

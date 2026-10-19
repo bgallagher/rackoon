@@ -21,6 +21,7 @@ from rackoon.ssh import AuthFailed, CommandResult, HostKey, Unreachable
 
 from .connections import CheckResult, Connections, Transport
 from .demo_docker import DemoDocker, DemoStream
+from .demo_extras import DemoExtras
 from .demo_system import DEMO_PASSWORD, DemoSystem
 
 ELEVATED = "sudo -S -p '' sh -c "
@@ -86,6 +87,8 @@ class DemoTransport:
         self.cpu_total = 3_400_000_000
         self.cpu_idle = 2_300_000_000
         self.docker = DemoDocker(profile.hostname)
+        self.extras = DemoExtras(profile.hostname, {"homelab": "ubuntu", "garage-nuc": "pi"}.get(profile.hostname, "root"),
+                                 self.docker)
         self.system = DemoSystem(profile.hostname, "", needs_password=profile.hostname == "homelab",
                                  pending=profile.updates, reboot_required=profile.reboot_required)
 
@@ -112,6 +115,10 @@ class DemoTransport:
             return answer_
         if command == overview.command():
             return CommandResult(self._overview(), "", 0)
+        extra = self.extras.run(command)
+        if extra is not None:
+            await asyncio.sleep(0.1)
+            return extra
         answer = self.docker.run(command)
         if answer is not None:
             await asyncio.sleep(0.15)
@@ -140,12 +147,30 @@ class DemoTransport:
             yield f"##rackoon-sudo-ok-{n}\r\n"
             command = shlex.split(command[at + len(ELEVATED_STREAM):])[0]
         apt = await self.system.stream(command, input)
-        chunks = apt if apt is not None else self.docker.stream(command)
+        inner = re.search(r"\( (.*) \); rk=\$\?", command, re.S)
+        library = (await self.extras.library(inner.group(1)) if inner and 'PATH="$PATH:/usr/local/sbin' in inner.group(1)
+                   else None)
+        if apt is None and library is None and inner and 'PATH="$PATH:/usr/local/sbin' in inner.group(1):
+            library = self._nothing()
+        chunks = apt if apt is not None else library if library is not None else self.docker.stream(command)
         async for chunk in chunks:
             yield chunk
 
     async def close(self) -> None:
         pass
+
+    async def upload(self, command: str, chunks: AsyncIterable[bytes], timeout: float) -> CommandResult:
+        await self.run("true", 5)
+        return await self.extras.upload(command, chunks)
+
+    async def download(self, command: str) -> AsyncIterator[bytes]:
+        await self.run("true", 5)
+        async for chunk in self.extras.download(command):
+            yield chunk
+
+    async def _nothing(self) -> AsyncIterator[str]:
+        await asyncio.sleep(0.2)
+        yield "\x1b[2m(demo: nothing was run on a server)\x1b[0m\r\n\r\n##rackoon-exit:0\r\n"
 
     def _overview(self) -> str:
         p = self.profile

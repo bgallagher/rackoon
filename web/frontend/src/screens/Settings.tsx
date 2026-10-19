@@ -1,3 +1,4 @@
+import { NotificationsSettings } from "./Alerts";
 import { useEffect, useState, type FormEvent } from "react";
 import { api, ApiError, setCsrf } from "../api";
 import { HostKeyDialog } from "../components/HostKeyDialog";
@@ -354,7 +355,7 @@ function SafetyTab() {
   );
 }
 
-const TABS: [string, string][] = [["servers", "Servers"], ["keys", "Keys"], ["account", "Account"], ["appearance", "Appearance"], ["safety", "Safety"]];
+const TABS: [string, string][] = [["servers", "Servers"], ["keys", "Keys"], ["account", "Account"], ["appearance", "Appearance"], ["safety", "Safety"], ["notifications", "Notifications"]];
 
 export function SettingsScreen(props: { tab: string; sub?: string }) {
   return (
@@ -371,6 +372,7 @@ export function SettingsScreen(props: { tab: string; sub?: string }) {
       {props.tab === "account" && <AccountTab />}
       {props.tab === "appearance" && <AppearanceTab />}
       {props.tab === "safety" && <SafetyTab />}
+      {props.tab === "notifications" && <NotificationsSettings />}
     </div>
   );
 }

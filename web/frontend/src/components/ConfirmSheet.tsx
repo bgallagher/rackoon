@@ -64,6 +64,12 @@ export function ConfirmSheet(props: { action: PendingAction; onDone: (result: un
       <p className="muted">{action.isPreview ? "What changes" : "This runs on the server"}
         {action.target ? <> as <span className="mono">{action.target}</span></> : null}:</p>
       {action.isPreview ? <Diff text={action.command} /> : <pre className="command">{action.command}</pre>}
+      {action.details && (
+        <>
+          <p className="muted">What it would affect (a dry run, nothing changed yet):</p>
+          <pre className="command details">{action.details}</pre>
+        </>
+      )}
       {action.then && (
         <>
           <p className="muted">Then:</p>

@@ -15,11 +15,12 @@ from datetime import UTC, datetime
 from dataclasses import dataclass, field
 from typing import Any
 
-from rackoon.core import attention, connection_failure, overview
+from rackoon.core import attention, connection_failure, overview, unraid_view
+from rackoon.core.models import AttentionItem
 from rackoon.core.fleet import FleetTotals, HealthHistory, HealthSample, ServerState
 from rackoon.core.jsonmodel import to_json
 from rackoon.core.models import Server
-from rackoon.core.unraid import is_unraid
+from rackoon.core.unraid import UnraidSnapshot, is_unraid
 from rackoon.ssh import AuthFailed, HostKeyChanged, HostKeyUnknown, SSHError
 
 from .connections import Connections, TrustError, key_id_of
@@ -58,6 +59,7 @@ class Monitor:
         self.clock = clock
         self.entries: dict[str, Entry] = {}
         self.running = False
+        self.nas_for: Callable[[str], UnraidSnapshot | None] | None = None
 
     # --- lifecycle
 
@@ -191,6 +193,16 @@ class Monitor:
 
     # --- what the API returns
 
+    def attention_of(self, server_id: str) -> list[AttentionItem]:
+        """The Overview's items; on Unraid, `df`'s disk items give way to the NAS rules (once the NAS was read)."""
+        entry = self.entries.get(server_id)
+        if entry is None:
+            return []
+        o = entry.state.overview
+        if o is None or not is_unraid(o.os):
+            return entry.state.attention
+        return unraid_view.merge(entry.state.attention, True, self.nas_for(server_id) if self.nas_for else None)
+
     def state_json(self, server_id: str) -> dict[str, Any] | None:
         entry = self.entries.get(server_id)
         if entry is None:
@@ -209,7 +221,7 @@ class Monitor:
             "overview": to_json(s.overview) if s.overview else None,
             "cpuPercent": s.cpu_percent,
             "attention": [{**to_json(i), "red": attention.is_red(i), "short": attention.short_message(i)}
-                          for i in attention.sorted_items(s.attention)],
+                          for i in attention.sorted_items(self.attention_of(server_id))],
             "error": s.error,
             "failure": failure,
             "updatedAt": s.updated_at,
@@ -234,8 +246,8 @@ class Monitor:
                 "cpuPercent": entry.state.cpu_percent,
                 "overview": to_json(o) if o else None,
                 "derived": _derived(o),
-                "attentionCount": len(entry.state.attention),
-                "redCount": sum(attention.is_red(i) for i in entry.state.attention),
+                "attentionCount": len(self.attention_of(server.id)),
+                "redCount": sum(attention.is_red(i) for i in self.attention_of(server.id)),
                 "history": [to_json(h) for h in entry.history.samples],
                 "uptimeFraction": entry.history.uptime_fraction,
             })

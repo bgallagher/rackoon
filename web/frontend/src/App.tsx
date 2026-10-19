@@ -4,6 +4,7 @@ import { Sidebar } from "./components/Sidebar";
 import { Empty, Spinner } from "./components/ui";
 import { AppContext, type AppData } from "./context";
 import { usePoll, useRoute } from "./hooks";
+import { AlertsScreen } from "./screens/Alerts";
 import { BookmarksScreen } from "./screens/Bookmarks";
 import { DashboardScreen } from "./screens/Dashboard";
 import { OverviewScreen } from "./screens/Overview";
@@ -14,6 +15,9 @@ const TerminalScreen = lazy(() => import("./screens/Terminal").then((m) => ({ de
 const DockerScreen = lazy(() => import("./screens/Docker").then((m) => ({ default: m.DockerScreen })));
 const StackScreen = lazy(() => import("./screens/Docker").then((m) => ({ default: m.StackScreen })));
 const UpdatesScreen = lazy(() => import("./screens/Updates").then((m) => ({ default: m.UpdatesScreen })));
+const CommandsScreen = lazy(() => import("./screens/Commands").then((m) => ({ default: m.CommandsScreen })));
+const ServicesScreen = lazy(() => import("./screens/Services").then((m) => ({ default: m.ServicesScreen })));
+const FilesScreen = lazy(() => import("./screens/Files").then((m) => ({ default: m.FilesScreen })));
 const AddContainerScreen = lazy(() => import("./screens/AddContainer").then((m) => ({ default: m.AddContainerScreen })));
 import { applyAppearance } from "./theme";
 import type { Appearance, AuthState, Fleet, Safety, Server } from "./types";
@@ -86,7 +90,7 @@ function Shell(props: { auth: AuthState; onSignedOut: () => void }) {
     },
   }), [props, servers, fleet, safety, appearance, reloadServers, reloadFleet, setAppearance, go]);
 
-  // Routes: /dashboard[/<page>], /servers/<id>[/terminal|/docker[/add|/stack/<id>]|/bookmarks|/updates], /settings/<tab>[/<sub>]; "/" opens the last server or the dashboard.
+  // Routes: /dashboard[/<page>], /servers/<id>[/terminal|/docker[/add|/stack/<id>]|/bookmarks|/updates|/services[/<q>]|/commands[/<id>]|/files|/alerts], /settings/<tab>[/<sub>]; "/" opens the last server or the dashboard.
   const parts = route.split("/").filter(Boolean);
   useEffect(() => {
     if (!servers || parts.length > 0) return;
@@ -116,6 +120,14 @@ function Shell(props: { auth: AuthState; onSignedOut: () => void }) {
       screen = lazyScreen(<DockerScreen key={server.id} server={server} />);
     } else if (parts[2] === "updates") {
       screen = lazyScreen(<UpdatesScreen key={server.id} server={server} />);
+    } else if (parts[2] === "commands") {
+      screen = lazyScreen(<CommandsScreen key={server.id} server={server} select={parts[3]} />);
+    } else if (parts[2] === "services") {
+      screen = lazyScreen(<ServicesScreen key={server.id} server={server} focus={parts[3] ? decodeURIComponent(parts[3]) : undefined} />);
+    } else if (parts[2] === "files") {
+      screen = lazyScreen(<FilesScreen key={server.id} server={server} />);
+    } else if (parts[2] === "alerts") {
+      screen = <AlertsScreen key={server.id} serverId={server.id} />;
     } else if (parts[2] === "bookmarks") {
       screen = <BookmarksScreen key={server.id} server={server} />;
     } else {
