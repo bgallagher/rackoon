@@ -1,0 +1,7 @@
+// Signing for running Rackoon on your own iPhone with a free (personal team) Apple account.
+// Put your own values in Signing.local.xcconfig next to this file (git-ignored), for example:
+//   DEVELOPMENT_TEAM = ABCDE12345
+//   RACKOON_BUNDLE_ID = com.yourname.rackoon
+// A personal team can only sign bundle ids it registers itself, so pick one of your own.
+RACKOON_BUNDLE_ID = com.bgallagher.rackoon.ios
+#include? "Signing.local.xcconfig"
