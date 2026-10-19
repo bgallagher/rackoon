@@ -162,7 +162,7 @@ jobs:
         run: |
           eval "$(tools/lab env)"
           uv sync --locked
-          uv run pytest tests/test_lab_integration.py tests/test_api_lab.py tests/test_docker_api_lab.py --junitxml=build/junit-lab/web.xml
+          uv run pytest tests/test_lab_integration.py tests/test_api_lab.py tests/test_docker_api_lab.py tests/test_updates_api_lab.py --junitxml=build/junit-lab/web.xml
         working-directory: web/backend
       - if: always()
         run: tools/lab down

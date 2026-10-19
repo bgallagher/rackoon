@@ -16,12 +16,13 @@ import json
 import logging
 import secrets
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from typing import Any
 
 from rackoon.core import stream
 from rackoon.core.stream import StreamedRun, StreamOutputParser
+from rackoon.core.sudo import TYPE_PASSWORD, SudoCredential, SudoHandshake
 from rackoon.ssh import SSHError
 
 from .connections import Transport
@@ -54,6 +55,10 @@ class Run:
     clients: set[Client] = field(default_factory=set)
     task: asyncio.Task[None] | None = None
     cancelling: bool = False
+    needs_password: bool = False
+    """The page may offer the sudo password sheet (sudo wanted one, or rejected the one given)."""
+    sudo: str | None = None
+    """How the password step went: accepted, rejected, refused, other_prompt, unfinished."""
 
     @property
     def running(self) -> bool:
@@ -62,7 +67,8 @@ class Run:
     def json(self) -> dict[str, Any]:
         return {"id": self.id, "serverId": self.server_id, "scope": self.scope, "title": self.title,
                 "working": self.working, "phase": self.phase, "exitCode": self.exit_code, "message": self.message,
-                "started": self.started, "finished": self.finished, "cols": self.cols, "rows": self.rows}
+                "started": self.started, "finished": self.finished, "cols": self.cols, "rows": self.rows,
+                "needsPassword": self.needs_password, "sudo": self.sudo}
 
     def emit(self, text: str) -> None:
         if not text:
@@ -104,7 +110,8 @@ class RunManager:
         return next((r for r in reversed(self.for_server(server_id)) if r.scope == scope), None)
 
     def start(self, server_id: str, scope: str, title: str, working: str, cols: int, rows: int, work: Work,
-              on_done: Callable[[Run], Awaitable[None] | None] | None = None) -> Run:
+              on_done: Callable[[Run], Awaitable[None] | None] | None = None,
+              explain: Callable[[StreamedRun], str | None] | None = None) -> Run:
         """Starts `work` now. The caller has the confirmation; `work` streams through `stream_command`."""
         if self.running_on(server_id) is not None:
             raise RuntimeError("Another action is running on this server. Wait for it to finish.")
@@ -112,7 +119,7 @@ class RunManager:
                   max(5, min(200, rows)), self.clock())
         self.runs[run.id] = run
         self._prune(server_id)
-        run.task = asyncio.create_task(self._run(run, work, on_done))
+        run.task = asyncio.create_task(self._run(run, work, on_done, explain))
         return run
 
     def cancel(self, run_id: str) -> bool:
@@ -149,7 +156,8 @@ class RunManager:
         for r in finished[:-KEEP_FINISHED]:
             del self.runs[r.id]
 
-    async def _run(self, run: Run, work: Work, on_done: Callable[[Run], Awaitable[None] | None] | None) -> None:
+    async def _run(self, run: Run, work: Work, on_done: Callable[[Run], Awaitable[None] | None] | None,
+                   explain: Callable[[StreamedRun], str | None] | None = None) -> None:
         result: StreamedRun | None = None
         try:
             result = await work(run)
@@ -167,6 +175,12 @@ class RunManager:
             run.phase = "succeeded" if result.succeeded else ("cancelled" if result.cancelled and result.exit_code is None
                                                               else "failed")
             run.message = result.failure_message(run.title)
+            run.sudo = result.sudo.kind if result.sudo is not None else None
+            run.needs_password = not result.succeeded and result.needs_sudo_password
+            if result.sudo_problem is not None:
+                run.phase, run.message = "failed", result.sudo_problem
+            elif explain is not None and not result.succeeded and not result.cancelled:
+                run.message = explain(result) or run.message
         run.finished = self.clock()
         self.touch()  # a long run is activity: Read-only's idle timer starts after it ends
         run._publish()
@@ -201,23 +215,72 @@ class RunFailed(Exception):
     """A step before or after the stream failed with a message for the Output tab."""
 
 
-async def stream_command(run: Run, transport: Transport, command: str) -> StreamedRun:
-    """Streams one vetted command into the run and returns what it came to (the wrapper's exit marker, or none)."""
+class Keyboard:
+    """What is typed into a stream's pty (the sudo password at its one prompt, or a Ctrl-C), as an async iterable."""
+
+    def __init__(self) -> None:
+        self._queue: asyncio.Queue[str | None] = asyncio.Queue()
+
+    def type(self, text: str) -> None:
+        self._queue.put_nowait(text)
+
+    def close(self) -> None:
+        self._queue.put_nowait(None)
+
+    def __aiter__(self) -> AsyncIterator[str]:
+        return self._keys()
+
+    async def _keys(self) -> AsyncIterator[str]:
+        while (text := await self._queue.get()) is not None:
+            yield text
+
+
+async def stream_command(run: Run, transport: Transport, command: str,
+                         credential: SudoCredential | None = None) -> StreamedRun:
+    """Streams one vetted command into the run and returns what it came to (the wrapper's exit marker, or none).
+
+    With `credential`, `command` must be the password variant built with the same nonce: the password is typed at the
+    first nonce prompt only, the handshake's lines are not shown, and after the ok marker nothing is looked at again.
+    """
     parser = StreamOutputParser()
+    handshake = SudoHandshake(credential.nonce) if credential is not None else None
+    keyboard = Keyboard() if credential is not None else None
     text: list[str] = []
-    try:
-        async with transport.stream(stream.wrap(command, run.cols, run.rows), cols=run.cols, rows=run.rows) as s:
-            async for chunk in s:
-                shown = parser.push(chunk)
-                text.append(shown)
-                run.emit(shown)
-    except SSHError as e:
+
+    def show(chunk: str) -> None:
+        visible = chunk
+        if handshake is not None and keyboard is not None and credential is not None:
+            visible, actions = handshake.push(chunk)
+            for action in actions:
+                keyboard.type(credential.password + "\n" if action == TYPE_PASSWORD else "\x03")
+        shown = parser.push(visible)
+        if sum(len(t) for t in text) < 200_000:
+            text.append(shown)
+        run.emit(shown)
+
+    def end() -> tuple[str, int | None]:
+        if handshake is not None:
+            run.emit(parser.push(handshake.finish()))
+        if keyboard is not None:
+            keyboard.close()
         held, code = parser.finish()
         run.emit(held)
-        return StreamedRun(code, False, str(e), "".join(text) + held)
-    held, code = parser.finish()
-    run.emit(held)
-    return StreamedRun(code, False, None, "".join(text) + held)
+        return held, code
+
+    error: str | None = None
+    try:
+        async with transport.stream(stream.wrap(command, run.cols, run.rows), input=keyboard, cols=run.cols,
+                                    rows=run.rows) as s:
+            async for chunk in s:
+                show(chunk)
+    except SSHError as e:
+        error = str(e)
+    except asyncio.CancelledError:
+        if keyboard is not None:
+            keyboard.close()
+        raise
+    held, code = end()
+    return StreamedRun(code, False, error, "".join(text) + held, handshake.outcome if handshake else None)
 
 
 def note(text: str) -> str:

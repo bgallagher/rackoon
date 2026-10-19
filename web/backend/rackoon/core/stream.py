@@ -6,8 +6,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from . import shell, spec
+
+if TYPE_CHECKING:
+    from .sudo import SudoOutcome
 
 MARKER = "##rackoon-exit:"
 
@@ -96,10 +100,47 @@ class StreamedRun:
     cancelled: bool
     transport_error: str | None
     text: str
+    sudo: SudoOutcome | None = None
+    """How the password step went, when a sudo password was given (None otherwise)."""
 
     @property
     def succeeded(self) -> bool:
         return self.exit_code == 0
+
+    @property
+    def sudo_rejected(self) -> bool:
+        return self.sudo is not None and self.sudo.kind == "rejected"
+
+    @property
+    def needs_sudo_password(self) -> bool:
+        """Offer the password sheet. A plain run: sudo refused for want of a password, judged from the text (a pipeline
+        can exit 0). A password run: only when the password was rejected."""
+        from .sudo import needs_password
+        if self.sudo is not None:
+            return self.sudo_rejected
+        return needs_password(strip_ansi(self.text))
+
+    @property
+    def sudo_asks_every_time(self) -> bool:
+        """sudo took the password, but the command's own `sudo -n` still wanted one (it keeps no session record)."""
+        from .sudo import needs_password
+        return self.sudo is not None and self.sudo.kind == "accepted" and needs_password(strip_ansi(self.text))
+
+    @property
+    def sudo_problem(self) -> str | None:
+        """Why the password step failed, in plain words, or None when it did not."""
+        from . import sudo as s
+        if self.sudo is None:
+            return None
+        if self.sudo.kind == "rejected":
+            return "The server did not accept that sudo password. Nothing was run."
+        if self.sudo.kind == "refused":
+            return s.explain_refusal(self.sudo.said)
+        if self.sudo.kind == "other_prompt":
+            return s.OTHER_PROMPT
+        if self.sudo_asks_every_time:
+            return s.ASKS_EVERY_TIME
+        return None
 
     def failure_message(self, label: str) -> str | None:
         if self.exit_code is not None:

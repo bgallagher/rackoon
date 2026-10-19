@@ -1,13 +1,15 @@
 import { useState } from "react";
 import { api } from "../api";
 import { HostKeyDialog } from "../components/HostKeyDialog";
+import { RebootBanner, useReboot } from "../components/root";
 import { Button, Card, CopyButton, Empty, Meter, Notice, Spinner } from "../components/ui";
 import { useApp } from "../context";
 import { ago, bytes, duration, percent, serverClock } from "../format";
 import { useNow, usePoll } from "../hooks";
 import type { AttentionItem, Server, ServerState } from "../types";
 
-function AttentionStrip(props: { items: AttentionItem[] }) {
+function AttentionStrip(props: { serverId: string; items: AttentionItem[];
+  reboot?: { onClick: () => void; disabled: boolean } }) {
   if (props.items.length === 0) return null;
   const red = props.items.some((i) => i.red);
   return (
@@ -19,7 +21,12 @@ function AttentionStrip(props: { items: AttentionItem[] }) {
         {props.items.map((i) => (
           <li key={i.id}>
             <span className={`dot dot-${i.red ? "danger" : "warn"}`} aria-hidden="true" />
-            <span>{i.short}</span>
+            <span className="attention-text">{i.short}</span>
+            {i.id === "security_updates" && <a href={`#/servers/${props.serverId}/updates`}>Updates</a>}
+            {i.id === "reboot_required" && props.reboot && (
+              <Button small disabled={props.reboot.disabled} title={props.reboot.disabled ? "Read-only mode is on" : undefined}
+                      onClick={props.reboot.onClick}>Reboot…</Button>
+            )}
           </li>
         ))}
       </ul>
@@ -85,6 +92,17 @@ export function OverviewScreen(props: { server: Server }) {
     await app.reloadFleet();
   };
   if (!state) return <div className="page"><Spinner /></div>;
+  return <OverviewBody server={props.server} state={state} now={now} refresh={refresh} reload={reload}
+                       trusting={trusting} setTrusting={setTrusting} />;
+}
+
+function OverviewBody(props: { server: Server; state: ServerState; now: number; refresh: () => Promise<void>;
+  reload: () => Promise<void>; trusting: boolean; setTrusting: (b: boolean) => void }) {
+  const app = useApp();
+  const { state, now, refresh, trusting, setTrusting } = props;
+  const reboot = useReboot(props.server, () => void props.reload());
+  const readOnly = app.safety?.readOnly ?? true;
+  const rebooting = state.reboot?.phase === "waiting";
   const o = state.overview;
   const polledAt = state.updatedAt ?? now;
   return (
@@ -100,13 +118,23 @@ export function OverviewScreen(props: { server: Server }) {
                            : state.error ? "Has not answered yet" : "Connecting…"}
           </p>
         </div>
-        <Button onClick={() => void refresh()}>Refresh</Button>
+        <div className="card-actions">
+          {o?.rebootRequired && (
+            <Button disabled={readOnly || rebooting} title={readOnly ? "Read-only mode is on" : undefined}
+                    onClick={reboot.request}>Reboot…</Button>
+          )}
+          <Button onClick={() => void refresh()}>Refresh</Button>
+        </div>
       </header>
 
-      {state.error && (
+      <RebootBanner server={props.server} reboot={state.reboot}
+                    onDismiss={() => void api.post(`/api/servers/${props.server.id}/reboot/dismiss`).then(props.reload)} />
+      {reboot.error && <Notice tone="danger">{reboot.error}</Notice>}
+      {state.error && !rebooting && (
         <ConnectionProblem server={props.server} state={state} onRetry={() => void refresh()} onTrust={() => setTrusting(true)} />
       )}
-      {o && <AttentionStrip items={state.attention} />}
+      {o && <AttentionStrip serverId={props.server.id} items={state.attention}
+                            reboot={rebooting ? undefined : { onClick: reboot.request, disabled: readOnly }} />}
 
       {!o && !state.error && <Empty title="Connecting…"><Spinner /></Empty>}
       {o && (
@@ -153,6 +181,7 @@ export function OverviewScreen(props: { server: Server }) {
           if (trusted) void refresh();
         }} />
       )}
+      {reboot.sheets}
     </div>
   );
 }

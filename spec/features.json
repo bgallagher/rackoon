@@ -339,7 +339,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.DockerAccessTests", "RackoonCoreTests.ElevationWindowTests", "RackoonCoreTests.SudoTransportTests", "RackoonCoreTests.SudoTransportEdgeTests"]},
         "android": {"status": "planned", "reason": "Android has no sudo password flow yet"},
         "ios": {"status": "planned", "reason": "stage I5"},
-        "web": {"status": "planned", "reason": "stage W6"}
+        "web": {"status": "done", "tests": ["tests.test_elevation", "tests.test_sudo_core/test_the_elevation_window", "tests.test_sudo_core/test_elevated_commands_reach_the_inner_shell_unchanged", "tests.test_updates_api/test_docker_unlocked_through_sudo_for_a_while_in_memory_only", "tests.test_updates_api/test_a_rejected_password_locks_docker_again", "tests.test_updates_api_lab/test_lab_sudo_password_for_apt_reboot_and_docker"]}
       }
     },
     {
@@ -349,7 +349,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.UpdatesParserTests", "RackoonSSHSystemTests.LabIntegrationTests/testUpdatesParse"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.UpdatesParserTests", "com.bgallagher.rackoon.core.UpdatesPresentationTests", "com.bgallagher.rackoon.ssh.LabIntegrationTests/updatesParse"]},
         "ios": {"status": "planned", "reason": "stage I5"},
-        "web": {"status": "planned", "reason": "stage W6"}
+        "web": {"status": "done", "tests": ["tests.test_golden_fixtures/test_golden[updates]", "tests.test_sudo_core/test_the_updates_screen_rules", "tests.test_updates_api/test_the_update_list_security_first", "tests.test_lab_integration/test_updates_parse"]}
       }
     },
     {
@@ -359,7 +359,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.AptActionTests", "RackoonCoreTests.UpdatesSessionActionTests", "RackoonCoreTests.AptStreamingTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.AptActionTests", "com.bgallagher.rackoon.core.UpdatesSessionActionTests", "com.bgallagher.rackoon.core.AptStreamingTests"]},
         "ios": {"status": "planned", "reason": "stage I5"},
-        "web": {"status": "planned", "reason": "stage W6"}
+        "web": {"status": "done", "tests": ["tests.test_sudo_core/test_apt_commands_come_from_the_spec_and_never_remove", "tests.test_sudo_core/test_package_lists_are_deduplicated_capped_and_validated", "tests.test_sudo_core/test_a_real_shell_picks_sudo_only_when_not_root", "tests.test_sudo_core/test_apt_failures_are_explained", "tests.test_updates_api/test_installing_security_updates_clears_them", "tests.test_updates_api_lab/test_lab_sudo_password_for_apt_reboot_and_docker"]}
       }
     },
     {
@@ -369,7 +369,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.RebootSessionTests", "RackoonCoreTests.RebootOfferTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.RebootTests"]},
         "ios": {"status": "planned", "reason": "stage I5"},
-        "web": {"status": "planned", "reason": "stage W6"}
+        "web": {"status": "done", "tests": ["tests.test_sudo_core/test_reboot_commands_and_intents", "tests.test_sudo_core/test_sudo_refusals_of_the_reboot_are_explained", "tests.test_updates_api/test_reboot_needs_a_password_on_homelab_and_waits_for_a_new_boot_id", "tests.test_updates_api/test_passwordless_sudo_reboots_on_the_first_yes", "tests.test_updates_api_lab/test_lab_sudo_password_for_apt_reboot_and_docker"]}
       }
     },
     {
@@ -379,7 +379,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.SudoElevationTests", "RackoonCoreTests.SudoHandshakeTests", "RackoonCoreTests.SudoStreamTests", "RackoonCoreTests.SudoAuthFailureTests", "RackoonSSHSystemTests.LabIntegrationTests/testSudoPasswordChecked"]},
         "android": {"status": "planned", "reason": "Android has no sudo password flow yet"},
         "ios": {"status": "planned", "reason": "stage I5"},
-        "web": {"status": "planned", "reason": "stage W6"}
+        "web": {"status": "done", "tests": ["tests.test_sudo_core/test_the_password_variant_is_the_prefix_in_front_of_the_unchanged_script", "tests.test_sudo_core/test_the_prefix_in_a_real_shell", "tests.test_sudo_core/test_the_handshake_split_at_every_point", "tests.test_sudo_core/test_prompts_after_the_ok_marker_are_never_answered", "tests.test_sudo_core/test_a_wrong_password_is_typed_once_then_interrupted", "tests.test_updates_api/test_sudo_wants_a_password_then_the_password_variant_runs", "tests.test_lab_integration/test_sudo_password_checked", "tests.test_updates_api_lab/test_lab_sudo_password_for_apt_reboot_and_docker"]}
       }
     },
     {

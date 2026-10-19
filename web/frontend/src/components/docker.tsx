@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { api, ApiError } from "../api";
 import type { ActionResult, Bookmark, DockerState, PendingAction, Server, Stack } from "../types";
 import { ConfirmSheet } from "./ConfirmSheet";
+import { PasswordSheet } from "./root";
 import { Button, Empty, Field, Modal, Notice } from "./ui";
 
 /** The size the Output view last measured, so a run's progress is drawn for the view that shows it. */
@@ -224,14 +225,16 @@ export function stackRoute(serverId: string, stackId: string): string {
 
 
 /** Why Docker can't be shown, in words that never ask the user to change the server. */
-export function DockerProblem(props: { state: DockerState; server: Server }) {
+export function DockerProblem(props: { state: DockerState; server: Server; onUnlock?: () => void }) {
   const s = props.state;
   if (s.status === "notInstalled") return <Empty title="Docker is not installed on this server" />;
   if (s.problem === "permission") {
     return (
-      <Notice tone="warn" title={`Docker refused ${props.server.user ?? "this user"}`}>
-        <p>The ssh user may not use Docker on {props.server.name}. Unlocking Docker with sudo comes in a later version
-          of the web app; until then, sign in as a user Docker accepts.</p>
+      <Notice tone="warn" title={`Docker refused ${props.server.user ?? "this user"}`}
+              actions={props.onUnlock && <Button kind="primary" onClick={props.onUnlock}>Unlock with sudo…</Button>}>
+        <p>The ssh user may not use Docker on {props.server.name}. Rackoon can run Docker through sudo for a while
+          instead; nothing on the server changes.</p>
+        {s.elevation?.lockReason && <p>{s.elevation.lockReason}</p>}
         <p className="raw">{s.error}</p>
       </Notice>
     );
@@ -240,3 +243,36 @@ export function DockerProblem(props: { state: DockerState; server: Server }) {
   return null;
 }
 
+
+/** Docker through sudo: the unlock sheet, and while unlocked, a chip with the time left and Lock. */
+export function useDockerSudo(server: Server, state: DockerState | undefined, reload: () => Promise<void>): {
+  unlock: () => void; chip: ReactNode; sheet: ReactNode;
+} {
+  const [asking, setAsking] = useState<{ error: string | null }>();
+  const until = state?.elevation?.until ?? null;
+  const submit = async (password: string) => {
+    try {
+      await api.post(`/api/servers/${server.id}/docker/unlock`, { password });
+      setAsking(undefined);
+      await reload();
+    } catch (e) {
+      setAsking({ error: errorText(e) });
+    }
+  };
+  const lock = async () => {
+    await api.post(`/api/servers/${server.id}/docker/lock`).catch(() => undefined);
+    await reload();
+  };
+  const chip = until ? (
+    <span className="badge badge-warn" title="Docker commands run through sudo with the password held in memory">
+      Docker via sudo until {new Date(until * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+      {" "}<button type="button" className="link" onClick={() => void lock()}>Lock</button>
+    </span>
+  ) : null;
+  const sheet = asking ? (
+    <PasswordSheet server={server} holds error={asking.error}
+                   why={`Docker on ${server.name} refuses ${server.user ?? "this user"}. With the sudo password, Rackoon runs each Docker command through sudo.`}
+                   onCancel={() => setAsking(undefined)} onSubmit={(pw) => void submit(pw)} />
+  ) : null;
+  return { unlock: () => setAsking({ error: null }), chip, sheet };
+}

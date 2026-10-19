@@ -77,6 +77,7 @@ export interface ServerState {
   isStale: boolean;
   isUnraid: boolean;
   polling: "watched" | "background";
+  reboot?: RebootState | null;
 }
 
 export interface HealthSample {
@@ -327,6 +328,9 @@ export interface Run {
   finished: number | null;
   cols: number;
   rows: number;
+  /** sudo wanted a password (or rejected the one given): the page may ask for it. */
+  needsPassword: boolean;
+  sudo: "accepted" | "rejected" | "refused" | "other_prompt" | "unfinished" | null;
 }
 
 export interface BookmarkItem {
@@ -365,6 +369,7 @@ export interface DockerState {
   running: Run | null;
   readOnly: boolean;
   bookmarks?: BookmarkItem[];
+  elevation?: { until: number | null; lockReason: string | null; generation: number };
 }
 
 export interface StackPage {
@@ -419,4 +424,40 @@ export interface ActionResult {
 
 export interface FleetDocker {
   servers: (DockerState & { server: { id: string; name: string }; bookmarks: BookmarkItem[]; linkHost: string | null })[];
+}
+
+// --- Updates and reboot (stage W6) ------------------------------------------------------------------------------
+
+export interface RebootState {
+  phase: "waiting" | "back" | "timedOut";
+  started: number;
+  elapsed: number | null;
+}
+
+export interface PendingUpdate {
+  name: string;
+  suite: string;
+  newVersion: string;
+  oldVersion?: string;
+  architecture: string;
+  isSecurity: boolean;
+}
+
+export interface UpdatesState {
+  serverId: string;
+  status: "loading" | "ready" | "notInstalled" | "failed";
+  error: string | null;
+  updatedAt: number | null;
+  readOnly: boolean;
+  packages: PendingUpdate[];
+  held: string[];
+  refreshedAt: number | null;
+  rebootRequired: boolean;
+  securityCount: number;
+  subtitle: string | null;
+  refreshedText: string | null;
+  staleness: string | null;
+  securityHint: string | null;
+  run: Run | null;
+  reboot: RebootState | null;
 }

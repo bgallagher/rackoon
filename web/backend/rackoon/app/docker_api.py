@@ -85,6 +85,10 @@ class DeleteIn(SizeIn):
     deleteFolder: bool = False
 
 
+class PasswordIn(Body):
+    password: str = Field(min_length=1, max_length=1024)
+
+
 class ShellIn(Body):
     containerId: str = Field(max_length=64)
     cols: int = Field(default=80, ge=1, le=1000)
@@ -266,8 +270,9 @@ def register(app: FastAPI, rackoon: Rackoon, authenticated: Callable[[Request], 
         return find(store.load_servers(), server_id)
 
     def transport(server: Server) -> Transport:
+        """Docker's transport: through sudo while Docker is unlocked for this server, else the plain one."""
         try:
-            return rackoon.connections.transport(server)
+            return rackoon.docker_transport(server)
         except TrustError as e:
             raise ApiError(e.status, e.code, str(e)) from None
 
@@ -366,7 +371,39 @@ def register(app: FastAPI, rackoon: Rackoon, authenticated: Callable[[Request], 
             await hub.settle(e, 4.0)
         out = state_json(e, host(server), rackoon.preferences.read_only, runs.running_on(server_id))
         out["bookmarks"] = bookmarks_of(e)
+        out["elevation"] = rackoon.elevation.json(server_id)
         return out
+
+    @app.post("/api/servers/{server_id}/docker/unlock")
+    async def docker_unlock(server_id: str, body: PasswordIn, _: str = Auth) -> dict[str, Any]:
+        """Checks the sudo password with `sudo -S` on its own pinned connection (the password on stdin only), then
+        holds it in memory for 15 minutes. A wrong one is never kept."""
+        server = server_of(server_id)
+        try:
+            base = rackoon.connections.transport(server)
+            result = await base.run(rackoon.elevation.check_command(), 30, input=body.password + "\n")
+        except TrustError as x:
+            raise ApiError(x.status, x.code, str(x)) from None
+        except SSHError as x:
+            raise ApiError(502, "connection", str(x)) from None
+        if result.exit_code != 0:
+            from rackoon.core import sudo as sudo_rules
+            said = result.stderr + "\n" + result.stdout
+            if sudo_rules.is_auth_failure(said):
+                raise ApiError(422, "badPassword", "The server did not accept that password.")
+            raise ApiError(409, "sudoRefused", sudo_rules.explain_refusal(said))
+        rackoon.elevation.unlock(server_id, body.password)
+        e = await hub.refresh(server)
+        out = state_json(e, host(server), rackoon.preferences.read_only, runs.running_on(server_id))
+        out["elevation"] = rackoon.elevation.json(server_id)
+        return out
+
+    @app.post("/api/servers/{server_id}/docker/lock")
+    async def docker_lock(server_id: str, _: str = Auth) -> dict[str, Any]:
+        server = server_of(server_id)
+        rackoon.elevation.lock(server_id)
+        await hub.refresh(server)
+        return rackoon.elevation.json(server_id)
 
     @app.post("/api/servers/{server_id}/docker/refresh")
     async def docker_refresh(server_id: str, _: str = Auth) -> dict[str, Any]:
@@ -530,6 +567,8 @@ def register(app: FastAPI, rackoon: Rackoon, authenticated: Callable[[Request], 
         command = docker.shell_command(body.containerId) if c is not None else None
         if c is None or command is None:
             raise ApiError(404, "noSuchContainer", "That container is gone.")
+        if rackoon.elevation.until(server.id) is not None:
+            command = "sudo " + command  # sudo asks for the password in the terminal itself
         try:
             return rackoon.terminals.open(server, body.cols, body.rows, command, title=c.service or c.name).json()
         except PermissionError as x:

@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import asyncio
 import math
+import re
+import shlex
 import time
 from collections.abc import AsyncIterable, AsyncIterator
 from dataclasses import dataclass
@@ -19,6 +21,10 @@ from rackoon.ssh import AuthFailed, CommandResult, HostKey, Unreachable
 
 from .connections import CheckResult, Connections, Transport
 from .demo_docker import DemoDocker, DemoStream
+from .demo_system import DEMO_PASSWORD, DemoSystem
+
+ELEVATED = "sudo -S -p '' sh -c "
+ELEVATED_STREAM = "sudo -n sh -c "
 
 DEMO_KEY = HostKey("ssh-ed25519", b"\x00\x00\x00\x0bssh-ed25519\x00\x00\x00\x20" + bytes(range(32)))
 
@@ -80,6 +86,8 @@ class DemoTransport:
         self.cpu_total = 3_400_000_000
         self.cpu_idle = 2_300_000_000
         self.docker = DemoDocker(profile.hostname)
+        self.system = DemoSystem(profile.hostname, "", needs_password=profile.hostname == "homelab",
+                                 pending=profile.updates, reboot_required=profile.reboot_required)
 
     async def connect(self) -> None:
         await self.run("true", 5)
@@ -91,6 +99,17 @@ class DemoTransport:
             raise Unreachable(f"ssh: connect to host {p.hostname}.demo port 22: Connection timed out")
         if p.refuses_login:
             raise AuthFailed(f"Permission denied for user backup on host {p.hostname}.demo")
+        self.system.check_up()
+        answer_ = self.system.run(command, input)
+        if answer_ is None and command.startswith(ELEVATED):
+            # Docker through sudo: the password must be the demo's; then the inner command runs as before.
+            if self.system.needs_password and input != DEMO_PASSWORD + "\n":
+                return CommandResult("", "Sorry, try again.\nsudo: 1 incorrect password attempt\n", 1)
+            command, input = shlex.split(command[len(ELEVATED):])[0], None
+            answer_ = self.system.run(command, input)
+        if answer_ is not None:
+            await asyncio.sleep(0.15)
+            return answer_
         if command == overview.command():
             return CommandResult(self._overview(), "", 0)
         answer = self.docker.run(command)
@@ -101,11 +120,28 @@ class DemoTransport:
 
     def stream(self, command: str, input: AsyncIterable[str] | None = None, cols: int = 80,
                rows: int = 24) -> DemoStream:
-        return DemoStream(self._stream(command))
+        return DemoStream(self._stream(command, input))
 
-    async def _stream(self, command: str) -> AsyncIterator[str]:
+    async def _stream(self, command: str, input: AsyncIterable[str] | None) -> AsyncIterator[str]:
         await self.run("true", 5)  # the unreachable and refusing servers fail here, as a real one would
-        async for chunk in self.docker.stream(command):
+        at = command.find(ELEVATED_STREAM)
+        if at >= 0:
+            # Docker through sudo: answer the one nonce prompt like sudo would, then stream the inner command.
+            nonce = re.search(r"##rackoon-sudo-([0-9a-f]{32}):", command)
+            n = nonce.group(1) if nonce else ""
+            if self.system.needs_password:
+                yield f"[sudo: ##rackoon-sudo-{n}:] Password: "
+                keys = input.__aiter__() if input is not None else None
+                typed = await keys.__anext__() if keys is not None else ""
+                if typed != DEMO_PASSWORD + "\n":
+                    yield f"\r\nsudo: Authentication failed, try again.\r\n[sudo: ##rackoon-sudo-{n}:] Password: "
+                    return
+                yield "\r\n"
+            yield f"##rackoon-sudo-ok-{n}\r\n"
+            command = shlex.split(command[at + len(ELEVATED_STREAM):])[0]
+        apt = await self.system.stream(command, input)
+        chunks = apt if apt is not None else self.docker.stream(command)
+        async for chunk in chunks:
             yield chunk
 
     async def close(self) -> None:
@@ -130,7 +166,7 @@ class DemoTransport:
             "##hostname", p.hostname,
             "##os", f'PRETTY_NAME="{p.pretty_name}"', f'NAME="{"Debian GNU/Linux" if debian else "Ubuntu"}"',
             f'VERSION_ID="{p.version_id}"', f"ID={'debian' if debian else 'ubuntu'}",
-            "##uptime", f"{p.uptime_days * 86400 + now - self.started:.2f} 1000000.00",
+            "##uptime", f"{(now - self.system.booted_at) if self.system.booted_at else p.uptime_days * 86400 + now - self.started:.2f} 1000000.00",
             "##loadavg", f"{busy * p.cores * 0.6:.2f} 0.51 0.48 1/312 12345",
             "##nproc", str(p.cores),
             "##stat", f"cpu  {user} 0 {system} {self.cpu_idle} 0 0 0 0 0 0",
@@ -139,9 +175,9 @@ class DemoTransport:
             f"/dev/nvme0n1p2 {p.disk_total} {used} {p.disk_total - used} {int(p.disk_used_fraction * 100)}% /",
             "/dev/nvme0n1p1    1073741824     6291456  1067450368       1% /boot/efi",
             "##system", f"vendor={p.vendor}", f"product={p.product}", f"machine_id={p.machine_id}", f"kernel={p.kernel}",
-            "boot_id=demo-boot-1", f"time={int(now)} +0000 UTC", f"ip={p.ip}", f"tailscale_ip={p.tailscale_ip or ''}",
-            "##reboot", "yes" if p.reboot_required else "no",
-            "##updates", str(p.updates), "##security", str(p.security),
+            f"boot_id={self.system.boot_id}", f"time={int(now)} +0000 UTC", f"ip={p.ip}", f"tailscale_ip={p.tailscale_ip or ''}",
+            "##reboot", "yes" if self.system.reboot_required else "no",
+            "##updates", str(len(self.system.pending)), "##security", str(self.system.security),
             "##unhealthy", *p.unhealthy,
         ]
         return "\n".join(lines) + "\n"
@@ -163,7 +199,7 @@ class DemoConnections(Connections):
         return t
 
     async def forget(self, server_id: str) -> None:
-        self._demo.pop(server_id, None)
+        pass  # a made-up server keeps its state (installed updates, its boot id) for the whole demo
 
     async def scan(self, server: Server) -> CheckResult:
         return CheckResult("ok", "The host key is trusted.", DEMO_KEY, DEMO_KEY)

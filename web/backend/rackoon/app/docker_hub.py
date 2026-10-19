@@ -25,7 +25,7 @@ from rackoon.core.overview import Overview
 from rackoon.core.stack_files import editable
 from rackoon.ssh import SSHError
 
-from .connections import Connections, TrustError
+from .connections import Connections, Transport, TrustError
 
 log = logging.getLogger("rackoon.docker")
 
@@ -67,8 +67,10 @@ class DockerEntry:
 
 
 class DockerHub:
-    def __init__(self, connections: Connections, clock: Callable[[], float] = time.time) -> None:
+    def __init__(self, connections: Connections, clock: Callable[[], float] = time.time,
+                 transport_for: Callable[[Server], Transport] | None = None) -> None:
         self.connections = connections
+        self.transport_for = transport_for or connections.transport
         self.clock = clock
         self.entries: dict[str, DockerEntry] = {}
         self.running = True
@@ -138,7 +140,7 @@ class DockerHub:
         async with e.lock:
             e.last_poll = self.clock()
             try:
-                result = await self.connections.transport(e.server).run(docker.command(), timeout=TIMEOUT)
+                result = await self.transport_for(e.server).run(docker.command(), timeout=TIMEOUT)
                 if result.exit_code != 0:
                     raise SSHError(result.stderr.strip() or f"Command failed (exit {result.exit_code})")
                 snapshot = docker.parse(result.stdout)

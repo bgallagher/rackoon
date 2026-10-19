@@ -11,6 +11,11 @@ function connectionOf(id: string, rows: { id: string; connection: Connection; is
   return row.isStale && row.connection === "connecting" ? ("stale" as const) : row.connection;
 }
 
+/** Unraid has no apt, so the Updates screen is hidden for it (like the Mac). */
+function isUnraid(id: string, rows: { id: string; overview: { os: { id: string } } | null }[] | undefined): boolean {
+  return rows?.find((r) => r.id === id)?.overview?.os.id === "unraid-os";
+}
+
 /** The server menu: filter, pick, reorder (drag or ↑↓), add. Filtering is done by the backend's ServerList. */
 function ServerSwitcher(props: { selected?: string; onClose: () => void }) {
   const app = useApp();
@@ -136,6 +141,8 @@ export function Sidebar(props: { route: string; selected?: string }) {
       )}
       {server && nav(`/servers/${server.id}`, "Overview", props.route === `/servers/${server.id}`)}
       {server && nav(`/servers/${server.id}/terminal`, "Terminal", props.route.startsWith(`/servers/${server.id}/terminal`))}
+      {server && !isUnraid(server.id, app.fleet?.servers) && nav(`/servers/${server.id}/updates`, "Updates",
+                                                                  props.route.startsWith(`/servers/${server.id}/updates`))}
       {server && nav(`/servers/${server.id}/docker`, "Docker", props.route.startsWith(`/servers/${server.id}/docker`))}
       {server && nav(`/servers/${server.id}/bookmarks`, "Bookmarks", props.route.startsWith(`/servers/${server.id}/bookmarks`))}
       <div className="sidebar-spacer" />

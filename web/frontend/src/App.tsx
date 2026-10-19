@@ -13,6 +13,7 @@ import { SignInScreen } from "./screens/SignIn";
 const TerminalScreen = lazy(() => import("./screens/Terminal").then((m) => ({ default: m.TerminalScreen })));
 const DockerScreen = lazy(() => import("./screens/Docker").then((m) => ({ default: m.DockerScreen })));
 const StackScreen = lazy(() => import("./screens/Docker").then((m) => ({ default: m.StackScreen })));
+const UpdatesScreen = lazy(() => import("./screens/Updates").then((m) => ({ default: m.UpdatesScreen })));
 const AddContainerScreen = lazy(() => import("./screens/AddContainer").then((m) => ({ default: m.AddContainerScreen })));
 import { applyAppearance } from "./theme";
 import type { Appearance, AuthState, Fleet, Safety, Server } from "./types";
@@ -85,7 +86,7 @@ function Shell(props: { auth: AuthState; onSignedOut: () => void }) {
     },
   }), [props, servers, fleet, safety, appearance, reloadServers, reloadFleet, setAppearance, go]);
 
-  // Routes: /dashboard[/<page>], /servers/<id>[/terminal|/docker[/add|/stack/<id>]|/bookmarks], /settings/<tab>[/<sub>]; "/" opens the last server or the dashboard.
+  // Routes: /dashboard[/<page>], /servers/<id>[/terminal|/docker[/add|/stack/<id>]|/bookmarks|/updates], /settings/<tab>[/<sub>]; "/" opens the last server or the dashboard.
   const parts = route.split("/").filter(Boolean);
   useEffect(() => {
     if (!servers || parts.length > 0) return;
@@ -113,6 +114,8 @@ function Shell(props: { auth: AuthState; onSignedOut: () => void }) {
       screen = lazyScreen(<AddContainerScreen key={server.id} server={server} />);
     } else if (parts[2] === "docker") {
       screen = lazyScreen(<DockerScreen key={server.id} server={server} />);
+    } else if (parts[2] === "updates") {
+      screen = lazyScreen(<UpdatesScreen key={server.id} server={server} />);
     } else if (parts[2] === "bookmarks") {
       screen = <BookmarksScreen key={server.id} server={server} />;
     } else {

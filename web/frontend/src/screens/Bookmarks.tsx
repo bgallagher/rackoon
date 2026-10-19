@@ -2,7 +2,7 @@
 // labels into the service's compose file; the sheet after this one shows the diff.
 import { useState } from "react";
 import { api } from "../api";
-import { BookmarkSheet, DockerProblem, SiteIcon, useAction } from "../components/docker";
+import { BookmarkSheet, DockerProblem, useDockerSudo, SiteIcon, useAction } from "../components/docker";
 import { Button, CopyButton, Empty, Notice, Spinner } from "../components/ui";
 import { useApp } from "../context";
 import { usePoll } from "../hooks";
@@ -41,6 +41,7 @@ export function BookmarksScreen(props: { server: Server }) {
   const app = useApp();
   const base = `/api/servers/${props.server.id}/docker`;
   const { data, error, reload } = usePoll(() => api.get<DockerState>(`${base}?watch=true`), 8000, [props.server.id]);
+  const sudo = useDockerSudo(props.server, data, reload);
   const [editing, setEditing] = useState<BookmarkItem | "new">();
   const action = useAction(() => void reload());
   if (!data) return <div className="page">{error ? <Notice tone="danger">{error}</Notice> : <Spinner />}</div>;
@@ -57,12 +58,13 @@ export function BookmarksScreen(props: { server: Server }) {
       <header className="page-head">
         <div>
           <h1>Bookmarks</h1>
+          {sudo.chip}
           <p className="muted">From the Homepage labels (homepage.href, .name, .group) of {props.server.name}'s containers.</p>
         </div>
         <Button kind="primary" disabled={readOnly || services.length === 0}
                 title={readOnly ? "Read-only mode is on" : undefined} onClick={() => setEditing("new")}>Add Bookmark</Button>
       </header>
-      <DockerProblem state={data} server={props.server} />
+      <DockerProblem state={data} server={props.server} onUnlock={sudo.unlock} />
       {action.error && <Notice tone="danger">{action.error}</Notice>}
       {data.status === "ready" && items.length === 0 && (
         <Empty title="No bookmarks yet"><p>Add one to a service and it is written as Homepage labels in its compose file.</p></Empty>
@@ -93,6 +95,7 @@ export function BookmarksScreen(props: { server: Server }) {
                        onCancel={() => setEditing(undefined)} onSubmit={save} />
       )}
       {action.sheet}
+      {sudo.sheet}
     </div>
   );
 }

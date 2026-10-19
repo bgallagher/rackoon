@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-import re
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,6 +17,8 @@ from typing import Any
 
 import pytest
 
+from rackoon.core import reboot
+from rackoon.core import sudo as sudo_rules
 from rackoon.core import docker, overview, spec, stream, updates
 from rackoon.ssh import (
     AsyncSSHTransport,
@@ -201,8 +202,8 @@ async def test_sudo_password_checked() -> None:
         # -k: ignore any cached credential, so the password is really checked each time.
         wrong = await sudo.run("sudo -k -S -p '' id -u", timeout=30, input="not-the-password\n")
         assert wrong.exit_code != 0
-        # Stage W6 brings the core's classify_sudo_failure; until then sudo's own words.
-        assert re.search(r"incorrect password|Sorry, try again|authentication failure", wrong.stderr, re.I), wrong.stderr
+        assert sudo_rules.is_sudo_auth_failure(wrong.stderr), wrong.stderr
+        assert reboot.classify_sudo_failure(wrong.stdout + "\n" + wrong.stderr, wrong.exit_code).kind == "bad_password"
         right = await sudo.run("sudo -k -S -p '' id -u", timeout=30, input=lab.sudo_password + "\n")
     assert right.exit_code == 0, right.stderr
     assert right.stdout.strip() == "0"

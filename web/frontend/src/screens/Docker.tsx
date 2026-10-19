@@ -2,7 +2,7 @@
 // and the Logs / Output / file tabs). Polled every few seconds while showing; the backend polls docker only then.
 import { useEffect, useMemo, useState } from "react";
 import { api } from "../api";
-import { BookmarkSheet, DeleteSheet, DockerProblem, errorText, LetterTile, Menu, SiteIcon, stackRoute, useAction, type MenuItem } from "../components/docker";
+import { BookmarkSheet, DeleteSheet, DockerProblem, useDockerSudo, errorText, LetterTile, Menu, SiteIcon, stackRoute, useAction, type MenuItem } from "../components/docker";
 import { Button, Card, Empty, Notice, Spinner } from "../components/ui";
 import { useApp } from "../context";
 import { ago, bytes, fraction, percent } from "../format";
@@ -63,6 +63,7 @@ export function DockerScreen(props: { server: Server }) {
   const now = useNow();
   const base = `/api/servers/${props.server.id}/docker`;
   const { data, error, reload } = usePoll(() => api.get<DockerState>(`${base}?watch=true`), 5000, [props.server.id]);
+  const sudo = useDockerSudo(props.server, data, reload);
   const [query, setQuery] = useState("");
   const [chip, setChip] = useState("all");
   const [bookmarking, setBookmarking] = useState<Stack>();
@@ -81,6 +82,7 @@ export function DockerScreen(props: { server: Server }) {
       <header className="page-head">
         <div>
           <h1>Docker</h1>
+          {sudo.chip}
           <p className="muted">{data.summary ?? "Reading Docker…"} · updated {ago(data.updatedAt, now)}</p>
         </div>
         <div className="card-actions">
@@ -90,7 +92,7 @@ export function DockerScreen(props: { server: Server }) {
              href={readOnly ? undefined : `#/servers/${props.server.id}/docker/add`}>Add Container</a>
         </div>
       </header>
-      <DockerProblem state={data} server={props.server} />
+      <DockerProblem state={data} server={props.server} onUnlock={sudo.unlock} />
       {action.error && <Notice tone="danger">{action.error}</Notice>}
       {t && (
         <div className="totals">
@@ -134,6 +136,7 @@ export function DockerScreen(props: { server: Server }) {
         );
       })()}
       {action.sheet}
+      {sudo.sheet}
     </div>
   );
 }

@@ -380,3 +380,8 @@ button.tab { background: none; border: 0; border-bottom: 2px solid transparent; 
   .code { height: 340px; }
 }
 .rowset > .link { align-self: flex-start; }
+
+/* Updates and reboot (W6) */
+.updates-output { min-height: 420px; }
+.attention-text { flex: 1; }
+.attention li .btn { margin-left: auto; }

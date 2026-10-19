@@ -40,9 +40,10 @@ from rackoon.core import server_list
 
 from . import security
 from .actions import ActionCenter, ActionError
-from . import docker_api
-from .connections import CheckResult, Connections, Scanner, TrustError, key_id_of
+from . import docker_api, updates_api
+from .connections import CheckResult, Connections, Scanner, Transport, TrustError, key_id_of
 from .docker_hub import DockerHub
+from .elevation import DockerElevation
 from .favicons import FaviconStore
 from .errors import ApiError, Body
 from .demo import SERVERS as DEMO_SERVERS
@@ -177,9 +178,11 @@ class Rackoon:
         self.actions = ActionCenter(self.preferences.policy, clock)
         self.monitor = Monitor(self.store, self.connections, clock)
         self.monitor.sync(self.store.load_servers())
-        self.docker = DockerHub(self.connections, clock)
+        self.elevation = DockerElevation(clock)
+        self.docker = DockerHub(self.connections, clock, self.docker_transport)
         self.runs = RunManager(self.preferences.touch, clock)
         self.favicons = FaviconStore(self.store.root / "favicons")
+        self.reboots = updates_api.RebootWatch(self._transport_by_id, self.monitor.refresh, clock)
         self.terminals = TerminalManager(self.connections.open_shell, lambda: self.preferences.read_only,
                                          self.preferences.touch, lambda: self.preferences.highlight_output)
         self.setup_token: security.SetupToken | None = None
@@ -192,6 +195,14 @@ class Rackoon:
                         "(also in %s)", self.setup_token.value, settings.data_dir / "setup-token")
         else:
             self.store.write_setup_token(None)
+
+    def _transport_by_id(self, server_id: str) -> Transport | None:
+        server = next((s for s in self.store.load_servers() if s.id == server_id), None)
+        return self.connections.transport(server) if server is not None else None
+
+    def docker_transport(self, server: Server) -> Transport:
+        """Docker's transport for this server: through sudo while Docker is unlocked, else the shared one."""
+        return self.elevation.transport(server.id, self.connections.transport(server))
 
     # --- who is asking
 
@@ -282,6 +293,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
             await idle
         await rackoon.terminals.close_all()
         await rackoon.runs.close_all()
+        await rackoon.reboots.stop()
         await rackoon.docker.stop()
         await rackoon.monitor.stop()
         await rackoon.connections.close()
@@ -526,6 +538,8 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
             await rackoon.terminals.close_server(server_id)
             await rackoon.runs.close_server(server_id)
             rackoon.docker.forget(server_id)
+            rackoon.elevation.lock(server_id)
+            rackoon.reboots.forget(server_id)
             await rackoon.connections.forget(server_id)
             store.delete_snapshot(server_id)
         return _server_json(new, store.keys_dir)
@@ -538,6 +552,8 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         await rackoon.terminals.close_server(server_id)
         await rackoon.runs.close_server(server_id)
         rackoon.docker.forget(server_id)
+        rackoon.elevation.lock(server_id)
+        rackoon.reboots.forget(server_id)
         await rackoon.connections.forget(server_id)
         store.delete_snapshot(server_id)
         return {"ok": True}
@@ -586,6 +602,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         state = rackoon.monitor.state_json(server_id)
         if state is None:
             raise ApiError(404, "noSuchServer", "There is no such server.")
+        state["reboot"] = rackoon.reboots.json(server_id)
         return state
 
     @app.post("/api/servers/{server_id}/refresh")
@@ -852,6 +869,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         return {"ok": True}
 
     docker_api.register(app, rackoon, authenticated, identify, lambda r: _same_origin(r, rackoon), find)
+    updates_api.register(app, rackoon, authenticated, find)
 
     if settings.static_dir is not None:
         mount_frontend(app, settings.static_dir)
