@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import math
 import time
+from collections.abc import AsyncIterable, AsyncIterator
 from dataclasses import dataclass
 
 from rackoon.core import overview
@@ -17,6 +18,7 @@ from rackoon.core.models import Server
 from rackoon.ssh import AuthFailed, CommandResult, HostKey, Unreachable
 
 from .connections import CheckResult, Connections, Transport
+from .demo_docker import DemoDocker, DemoStream
 
 DEMO_KEY = HostKey("ssh-ed25519", b"\x00\x00\x00\x0bssh-ed25519\x00\x00\x00\x20" + bytes(range(32)))
 
@@ -77,6 +79,7 @@ class DemoTransport:
         self.last_poll = time.time()
         self.cpu_total = 3_400_000_000
         self.cpu_idle = 2_300_000_000
+        self.docker = DemoDocker(profile.hostname)
 
     async def connect(self) -> None:
         await self.run("true", 5)
@@ -90,7 +93,20 @@ class DemoTransport:
             raise AuthFailed(f"Permission denied for user backup on host {p.hostname}.demo")
         if command == overview.command():
             return CommandResult(self._overview(), "", 0)
+        answer = self.docker.run(command)
+        if answer is not None:
+            await asyncio.sleep(0.15)
+            return answer
         return CommandResult("", "", 0)
+
+    def stream(self, command: str, input: AsyncIterable[str] | None = None, cols: int = 80,
+               rows: int = 24) -> DemoStream:
+        return DemoStream(self._stream(command))
+
+    async def _stream(self, command: str) -> AsyncIterator[str]:
+        await self.run("true", 5)  # the unreachable and refusing servers fail here, as a real one would
+        async for chunk in self.docker.stream(command):
+            yield chunk
 
     async def close(self) -> None:
         pass
@@ -152,10 +168,11 @@ class DemoConnections(Connections):
     async def scan(self, server: Server) -> CheckResult:
         return CheckResult("ok", "The host key is trusted.", DEMO_KEY, DEMO_KEY)
 
-    async def open_shell(self, server: Server, cols: int, rows: int) -> DemoShell:  # type: ignore[override]
+    async def open_shell(self, server: Server, cols: int, rows: int,  # type: ignore[override]
+                         command: str | None = None) -> DemoShell:
         profile = self.profiles.get(server.id, NUC)
         await self.transport(server).connect()  # the unreachable and refusing servers fail here, as a real one would
-        shell = DemoShell(profile, server.user or "root")
+        shell = DemoShell(profile, "root" if command else server.user or "root", container=command is not None)
         shell.resize(cols, rows)
         return shell
 
@@ -173,8 +190,9 @@ class DemoShell:
     """A scripted pretend shell for terminal tabs in demo mode: a login banner, a prompt, a few canned answers, line
     editing and Ctrl-C. Whatever is typed is never run anywhere."""
 
-    def __init__(self, profile: DemoProfile, user: str) -> None:
+    def __init__(self, profile: DemoProfile, user: str, container: bool = False) -> None:
         self.profile = profile
+        self.container = container
         self.user = user
         self.line = ""
         self.out: asyncio.Queue[bytes] = asyncio.Queue()
@@ -185,9 +203,13 @@ class DemoShell:
                   f"{profile.disk_total // 10**9} GB\r\n  IPv4 address for eth0: {profile.ip}\r\n"
                   + (f"  IPv4 address for tailscale0: {profile.tailscale_ip}\r\n" if profile.tailscale_ip else "")
                   + "\r\nThis is Rackoon's demo: nothing you type is sent anywhere. Try: help\r\n\r\n")
+        if container:
+            banner = "This is a demo container shell: nothing you type is sent anywhere. Try: help\r\n\r\n"
         self.out.put_nowait(banner.encode() + self._prompt())
 
     def _prompt(self) -> bytes:
+        if self.container:
+            return b"/app # "
         return f"\x1b[1;32m{self.user}@{self.profile.hostname}\x1b[0m:\x1b[1;34m~\x1b[0m$ ".encode()
 
     async def read(self) -> bytes:

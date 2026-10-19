@@ -14,7 +14,7 @@ from fastapi.testclient import TestClient
 
 from rackoon.app.actions import ActionCenter, ActionError
 from rackoon.app.api import create_app
-from rackoon.app.connections import Connections
+from rackoon.app.connections import Connections, Transport
 from rackoon.app.keys import KeyStore
 from rackoon.app.monitor import Monitor
 from rackoon.app.preferences import Preferences
@@ -66,8 +66,8 @@ class FakeConnections(Connections):
         super().__init__(store, KeyStore(store))
         self.fake = FakeTransport()
 
-    def transport(self, server: Server) -> FakeTransport:
-        return self.fake
+    def transport(self, server: Server) -> Transport:
+        return self.fake  # type: ignore[return-value]  # it has no stream; these tests never stream
 
     async def forget(self, server_id: str) -> None:
         pass
@@ -270,7 +270,8 @@ def test_actions_confirm_the_exact_intent(tmp_path: Path) -> None:
     policy.is_read_only = False
     pending = center.propose(intent, run, destructive=True)
     assert pending.json() == {"id": pending.id, "summary": intent.summary, "command": intent.command, "risk": "mutate",
-                              "destructive": True}
+                              "destructive": True, "isPreview": False, "title": intent.summary, "message": None,
+                              "typed": None, "then": None, "target": None}
     assert asyncio.run(center.confirm(pending.id)) == "restarted" and len(ran) == 1
     with pytest.raises(ActionError, match="expired"):
         asyncio.run(center.confirm(pending.id))  # used once

@@ -40,12 +40,17 @@ from rackoon.core import server_list
 
 from . import security
 from .actions import ActionCenter, ActionError
+from . import docker_api
 from .connections import CheckResult, Connections, Scanner, TrustError, key_id_of
+from .docker_hub import DockerHub
+from .favicons import FaviconStore
+from .errors import ApiError, Body
 from .demo import SERVERS as DEMO_SERVERS
 from .demo import DemoConnections
 from .keys import KeyError_, KeyStore
 from .monitor import Monitor
 from .preferences import Preferences
+from .runs import RunManager
 from .settings import Settings
 from .static import mount_frontend
 from .storage import DataStore, KeyInfo, new_id
@@ -56,21 +61,10 @@ log = logging.getLogger("rackoon.api")
 COOKIE = "__Host-rackoon"
 CSRF_HEADER = "x-rackoon-csrf"
 UNSAFE = {"POST", "PUT", "PATCH", "DELETE"}
-MAX_BODY = 64 * 1024
+MAX_BODY = 320 * 1024  # a file save carries the original and the edited text (64 KiB each)
 USER = "admin"
 
 
-class ApiError(Exception):
-    def __init__(self, status: int, code: str, message: str, headers: dict[str, str] | None = None) -> None:
-        super().__init__(message)
-        self.status = status
-        self.code = code
-        self.message = message
-        self.headers = headers
-
-
-class Body(BaseModel):
-    model_config = ConfigDict(extra="forbid")
 
 
 class SetupIn(Body):
@@ -138,6 +132,10 @@ class TitleIn(Body):
     title: str = Field(max_length=200)
 
 
+class ConfirmIn(Body):
+    typed: str | None = Field(default=None, max_length=200)
+
+
 class SafetyIn(Body):
     readOnly: bool | None = None
     auto: str | None = Field(default=None, max_length=20)
@@ -179,6 +177,9 @@ class Rackoon:
         self.actions = ActionCenter(self.preferences.policy, clock)
         self.monitor = Monitor(self.store, self.connections, clock)
         self.monitor.sync(self.store.load_servers())
+        self.docker = DockerHub(self.connections, clock)
+        self.runs = RunManager(self.preferences.touch, clock)
+        self.favicons = FaviconStore(self.store.root / "favicons")
         self.terminals = TerminalManager(self.connections.open_shell, lambda: self.preferences.read_only,
                                          self.preferences.touch, lambda: self.preferences.highlight_output)
         self.setup_token: security.SetupToken | None = None
@@ -266,7 +267,8 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
     async def idle_watch() -> None:
         while True:
             await asyncio.sleep(15)
-            if rackoon.preferences.check_idle(busy=rackoon.actions.running > 0):
+            if rackoon.preferences.check_idle(busy=rackoon.actions.running > 0 or any(
+                    r.running for r in rackoon.runs.runs.values())):
                 log.info("Read-only turned itself back on after %s", rackoon.preferences.auto.label.lower())
 
     @asynccontextmanager
@@ -279,6 +281,8 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         with contextlib.suppress(asyncio.CancelledError):
             await idle
         await rackoon.terminals.close_all()
+        await rackoon.runs.close_all()
+        await rackoon.docker.stop()
         await rackoon.monitor.stop()
         await rackoon.connections.close()
 
@@ -313,7 +317,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Frame-Options"] = "DENY"
         if request.url.path.startswith("/api/"):
-            response.headers["Cache-Control"] = "no-store"
+            response.headers.setdefault("Cache-Control", "no-store")
         return response
 
     def identify(request: HTTPConnection) -> tuple[str, str]:
@@ -520,6 +524,8 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         if not new.connects_like(old):
             # A new address or key: the open connection, its terminals and the cached reading belong to the old one.
             await rackoon.terminals.close_server(server_id)
+            await rackoon.runs.close_server(server_id)
+            rackoon.docker.forget(server_id)
             await rackoon.connections.forget(server_id)
             store.delete_snapshot(server_id)
         return _server_json(new, store.keys_dir)
@@ -530,6 +536,8 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         find(servers, server_id)
         saved([s for s in servers if s.id != server_id])
         await rackoon.terminals.close_server(server_id)
+        await rackoon.runs.close_server(server_id)
+        rackoon.docker.forget(server_id)
         await rackoon.connections.forget(server_id)
         store.delete_snapshot(server_id)
         return {"ok": True}
@@ -720,9 +728,9 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
     # --- confirming an action
 
     @app.post("/api/actions/{action_id}/confirm")
-    async def confirm_action(action_id: str, _: str = Auth) -> dict[str, Any]:
+    async def confirm_action(action_id: str, body: ConfirmIn | None = None, _: str = Auth) -> dict[str, Any]:
         try:
-            return {"ok": True, "result": await rackoon.actions.confirm(action_id)}
+            return {"ok": True, "result": await rackoon.actions.confirm(action_id, body.typed if body else None)}
         except ActionError as e:
             raise ApiError(e.status, e.code, str(e)) from None
 
@@ -842,6 +850,8 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         if not rackoon.keys.delete(key_id):
             raise ApiError(404, "noSuchKey", "There is no such key.")
         return {"ok": True}
+
+    docker_api.register(app, rackoon, authenticated, identify, lambda r: _same_origin(r, rackoon), find)
 
     if settings.static_dir is not None:
         mount_frontend(app, settings.static_dir)

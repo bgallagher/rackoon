@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import secrets
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterable, Awaitable, Callable
+from contextlib import AbstractAsyncContextManager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Protocol
@@ -41,6 +42,9 @@ class Transport(Protocol):
     """What the backend's services need from a server connection (AsyncSSHTransport, or the demo's)."""
 
     async def run(self, command: str, timeout: float, input: str | None = None) -> CommandResult: ...
+
+    def stream(self, command: str, input: AsyncIterable[str] | None = None, cols: int = 80,
+               rows: int = 24) -> AbstractAsyncContextManager[AsyncIterable[str]]: ...
 
     async def connect(self) -> None: ...
 
@@ -107,12 +111,13 @@ class Connections:
             self._transports[server.id] = t
         return t
 
-    async def open_shell(self, server: Server, cols: int, rows: int) -> ShellSession:
-        """A terminal tab's interactive pty, on the server's shared connection (like the Mac's tabs over ControlMaster)."""
+    async def open_shell(self, server: Server, cols: int, rows: int, command: str | None = None) -> ShellSession:
+        """A terminal tab's interactive pty, on the server's shared connection (like the Mac's tabs over ControlMaster).
+        `command` is a vetted one (`docker exec -it` for a container's shell); None is the login shell."""
         t = self.transport(server)
         if not isinstance(t, AsyncSSHTransport):
             raise TypeError("this transport has no shell")
-        return await t.open_shell(cols, rows)
+        return await t.open_shell(cols, rows, command)
 
     async def forget(self, server_id: str) -> None:
         """Drop the server's open connection (its address or key changed, or it was removed)."""

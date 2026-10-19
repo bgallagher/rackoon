@@ -4,6 +4,9 @@
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
+
 from . import shell, spec
 
 MARKER = "##rackoon-exit:"
@@ -74,3 +77,35 @@ class StreamOutputParser:
                     self.exit_code = code
                     return held[:found], code
         return (held if self.exit_code is None else ""), self.exit_code
+
+
+_CSI = re.compile("\x1b\\[[0-9;?]*[ -/]*[@-~]")
+_CHARSET = re.compile("\x1b[()][0-9A-Za-z]")
+
+
+def strip_ansi(text: str) -> str:
+    """Text without escape sequences and carriage returns, for matching on what a command printed."""
+    return _CHARSET.sub("", _CSI.sub("", text)).replace("\r", "")
+
+
+@dataclass(frozen=True)
+class StreamedRun:
+    """What a streamed run came to (Kotlin `StreamedRun`)."""
+
+    exit_code: int | None
+    cancelled: bool
+    transport_error: str | None
+    text: str
+
+    @property
+    def succeeded(self) -> bool:
+        return self.exit_code == 0
+
+    def failure_message(self, label: str) -> str | None:
+        if self.exit_code is not None:
+            return None if self.exit_code == 0 else f"{label} failed (exit {self.exit_code}). The output shows why."
+        if self.transport_error is not None:
+            return self.transport_error
+        if self.cancelled:
+            return "Cancelled. The command was interrupted on the server."
+        return f"The connection ended before {label} reported a result."

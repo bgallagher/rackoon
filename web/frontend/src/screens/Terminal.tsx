@@ -1,5 +1,5 @@
 import { FitAddon } from "@xterm/addon-fit";
-import { Terminal, type ITheme } from "@xterm/xterm";
+import { Terminal } from "@xterm/xterm";
 import "@xterm/xterm/css/xterm.css";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "../api";
@@ -7,19 +7,7 @@ import { Button, Empty, Notice } from "../components/ui";
 import { useApp } from "../context";
 import { usePoll } from "../hooks";
 import type { Appearance, Safety, Server, TerminalTab } from "../types";
-
-function xtermTheme(a: Appearance | undefined): ITheme | undefined {
-  if (!a) return undefined;
-  const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const t = (dark ? a.dark : a.light).terminal;
-  const [black, red, green, yellow, blue, magenta, cyan, white, bBlack, bRed, bGreen, bYellow, bBlue, bMagenta, bCyan, bWhite] = t.ansi;
-  return {
-    background: t.background, foreground: t.foreground, cursor: t.cursor, cursorAccent: t.background,
-    selectionBackground: `${t.selection}66`, black, red, green, yellow, blue, magenta, cyan, white,
-    brightBlack: bBlack, brightRed: bRed, brightGreen: bGreen, brightYellow: bYellow, brightBlue: bBlue,
-    brightMagenta: bMagenta, brightCyan: bCyan, brightWhite: bWhite,
-  };
-}
+import { xtermTheme } from "../xterm";
 
 interface Status { state: TerminalTab["state"]; attempt?: number; of?: number; delay?: number; exitCode?: number | null }
 

@@ -89,9 +89,12 @@ class TerminalTab:
     task: asyncio.Task[None] | None = None
     wake: asyncio.Event = field(default_factory=asyncio.Event)
     closing: bool = False
+    command: str | None = None
+    """A vetted command instead of the login shell (a container's shell); reconnecting runs it again."""
 
     def json(self) -> dict[str, Any]:
-        return {"id": self.id, "serverId": self.server.id, "title": self.title, "state": self.state, **self.detail}
+        return {"id": self.id, "serverId": self.server.id, "title": self.title, "state": self.state,
+                "kind": "shell" if self.command is None else "command", **self.detail}
 
     def emit(self, data: bytes) -> None:
         if not data:
@@ -113,7 +116,7 @@ class TerminalTab:
 
 
 class TerminalManager:
-    def __init__(self, opener: Callable[[Server, int, int], Any], read_only: Callable[[], bool],
+    def __init__(self, opener: Callable[..., Any], read_only: Callable[[], bool],
                  touch: Callable[[], None], highlight: Callable[[], bool], clock: Callable[[], float] = time.monotonic,
                  delays: tuple[float, ...] = (1, 2, 4, 8, 15)) -> None:
         self.delays = delays
@@ -129,15 +132,17 @@ class TerminalManager:
     def for_server(self, server_id: str) -> list[TerminalTab]:
         return sorted((t for t in self.tabs.values() if t.server.id == server_id), key=lambda t: t.created)
 
-    def open(self, server: Server, cols: int, rows: int) -> TerminalTab:
+    def open(self, server: Server, cols: int, rows: int, command: str | None = None,
+             title: str | None = None) -> TerminalTab:
         if self.read_only():
             raise PermissionError("Read-only is on. A shell can change anything on the server, so turn Read-only off to "
                                   "open a session.")
         if len(self.for_server(server.id)) >= MAX_TABS_PER_SERVER or len(self.tabs) >= MAX_TABS:
             raise OverflowError("Too many terminal tabs are open. Close one first.")
-        tab = TerminalTab(secrets.token_urlsafe(12), server, DEFAULT_TITLE, self.clock(), _clamp(cols, 20, 500),
+        name = " ".join((title or "").split())[:TITLE_MAX] or DEFAULT_TITLE
+        tab = TerminalTab(secrets.token_urlsafe(12), server, name, self.clock(), _clamp(cols, 20, 500),
                           _clamp(rows, 5, 300), filter=TerminalOutputFilter(self.highlight()),
-                          policy=ReconnectPolicy(self.delays))
+                          policy=ReconnectPolicy(self.delays), command=command)
         self.tabs[tab.id] = tab
         tab.task = asyncio.create_task(self._run(tab))
         return tab
@@ -229,7 +234,8 @@ class TerminalManager:
             started = self.clock()
             final = False
             try:
-                tab.shell = await self.opener(tab.server, tab.cols, tab.rows)
+                tab.shell = await (self.opener(tab.server, tab.cols, tab.rows, tab.command) if tab.command is not None
+                                   else self.opener(tab.server, tab.cols, tab.rows))
             except (HostKeyUnknown, HostKeyChanged, AuthFailed) as e:
                 tab.emit(dim(f"Could not sign in: {e}"))
                 end, final = SessionEnd.CONNECTION_LOST, True  # retrying can't fix these

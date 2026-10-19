@@ -220,9 +220,18 @@ export interface SSHConfigHost {
 export interface PendingAction {
   id: string;
   summary: string;
+  /** The exact command, or its readable preview (a diff) when `isPreview`. */
   command: string;
+  isPreview: boolean;
   risk: "read" | "mutate";
   destructive: boolean;
+  title: string;
+  message: string | null;
+  /** A word the user must type before the button works (the backend checks it too). */
+  typed: string | null;
+  /** The command that follows once this one succeeded (the `up -d` after a save). */
+  then: string | null;
+  target: string | null;
 }
 
 export interface TerminalTab {
@@ -230,8 +239,184 @@ export interface TerminalTab {
   serverId: string;
   title: string;
   state: "starting" | "connected" | "reconnecting" | "disconnected" | "exited";
+  kind?: "shell" | "command";
   attempt?: number;
   of?: number;
   delay?: number;
   exitCode?: number | null;
+}
+
+// --- Docker (stage W5) ------------------------------------------------------------------------------------------
+
+export interface Bookmark {
+  href: string;
+  name?: string;
+  group?: string;
+  icon?: string;
+  description?: string;
+}
+
+export interface Container {
+  id: string;
+  name: string;
+  image: string;
+  imageName: string;
+  imageTag: string | null;
+  state: string;
+  health: string;
+  status: string;
+  ports: { hostPort: number; containerPort: number; proto: string }[];
+  project?: string;
+  service?: string;
+  cpuPercent?: number;
+  memoryUsedBytes?: number;
+  memoryLimitBytes?: number;
+  bookmark?: Bookmark;
+  isRunning: boolean;
+  isUnhealthy: boolean;
+  canRebuild: boolean;
+  letter: string;
+  hue: number;
+}
+
+export interface Stack {
+  id: string;
+  name: string;
+  kind: string;
+  isStandalone: boolean;
+  workingDir: string | null;
+  configFiles: string[];
+  statusText: string;
+  severity: "ok" | "warning" | "danger" | "idle";
+  health?: "running" | "attention" | "stopped";
+  running: number;
+  stopped: number;
+  unhealthy: number;
+  total: number;
+  hasBookmark: boolean;
+  mainWebPort: number | null;
+  link: string | null;
+  letter: string;
+  hue: number;
+  images: string[];
+  cpuPercent: number | null;
+  memoryBytes: number;
+  notStarted: boolean;
+  removing: boolean;
+  busy: boolean;
+  containers: Container[];
+  // a stack's page only
+  composeBlocked?: string | null;
+  blocked?: string | null;
+  pullable?: string | null;
+  folderProblem?: string | null;
+  files?: { path: string; name: string; isEnv: boolean }[];
+  services?: string[];
+}
+
+export interface Run {
+  id: string;
+  serverId: string;
+  scope: string;
+  title: string;
+  working: string;
+  phase: "running" | "succeeded" | "failed" | "cancelled";
+  exitCode: number | null;
+  message: string | null;
+  started: number;
+  finished: number | null;
+  cols: number;
+  rows: number;
+}
+
+export interface BookmarkItem {
+  stackId: string;
+  stackName: string;
+  service: string | null;
+  container: string;
+  containerId: string;
+  bookmark: Bookmark;
+  address: string;
+  scope: "local" | "tailscale" | "public";
+  origin: string | null;
+  editable: boolean;
+}
+
+export interface DockerTotals {
+  stacks: number;
+  containers: number;
+  running: number;
+  unhealthy: number;
+  cpuPercentOfHost: number | null;
+  memoryBytes: number;
+  memoryFractionOfHost: number | null;
+  dataDisk: Disk | null;
+}
+
+export interface DockerState {
+  serverId: string;
+  status: "loading" | "ready" | "notInstalled" | "failed";
+  error: string | null;
+  problem: "notInstalled" | "permission" | "daemon" | "malformed" | "connection" | null;
+  updatedAt: number | null;
+  summary: string | null;
+  totals: DockerTotals | null;
+  stacks: Stack[];
+  running: Run | null;
+  readOnly: boolean;
+  bookmarks?: BookmarkItem[];
+}
+
+export interface StackPage {
+  stack: Stack;
+  run: Run | null;
+  updatedAt: number | null;
+  error: string | null;
+}
+
+export interface CheckRow {
+  id: string;
+  state: "pass" | "fail" | "warn" | "skipped" | "running";
+  title: string;
+  detail: string;
+}
+
+export interface Issue {
+  severity: "error" | "warning";
+  line: number | null;
+  message: string;
+}
+
+export interface EditorFile {
+  path: string;
+  name: string;
+  isEnv: boolean;
+  status: "file" | "missing" | "tooLarge";
+  content: string | null;
+  sha: string | null;
+}
+
+export interface Verdict {
+  rows: CheckRow[];
+  canSave: boolean;
+  blocked: string | null;
+  changedLines: number[];
+  errorLines: number[];
+  changeCount: number;
+  issues: Issue[];
+  checked: boolean;
+}
+
+/** What a confirmed Docker action came to: a run that streams, and/or a file outcome. */
+export interface ActionResult {
+  run?: Run;
+  outcome?: "saved" | "changed" | "invalid" | "created" | "exists";
+  message?: string;
+  issues?: Issue[];
+  stackId?: string;
+  sha?: string;
+}
+
+export interface FleetDocker {
+  servers: (DockerState & { server: { id: string; name: string }; bookmarks: BookmarkItem[]; linkHost: string | null })[];
 }

@@ -4,12 +4,16 @@ import { Sidebar } from "./components/Sidebar";
 import { Empty, Spinner } from "./components/ui";
 import { AppContext, type AppData } from "./context";
 import { usePoll, useRoute } from "./hooks";
+import { BookmarksScreen } from "./screens/Bookmarks";
 import { DashboardScreen } from "./screens/Dashboard";
 import { OverviewScreen } from "./screens/Overview";
 import { SettingsScreen } from "./screens/Settings";
 import { SignInScreen } from "./screens/SignIn";
 // xterm.js is most of the bundle: load it only when a terminal is opened.
 const TerminalScreen = lazy(() => import("./screens/Terminal").then((m) => ({ default: m.TerminalScreen })));
+const DockerScreen = lazy(() => import("./screens/Docker").then((m) => ({ default: m.DockerScreen })));
+const StackScreen = lazy(() => import("./screens/Docker").then((m) => ({ default: m.StackScreen })));
+const AddContainerScreen = lazy(() => import("./screens/AddContainer").then((m) => ({ default: m.AddContainerScreen })));
 import { applyAppearance } from "./theme";
 import type { Appearance, AuthState, Fleet, Safety, Server } from "./types";
 
@@ -81,7 +85,7 @@ function Shell(props: { auth: AuthState; onSignedOut: () => void }) {
     },
   }), [props, servers, fleet, safety, appearance, reloadServers, reloadFleet, setAppearance, go]);
 
-  // Routes: /dashboard, /servers/<id>[/terminal], /settings/<tab>[/<sub>]; "/" opens the last server or the dashboard.
+  // Routes: /dashboard[/<page>], /servers/<id>[/terminal|/docker[/add|/stack/<id>]|/bookmarks], /settings/<tab>[/<sub>]; "/" opens the last server or the dashboard.
   const parts = route.split("/").filter(Boolean);
   useEffect(() => {
     if (!servers || parts.length > 0) return;
@@ -97,14 +101,27 @@ function Shell(props: { auth: AuthState; onSignedOut: () => void }) {
   const server = serverId ? servers!.find((s) => s.id === serverId) : undefined;
   let screen;
   if (parts[0] === "servers") {
-    screen = server && parts[2] === "terminal"
-      ? <Suspense fallback={<div className="page"><Spinner /></div>}><TerminalScreen key={server.id} server={server} /></Suspense>
-           : server ? <OverviewScreen key={server.id} server={server} />
-                    : <div className="page"><Empty title="No such server"><a href="#/dashboard">Back to the dashboard</a></Empty></div>;
+    const lazyScreen = (node: JSX.Element) => <Suspense fallback={<div className="page"><Spinner /></div>}>{node}</Suspense>;
+    if (!server) {
+      screen = <div className="page"><Empty title="No such server"><a href="#/dashboard">Back to the dashboard</a></Empty></div>;
+    } else if (parts[2] === "terminal") {
+      screen = lazyScreen(<TerminalScreen key={server.id} server={server} />);
+    } else if (parts[2] === "docker" && parts[3] === "stack" && parts[4]) {
+      const stackId = decodeURIComponent(parts.slice(4).join("/"));
+      screen = lazyScreen(<StackScreen key={`${server.id}/${stackId}`} server={server} stackId={stackId} />);
+    } else if (parts[2] === "docker" && parts[3] === "add") {
+      screen = lazyScreen(<AddContainerScreen key={server.id} server={server} />);
+    } else if (parts[2] === "docker") {
+      screen = lazyScreen(<DockerScreen key={server.id} server={server} />);
+    } else if (parts[2] === "bookmarks") {
+      screen = <BookmarksScreen key={server.id} server={server} />;
+    } else {
+      screen = <OverviewScreen key={server.id} server={server} />;
+    }
   } else if (parts[0] === "settings") {
     screen = <SettingsScreen tab={parts[1] ?? "servers"} sub={parts[2]} />;
   } else {
-    screen = <DashboardScreen />;
+    screen = <DashboardScreen page={parts[1]} />;
   }
   return (
     <AppContext.Provider value={data}>

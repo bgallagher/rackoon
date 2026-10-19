@@ -129,7 +129,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.FleetTests"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
         "ios": {"status": "planned", "reason": "stage I2"},
-        "web": {"status": "planned", "reason": "stage W5: fleet health and server tiles are built (W3, tests.test_core_ui); the Docker and bookmark pages come with Docker"}
+        "web": {"status": "done", "tests": ["tests.test_core_ui", "tests.test_docker_api/test_the_fleet_view_shows_only_answering_servers"]}
       }
     },
     {
@@ -209,7 +209,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.DockerParserTests", "RackoonCoreTests.DockerSessionTests", "RackoonCoreTests.StackSummaryTests", "RackoonCoreTests.ComposeOverviewTests", "RackoonSSHSystemTests.LabIntegrationTests/testDockerParses"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.DockerParserTests", "com.bgallagher.rackoon.core.DockerSessionTests", "com.bgallagher.rackoon.core.DockerPresentationTests", "com.bgallagher.rackoon.ssh.LabIntegrationTests/dockerParses"]},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "done", "tests": ["tests.test_golden_fixtures/test_golden[docker]", "tests.test_docker_api/test_the_overview_has_every_stack_with_its_status", "tests.test_compose_edit/test_stack_status_summary_letter_and_image", "tests.test_lab_integration/test_docker_parses"]}
       }
     },
     {
@@ -219,7 +219,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.DockerSessionTests", "RackoonCoreTests.StreamingActionTests", "RackoonCoreTests.SharedScenarioTests/testDockerIDs"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.DockerSessionTests", "com.bgallagher.rackoon.core.StreamingActionTests", "com.bgallagher.rackoon.core.SharedScenarioTests/dockerIDs"]},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "done", "tests": ["tests.test_docker_api/test_start_runs_at_once_and_stop_asks_first", "tests.test_docker_api/test_read_only_refuses_every_change", "tests.test_runs_and_prompts/test_start_has_no_prompt_and_stop_and_restart_are_destructive", "tests.test_shared_scenarios/test_docker_ids", "tests.test_docker_api_lab/test_lab_create_edit_restart_and_delete_a_throwaway_stack"]}
       }
     },
     {
@@ -229,7 +229,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.LogBufferTests", "RackoonCoreTests.LogLineParserTests", "RackoonCoreTests.LogBufferCountTests", "RackoonSSHSystemTests.LabIntegrationTests/testLogsCancelLeavesNothing"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.LogFollowerTests", "com.bgallagher.rackoon.core.LogBufferTests", "com.bgallagher.rackoon.core.LogLineParserTests", "com.bgallagher.rackoon.core.LogViewTests", "com.bgallagher.rackoon.ssh.LabIntegrationTests/logsCancelLeavesNothing"]},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "done", "tests": ["tests.test_logs", "tests.test_docker_api/test_logs_stream_parsed_lines_and_stop_with_the_socket", "tests.test_lab_integration/test_logs_cancel_leaves_nothing"]}
       }
     },
     {
@@ -239,7 +239,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ComposeActionTests", "RackoonCoreTests.StreamParserTests", "RackoonCoreTests.Utf8ChunkerTests", "RackoonCoreTests.SharedScenarioTests/testComposeCommand", "RackoonCoreTests.SharedScenarioTests/testStreamOutput", "RackoonSSHSystemTests.LabIntegrationTests/testStreamExitStatus"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.DockerSessionTests", "com.bgallagher.rackoon.core.StreamParserTests", "com.bgallagher.rackoon.core.Utf8ChunkerTests", "com.bgallagher.rackoon.core.SharedScenarioTests/composeCommand", "com.bgallagher.rackoon.core.SharedScenarioTests/streamOutput", "com.bgallagher.rackoon.ssh.LabIntegrationTests/streamExitStatus"]},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "done", "tests": ["tests.test_docker_api/test_stack_actions_stream_one_at_a_time_and_can_be_cancelled", "tests.test_runs_and_prompts/test_a_run_succeeds_only_with_the_exit_marker_and_strips_it", "tests.test_runs_and_prompts/test_one_run_per_server_and_cancel_closes_the_stream", "tests.test_runs_and_prompts/test_stack_prompts_name_the_stack_and_count_its_containers", "tests.test_shared_scenarios/test_compose_command", "tests.test_shared_scenarios/test_stream_output", "tests.test_lab_integration/test_stream_exit_status"]}
       }
     },
     {
@@ -249,7 +249,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ComposeActionTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.DockerSessionTests"]},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "done", "tests": ["tests.test_docker_api/test_stack_actions_stream_one_at_a_time_and_can_be_cancelled", "tests.test_runs_and_prompts/test_rebuild_applies_only_to_a_service_the_stack_can_address"]}
       }
     },
     {
@@ -259,7 +259,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.StandaloneStackTests", "RackoonCoreTests.StandaloneActionTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.StandaloneStackTests", "com.bgallagher.rackoon.core.StandaloneActionTests"]},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "done", "tests": ["tests.test_stack_actions/test_every_standalone_container_gets_its_own_stack_with_a_unique_id", "tests.test_stack_actions/test_standalone_commands_come_from_the_spec_and_are_exact", "tests.test_stack_actions/test_unsafe_or_unpullable_values_are_refused", "tests.test_docker_api/test_standalone_pull_and_delete_with_the_typed_name"]}
       }
     },
     {
@@ -269,7 +269,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ComposeActionTests"]},
         "android": {"status": "done", "tests": [], "untested": "opens docker exec in a terminal tab; command built in DockerSession"},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "done", "tests": ["tests.test_docker_api/test_a_container_shell_opens_a_terminal_tab"]}
       }
     },
     {
@@ -279,7 +279,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.StackFileParserTests", "RackoonCoreTests.ComposeIssueParserTests", "RackoonCoreTests.LineDiffTests", "RackoonCoreTests.StackFileCommandTests", "RackoonCoreTests.StackFileSessionTests", "RackoonCoreTests.SyntaxHighlighterTests", "RackoonCoreTests.EnvSyntaxTests", "RackoonCoreTests.EditorChecksTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.StackFileParserTests", "com.bgallagher.rackoon.core.ComposeIssueParserTests", "com.bgallagher.rackoon.core.LineDiffTests", "com.bgallagher.rackoon.core.StackFileCommandTests", "com.bgallagher.rackoon.core.StackFileSessionTests", "com.bgallagher.rackoon.core.StackEditorTests", "com.bgallagher.rackoon.core.SyntaxHighlighterTests", "com.bgallagher.rackoon.core.EnvSyntaxTests", "com.bgallagher.rackoon.core.EditorChecksTests"]},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "done", "tests": ["tests.test_editor_core", "tests.test_docker_api/test_the_editor_checks_exactly_the_text_and_saves_only_against_the_opened_file", "tests.test_docker_api/test_save_and_redeploy_runs_up_after_the_save", "tests.test_docker_api_lab/test_lab_create_edit_restart_and_delete_a_throwaway_stack"]}
       }
     },
     {
@@ -289,7 +289,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.StackRemovalTests", "RackoonCoreTests.StackRemovalLabelsTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.StackRemovalTests"]},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "done", "tests": ["tests.test_stack_actions/test_removal_commands_are_exact", "tests.test_stack_actions/test_the_folder_is_deleted_only_after_down_succeeds_and_only_with_its_compose_file", "tests.test_stack_actions/test_a_symlink_cannot_redirect_the_delete", "tests.test_docker_api/test_deleting_a_stack_and_its_folder", "tests.test_docker_api_lab/test_lab_create_edit_restart_and_delete_a_throwaway_stack"]}
       }
     },
     {
@@ -299,7 +299,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ContainerSpecTests", "RackoonCoreTests.ComposeFormParserTests", "RackoonCoreTests.NewStackTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ContainerSpecTests", "com.bgallagher.rackoon.core.NewStackTests", "com.bgallagher.rackoon.core.AddContainerDraftTests"]},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "done", "tests": ["tests.test_add_container", "tests.test_add_draft", "tests.test_docker_api/test_adding_a_container_as_a_new_stack", "tests.test_docker_api/test_adding_a_container_to_an_existing_stack", "tests.test_docker_api/test_a_created_stack_that_is_not_started_stays_visible"]}
       }
     },
     {
@@ -309,7 +309,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.BookmarkTests", "RackoonCoreTests.ComposeLabelsTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.BookmarkTests", "com.bgallagher.rackoon.core.ComposeLabelsTests", "com.bgallagher.rackoon.core.BookmarkEditorTests"]},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "done", "tests": ["tests.test_compose_edit/test_adds_a_labels_block_to_a_service_with_none", "tests.test_compose_edit/test_removing_keeps_other_labels_or_drops_an_empty_block", "tests.test_compose_edit/test_link_scope_matches_the_mac_rules", "tests.test_docker_api/test_bookmarks_are_written_into_the_compose_file"]}
       }
     },
     {
@@ -319,7 +319,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.FaviconLinksTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.FaviconLinksTests"]},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "done", "tests": ["tests.test_compose_edit/test_origin_is_the_cache_key", "tests.test_compose_edit/test_ranks_apple_touch_then_png_then_svg_then_ico", "tests.test_runs_and_prompts/test_the_best_icon_link_wins_and_is_cached", "tests.test_runs_and_prompts/test_redirects_are_checked_hop_by_hop_and_sizes_are_capped", "tests.test_docker_api/test_favicons_are_only_fetched_for_addresses_docker_reported"]}
       }
     },
     {
@@ -329,7 +329,7 @@
         "mac": {"status": "done", "tests": ["RackoonCoreTests.AppIconsTests", "RackoonCoreTests.IconSourcesTests", "RackoonCoreTests.IconChoicesTests", "RackoonCoreTests.IconFetchQueueTests", "RackoonMacTests.AppIconStoreTests"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
         "ios": {"status": "planned", "reason": "stage I4"},
-        "web": {"status": "planned", "reason": "stage W5"}
+        "web": {"status": "planned", "reason": "not in W5: Docker tiles show the site icon or a letter tile; the dashboard-icons/selfh.st catalog, picker and uploads come later"}
       }
     },
     {
