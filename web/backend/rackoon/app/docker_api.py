@@ -1130,9 +1130,10 @@ def register(app: FastAPI, rackoon: Rackoon, authenticated: Callable[[Request], 
         origin = favicon.origin(href[:2048])
         if origin is None or origin not in known_origins():
             raise ApiError(404, "noIcon", "No icon for that address.")
-        icon = await rackoon.favicons.get(origin, refresh)
+        icon = rackoon.favicons.get_now(origin, refresh)
         if icon is None:
-            return Response(status_code=204, headers={"Cache-Control": "private, max-age=3600"})
+            # Not fetched (yet): the fetch runs in the background and the page asks once more a little later.
+            return Response(status_code=204, headers={"Cache-Control": "no-store"})
         data, kind = icon
         headers = {"Cache-Control": "private, max-age=86400",
                    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; sandbox"}

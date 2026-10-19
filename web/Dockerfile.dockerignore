@@ -1,0 +1,19 @@
+# The build context is the repository root; only these go in.
+*
+!web/frontend/package.json
+!web/frontend/package-lock.json
+!web/frontend/index.html
+!web/frontend/tsconfig.json
+!web/frontend/vite.config.ts
+!web/frontend/public
+!web/frontend/src
+!web/backend/pyproject.toml
+!web/backend/uv.lock
+!web/backend/rackoon
+!spec/commands.json
+!spec/command-library.json
+!apple/Apps/RackoonMac/Resources/themes.json
+!spec/fixtures/services/synthetic-root-failed.out.txt
+!spec/fixtures/services/ubuntu-user-units-and-processes.out.txt
+**/__pycache__
+**/*.pyc

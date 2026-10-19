@@ -346,7 +346,7 @@ def test_frontend_is_served_with_a_strict_policy(tmp_path: Path) -> None:
     assert client.get("/../secret.txt").text == page.text
     assert client.get("/%2e%2e/secret.txt").text == page.text, "no way out of the folder"
     assert client.get("/api/nothing-here").status_code == 404
-    assert json.loads(client.get("/api/health").text) == {"ok": True}
+    assert json.loads(client.get("/api/health").text)["ok"] is True
 
 
 def test_unknown_server_state(demo: TestClient) -> None:

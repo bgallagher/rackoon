@@ -1,0 +1,37 @@
+# Rackoon for the web with its own Tailscale node (docs/web.md, option B): the host needs no Tailscale, and Rackoon is
+# reached at https://rackoon.<your-tailnet>.ts.net. Get an auth key from the Tailscale admin console (tag it, e.g.
+# tag:rackoon) and put it in .env as TS_AUTHKEY=tskey-auth-... next to this file.
+services:
+  tailscale:
+    image: tailscale/tailscale:v1.78.1
+    hostname: rackoon
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_USERSPACE: "false"        # a real tun device, so Rackoon (sharing this network) can reach your servers
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./serve.json:/config/serve.json:ro
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_add: [NET_ADMIN]           # for the tailscale container only; Rackoon itself has no capabilities
+
+  rackoon:
+    image: ghcr.io/bgallagher/rackoon-web:latest
+    restart: unless-stopped
+    network_mode: service:tailscale
+    depends_on: [tailscale]
+    environment:
+      RACKOON_HOST: 127.0.0.1      # only `tailscale serve` (in the same network) reaches it
+    volumes:
+      - rackoon-data:/data
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  tailscale-state:
+  rackoon-data:

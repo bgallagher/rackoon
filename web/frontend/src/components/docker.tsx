@@ -26,13 +26,20 @@ export function LetterTile(props: { letter: string; hue: number; size?: number }
 
 /** A site's icon (fetched and cached by the backend, only for addresses Docker reported), else the letter tile. */
 export function SiteIcon(props: { href: string | null | undefined; letter: string; hue: number; size?: number }) {
+  // 0: first try; 1: the server had none yet and is fetching it, so ask again shortly; 2: no icon, the letter stays.
+  const [attempt, setAttempt] = useState(0);
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [props.href]);
+  useEffect(() => { setAttempt(0); setFailed(false); }, [props.href]);
+  useEffect(() => {
+    if (!failed || attempt > 0) return;
+    const timer = window.setTimeout(() => { setAttempt(1); setFailed(false); }, 8000);
+    return () => window.clearTimeout(timer);
+  }, [failed, attempt]);
   if (!props.href || failed) return <LetterTile letter={props.letter} hue={props.hue} size={props.size} />;
   const size = props.size ?? 36;
   return (
-    <img className="site-icon" src={`/api/favicons?href=${encodeURIComponent(props.href)}`} alt="" width={size}
-         height={size} loading="lazy" onError={() => setFailed(true)} />
+    <img className="site-icon" src={`/api/favicons?href=${encodeURIComponent(props.href)}${attempt ? "&again=1" : ""}`}
+         alt="" width={size} height={size} loading="lazy" onError={() => setFailed(true)} />
   );
 }
 

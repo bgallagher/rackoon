@@ -15,6 +15,7 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import tempfile
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
@@ -395,7 +396,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
 
     @app.get("/api/health")
     async def health() -> dict[str, Any]:
-        return {"ok": True}
+        return {"ok": True, "version": os.environ.get("RACKOON_VERSION", "dev")}
 
     @app.get("/api/auth/state")
     async def auth_state(request: Request) -> dict[str, Any]:

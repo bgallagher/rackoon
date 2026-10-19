@@ -72,6 +72,7 @@ class FaviconStore:
         self.folder = folder
         self.clock = clock
         self.transport = transport  # tests answer with httpx.MockTransport
+        self._pending: dict[str, asyncio.Task[tuple[bytes, str] | None]] = {}
         self.lock = asyncio.Lock()
         self._index: dict[str, dict[str, object]] | None = None
 
@@ -99,6 +100,19 @@ class FaviconStore:
         except OSError:
             return None
         return data, TYPES[str(row["kind"])]
+
+    def get_now(self, origin: str, refresh: bool = False) -> tuple[bytes, str] | None:
+        """What the page gets without waiting: the cached icon (or None), while a fetch that is due runs in the
+        background. A browser holds few connections per site, so an icon request must never wait on a slow site."""
+        row = self.index.get(origin)
+        have = self.cached(origin)
+        due = refresh or row is None or (have is None and
+                                         self.clock() - float(str(row.get("tried", 0))) >= RETRY_SECONDS)
+        if due and origin not in self._pending:
+            task = asyncio.get_running_loop().create_task(self.get(origin, refresh=True))
+            self._pending[origin] = task
+            task.add_done_callback(lambda _: self._pending.pop(origin, None))
+        return have
 
     async def get(self, origin: str, refresh: bool = False) -> tuple[bytes, str] | None:
         row = self.index.get(origin)
