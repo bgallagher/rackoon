@@ -15,6 +15,8 @@ final class AppModel {
     private(set) var trust: HostTrustModel
     private(set) var signIn: SignInStore
     private(set) var fleet: FleetModel!
+    /// Terminal tabs per server; they outlive screens and end on close, removal or an edit of the address.
+    let terminals = TerminalStore()
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let dataDirectory: URL
@@ -89,6 +91,7 @@ final class AppModel {
         defaults.set(on, forKey: Self.demoKey)
         guard on != isDemo else { return }
         fleet.pause()
+        terminals.closeEverything()
         isDemo = on
         (servers, trust, signIn) = Self.models(demo: on, dataDirectory: dataDirectory, secrets: secrets)
         fleet = makeFleet()
@@ -97,12 +100,40 @@ final class AppModel {
     /// The transport for a server: the demo's, or the embedded SSH client signed in the way the user chose.
     func transport(for server: Server) -> Result<SSHTransport, FleetModel.BlockedReason> {
         if isDemo { return .success(DemoFleet.transport(for: server)) }
+        return embedded(for: server).map { $0 }
+    }
+
+    private func embedded(for server: Server) -> Result<EmbeddedSSHTransport, FleetModel.BlockedReason> {
         guard let auth = signIn.auth(for: server.id) else {
             return .failure(.init(message: "The saved \(signIn.method(for: server.id) == .key ? "key" : "password") is missing on this \(deviceName). Choose it again under Edit."))
         }
         return .success(EmbeddedSSHTransport(endpoint: SSHEndpoint(host: server.host, port: HostTrustModel.port(server),
                                                                    user: server.user ?? "root", auth: auth),
                                              knownHosts: trust.knownHosts))
+    }
+
+    /// What opens terminals on a server, or why none can be opened now (Read-only, the host key, a missing secret).
+    func terminalOpener(for server: Server) -> Result<any TerminalOpening, FleetModel.BlockedReason> {
+        // A terminal can change anything on the server, so Read-only keeps it closed (as on Android).
+        if safety.readOnly { return .failure(.init(message: "Read-only is on, so terminals are off. Turn it off to open one.")) }
+        if isDemo { return .success(DemoTerminals(host: server.name)) }
+        switch trust.state(for: server) {
+        case .trusted: break
+        default: return .failure(.init(message: "Trust the server's host key on its Overview first."))
+        }
+        return embedded(for: server).map { $0 as any TerminalOpening }
+    }
+
+    /// Opens a new terminal tab on a server, or says why it can't.
+    @discardableResult
+    func openTerminal(on server: Server) -> String? {
+        switch terminalOpener(for: server) {
+        case .success(let opener):
+            terminals.newTab(for: server.id, opener: opener, highlight: appearance.highlightOutput)
+            return nil
+        case .failure(let reason):
+            return reason.message
+        }
     }
 
     /// The last poll's error explained for this device and sign-in method, or nil.
@@ -118,11 +149,13 @@ final class AppModel {
         if changed, let server = servers.server(id: id) {
             trust.reset(server)
             fleet.reset(id)
+            terminals.closeAll(for: id)
         }
         return problem
     }
 
     func remove(id: String) {
+        terminals.closeAll(for: id)
         fleet.forget(id)
         signIn.forget(id)
         servers.remove(id: id)
@@ -152,6 +185,7 @@ final class AppModel {
         case .password(let password): try signIn.usePassword(password, for: id)
         }
         fleet.reset(id)
+        terminals.closeAll(for: id)
     }
 
     enum SignInChoice: Equatable {

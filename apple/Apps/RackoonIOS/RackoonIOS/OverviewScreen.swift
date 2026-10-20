@@ -44,6 +44,12 @@ struct OverviewScreen: View {
             .navigationTitle(server.name)
             .refreshable { await model.fleet.refresh(serverID) }
             .toolbar {
+                NavigationLink {
+                    TerminalScreen(serverID: serverID)
+                } label: {
+                    Image(systemName: "terminal")
+                }
+                .accessibilityLabel("Terminal")
                 Button { settings = true } label: { Image(systemName: "slider.horizontal.3") }
                     .accessibilityLabel("Server settings")
             }

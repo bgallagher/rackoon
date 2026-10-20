@@ -24,6 +24,11 @@ struct SettingsScreen: View {
                     } label: {
                         LabeledContent("Theme", value: model.appearance.selectionTitle)
                     }
+                    Toggle("Highlight Terminal Output", isOn: Binding(get: { model.appearance.highlightOutput }, set: {
+                        model.appearance.setHighlight($0)
+                        model.terminals.setHighlight($0)
+                    }))
+                    .accessibilityIdentifier("highlightToggle")
                     if let error = model.appearance.themeError {
                         Text(error).font(.footnote).foregroundStyle(t.danger)
                     }

@@ -45,3 +45,22 @@ public struct ReconnectPolicy: Sendable {
     /// The user pressed Reconnect now, or a new session started on purpose: forget earlier failures.
     public mutating func reset() { used = 0 }
 }
+
+/// A terminal session on a server: a shell, or one command, on a pty that can be resized. Implemented by the embedded
+/// SSH client (iOS) and the demo's fake shell; the Mac's terminal tabs run ssh in SwiftTerm's own process view instead.
+public protocol TerminalShell: AnyObject, Sendable {
+    /// Everything the remote side prints (stdout and stderr share the pty), as raw bytes for the terminal emulator.
+    /// Read it once.
+    var output: AsyncStream<[UInt8]> { get }
+    func write(_ bytes: [UInt8]) async
+    func resize(cols: Int, rows: Int) async
+    /// Waits until the session is over and says why (only `.connectionLost` is ever retried).
+    func awaitEnd() async -> SessionEnd
+    /// Ends the session now (the user closed it).
+    func close() async
+}
+
+/// Opens terminals on one server. Take `cols`/`rows` from the emulator's measured size.
+public protocol TerminalOpening: Sendable {
+    func openTerminal(cols: Int, rows: Int, command: String?) async throws -> any TerminalShell
+}

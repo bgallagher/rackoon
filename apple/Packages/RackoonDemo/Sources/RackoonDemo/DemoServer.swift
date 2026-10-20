@@ -154,56 +154,8 @@ enum DemoData {
 
     // MARK: the fake shell
 
-    static let shellScript = #"""
-    #!/bin/bash
-    # Demo-mode terminal: prints a login banner and answers a few commands with canned text.
-    # It never runs what you type, so it is safe to use while taking screenshots.
-    host="${1:-homelab}"
-    cat <<BANNER
-    Welcome to Ubuntu 24.04.2 LTS (GNU/Linux 6.8.0-52-generic x86_64)
-
-     * Documentation:  https://help.ubuntu.com
-     * Management:     https://landscape.canonical.com
-     * Support:        https://ubuntu.com/pro
-
-      System load:  0.42               Processes:             312
-      Usage of /:   41.2% of 465GB     Users logged in:       1
-      Memory usage: 39%                IPv4 address for eno1: 203.0.113.24
-      Swap usage:   0%                 IPv4 address for tailscale0: 100.100.40.7
-
-    5 updates can be applied immediately.
-    2 of these updates are standard security updates.
-
-    *** System restart required ***
-    Last login: Sat Oct 10 09:12:44 2026 from 100.100.40.12
-    BANNER
-    while true; do
-      IFS= read -e -r -p "root@${host}:~# " line || exit 0
-      case "$line" in
-        "") ;;
-        exit|logout) echo logout; exit 0 ;;
-        clear) printf '\033c' ;;
-        whoami) echo root ;;
-        hostname) echo "$host" ;;
-        uptime) echo " 10:41:07 up 27 days,  9:36,  1 user,  load average: 0.42, 0.51, 0.48" ;;
-        "docker ps"*)
-          printf '%-14s %-44s %-22s %s\n' CONTAINER "IMAGE" STATUS PORTS
-          printf '%-14s %-44s %-22s %s\n' 4f1c0a9d3b21 "jellyfin/jellyfin:10.10.3" "Up 3 days (healthy)" "100.100.40.7:8096->8096/tcp"
-          printf '%-14s %-44s %-22s %s\n' 9a7e22c5d610 "ghcr.io/immich-app/immich-server:v1.122.0" "Up 3 days (healthy)" "100.100.40.7:2283->2283/tcp"
-          printf '%-14s %-44s %-22s %s\n' 2b8d41e07f93 "adguard/adguardhome:v0.107.55" "Up 9 days" "100.100.40.7:3000->3000/tcp"
-          printf '%-14s %-44s %-22s %s\n' e03c6a1f5d48 "grafana/promtail:3.3.0" "Up 2 days (unhealthy)" "" ;;
-        "df -h"*)
-          printf 'Filesystem      Size  Used Avail Use%% Mounted on\n/dev/nvme0n1p2  465G  191G  255G  43%% /\n/dev/nvme0n1p1  1.0G  6.1M  1.0G   1%% /boot/efi\n' ;;
-        free*)
-          printf '               total        used        free      shared  buff/cache   available\nMem:            15Gi       6.1Gi       3.9Gi       112Mi       5.4Gi       9.4Gi\nSwap:          2.0Gi          0B       2.0Gi\n' ;;
-        "ip a"*|"ip addr"*|"ip -br a"*)
-          printf 'lo               UNKNOWN        127.0.0.1/8 ::1/128\neno1             UP             203.0.113.24/24 2001:db8:a:1::24/64\ntailscale0       UNKNOWN        100.100.40.7/32\ndocker0          DOWN           172.17.0.1/16\n' ;;
-        ls*) echo "backups  docker-compose.yml  notes.txt  stacks" ;;
-        pwd) echo /root ;;
-        *) echo "$line: demo shell, so only a few commands are simulated" ;;
-      esac
-    done
-    """#.replacingOccurrences(of: "\n    ", with: "\n").trimmingCharacters(in: .whitespacesAndNewlines) + "\n"
+    /// The Mac's demo terminal script, generated from `DemoShell`'s table (iOS answers from the same table in-process).
+    static var shellScript: String { DemoShell.bashScript }
 }
 
 // MARK: - The transport

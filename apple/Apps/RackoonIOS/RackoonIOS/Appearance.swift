@@ -14,9 +14,12 @@ final class AppearanceStore {
     private(set) var systemIsDark: Bool
     private(set) var resolvedTheme: TerminalTheme
     private(set) var palette: AppPalette
+    /// Colour IPs, errors, warnings and high percentages in terminal output (the Mac's switch, same key).
+    private(set) var highlightOutput: Bool
 
     @ObservationIgnored private let defaults: UserDefaults
     static let selectionKey = "appearanceSelection"
+    static let highlightKey = "terminalHighlightOutput"
 
     static let fallback = TerminalTheme(
         id: ThemeCatalog.defaultID, name: "Default", family: "Rackoon", appearance: "dark",
@@ -47,6 +50,7 @@ final class AppearanceStore {
         resolvedTheme = resolved
         palette = AppPalette.derive(from: resolved)
         self.defaults = defaults
+        highlightOutput = defaults.object(forKey: Self.highlightKey) as? Bool ?? true
         if !valid { defaults.set(ThemeCatalog.automaticID, forKey: Self.selectionKey) }
     }
 
@@ -73,6 +77,12 @@ final class AppearanceStore {
         selectionID = id
         defaults.set(id, forKey: Self.selectionKey)
         recompute()
+    }
+
+    func setHighlight(_ on: Bool) {
+        guard on != highlightOutput else { return }
+        highlightOutput = on
+        defaults.set(on, forKey: Self.highlightKey)
     }
 
     /// The system's light/dark setting, read by the root view while nothing overrides it.

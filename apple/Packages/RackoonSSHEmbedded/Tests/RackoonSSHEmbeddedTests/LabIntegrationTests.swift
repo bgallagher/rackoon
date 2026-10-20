@@ -249,6 +249,25 @@ final class LabIntegrationTests: XCTestCase {
         XCTAssertEqual(end, .remoteExit(7))
     }
 
+    /// A dropped link reads as a lost connection (which the terminal retries), not as the shell exiting (which it never
+    /// retries). The session's own sshd process is killed from a second connection. As rkpw, so no other test's rk shell
+    /// running in parallel is touched.
+    func testADroppedTerminalIsALostConnection() async throws {
+        let lab = try lab()
+        let shell = try await transport(lab, user: lab.sudoUser).openShell(cols: 80, rows: 24)
+        var iterator = shell.output.makeAsyncIterator()
+        await shell.write(Array("echo ready-to-drop\n".utf8))
+        var seen = ""
+        while !seen.contains("ready-to-drop\r\n"), let bytes = await iterator.next() { seen += String(decoding: bytes, as: UTF8.self) }
+        // `[s]shd` keeps pkill from matching the shell that runs it; `.*` covers both sshd and the newer sshd-session.
+        _ = try await transport(lab, user: lab.sudoUser).run("pkill -KILL -f '[s]shd.*\(lab.sudoUser)@pts'", timeout: 15)
+        while await iterator.next() != nil {}
+        let end = await shell.awaitEnd()
+        XCTAssertEqual(end, .connectionLost)
+        var policy = ReconnectPolicy()
+        XCTAssertEqual(policy.onEnded(end, connectedFor: 1), .retry(delay: 1, attempt: 1, of: 5), "a dropped terminal is retried")
+    }
+
     /// A Ctrl-C typed into a shell interrupts the foreground program, as in a terminal.
     func testCtrlCInterruptsAShellProgram() async throws {
         let lab = try lab()

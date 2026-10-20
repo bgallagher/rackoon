@@ -9,7 +9,7 @@ import RackoonCore
 /// and terminal shells; `stream` uses its own connection with a pty, because stopping a stream must send Ctrl-C through
 /// the pty (closing alone leaves the remote command running). Host keys are checked against `knownHosts` before any
 /// credentials are sent: an unknown key is reported for the user to confirm, a changed one is blocked.
-public final class EmbeddedSSHTransport: SSHTransport {
+public final class EmbeddedSSHTransport: SSHTransport, TerminalOpening {
     public let endpoint: SSHEndpoint
     private let knownHosts: any KnownHostsStore
     private let connectTimeout: TimeInterval
@@ -190,6 +190,10 @@ public final class EmbeddedSSHTransport: SSHTransport {
 
     // MARK: Terminals
 
+    public func openTerminal(cols: Int, rows: Int, command: String?) async throws -> any TerminalShell {
+        try await openShell(cols: cols, rows: rows, command: command)
+    }
+
     /// Opens a terminal of the given size on the shared connection: a login shell, or, with `command`, that command on a
     /// pty (for example `docker exec -it <id> sh`). Take the size from the emulator's measured size.
     public func openShell(cols: Int, rows: Int, command: String? = nil) async throws -> EmbeddedShell {
@@ -213,15 +217,8 @@ public final class EmbeddedSSHTransport: SSHTransport {
     }
 }
 
-/// Why a terminal session ended, so the app can decide whether to reconnect (like Android's `SessionEnd`).
-public enum ShellEnd: Sendable, Equatable {
-    case closedByUser
-    case remoteExit(Int32)
-    case connectionLost
-}
-
 /// A terminal session: a shell on a pty that can be resized.
-public final class EmbeddedShell: Sendable {
+public final class EmbeddedShell: TerminalShell {
     private let channel: Channel
     private let pump: Task<Int32?, Never>
     private let closedByUser = NIOLockedValueBoxBool()
@@ -257,7 +254,7 @@ public final class EmbeddedShell: Sendable {
     }
 
     /// Waits until the session is over and says why.
-    public func awaitEnd() async -> ShellEnd {
+    public func awaitEnd() async -> SessionEnd {
         let code = await pump.value
         if closedByUser.value { return .closedByUser }
         if let code { return .remoteExit(code) }

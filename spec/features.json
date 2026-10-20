@@ -156,9 +156,9 @@
       "id": "demo", "title": "Demo mode with made-up servers (nothing is sent)",
       "commands": [],
       "platforms": {
-        "mac": {"status": "done", "tests": ["RackoonMacTests.DemoServicesTests", "RackoonMacTests.DemoAlertsTests", "RackoonDemoTests.DemoDataTests"]},
+        "mac": {"status": "done", "tests": ["RackoonMacTests.DemoServicesTests", "RackoonMacTests.DemoAlertsTests", "RackoonDemoTests.DemoDataTests", "RackoonDemoTests.DemoShellTests"]},
         "android": {"status": "done", "tests": [], "untested": "debug-build demo mode; demo data is not unit-tested"},
-        "ios": {"status": "done", "tests": ["RackoonDemoTests.DemoDataTests", "RackoonIOSTests.DemoModeTests"]},
+        "ios": {"status": "done", "tests": ["RackoonDemoTests.DemoDataTests", "RackoonDemoTests.DemoShellTests", "RackoonIOSTests.DemoModeTests", "RackoonIOSTests.TerminalStoreTests/testTheDemoTerminalAnswers"]},
         "web": {"status": "planned", "reason": "stage W3"}
       }
     },
@@ -168,7 +168,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": [], "untested": "SwiftTerm view; verified by hand"},
         "android": {"status": "done", "tests": [], "untested": "termlib view; verified by hand"},
-        "ios": {"status": "planned", "reason": "stage I3"},
+        "ios": {"status": "done", "tests": ["RackoonIOSTests.TerminalStoreTests", "RackoonIOSTests.TerminalTabTests/testThePtyOpensAtTheViewsFirstSizeAndFollowsLaterOnes", "RackoonIOSTests.TerminalTabTests/testKeystrokesReachTheShellInTheOrderTyped", "RackoonSSHEmbeddedTests.LabIntegrationTests/testShellSizeResizeAndExit"]},
         "web": {"status": "planned", "reason": "stage W4"}
       }
     },
@@ -178,7 +178,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.TerminalOutputFilterTests", "RackoonCoreTests.OutputHighlighterTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.TerminalOutputFilterTests", "com.bgallagher.rackoon.core.OutputHighlighterTests"]},
-        "ios": {"status": "planned", "reason": "stage I3"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.TerminalOutputFilterTests", "RackoonCoreTests.OutputHighlighterTests", "RackoonIOSTests.TerminalTabTests/testOutputIsHighlightedInProcessAndTheSwitchTurnsItOff"]},
         "web": {"status": "planned", "reason": "stage W4"}
       }
     },
@@ -188,7 +188,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": [], "untested": "TerminalTab.ended retry; verified by hand with Wi-Fi off/on"},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ReconnectPolicyTests"]},
-        "ios": {"status": "planned", "reason": "stage I3"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.ReconnectPolicyTests", "RackoonIOSTests.TerminalTabTests/testADroppedConnectionIsRetriedWithBackoffButAnExitIsFinal", "RackoonIOSTests.TerminalTabTests/testRetriesRunOutAndASignInFailureIsNotRetried", "RackoonSSHEmbeddedTests.LabIntegrationTests/testADroppedTerminalIsALostConnection"]},
         "web": {"status": "planned", "reason": "stage W4"}
       }
     },

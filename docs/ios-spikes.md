@@ -127,3 +127,21 @@ Not built in I1: an app icon (needs an asset catalog), key sign-in, and anything
   - The fingerprint wrapped with an inserted hyphen, a fake character in a value people compare by eye. It is now kept on one line and shrunk to fit.
   - Trusting no longer depends on the screen's momentary state, only on the key last read from the server.
 - **Not built:** reboot from the attention strip (I5), the attention items' links to Docker/Updates (those screens come in I4/I5), RSA/ECDSA keys, and the dashboard's Docker and bookmark pages.
+
+## Stage I3 result: terminal tabs, highlighting, reconnect (20 Oct 2026)
+
+| Feature | iOS | Proven by |
+|---|---|---|
+| `terminal.tabs` | done | `RackoonIOSTests.TerminalStoreTests` (tabs per server, outliving screens, closed with their server; Read-only and an untrusted key keep terminals closed), `TerminalTabTests` (the pty opens at the view's first size, resizes are debounced, keystrokes arrive in order), lab `testShellSizeResizeAndExit` |
+| `terminal.highlight` | done | Core `TerminalOutputFilterTests`, `OutputHighlighterTests`, `TerminalTabTests/testOutputIsHighlightedInProcessAndTheSwitchTurnsItOff` |
+| `terminal.reconnect` | done | Core `ReconnectPolicyTests` (the Kotlin rule, ported), `TerminalTabTests` (backoff 1/2/4/8/15 s, an exit or a refused sign-in is never retried, Reconnect Now starts fresh), lab `testADroppedTerminalIsALostConnection` (the session's sshd killed: `connectionLost`, retried) |
+
+- **Model.** `TerminalStore` and `TerminalTab` (`Terminals.swift`) are owned by `AppModel`, so tabs survive moving between screens and servers. They are closed when their server is removed or its address or sign-in changes, and when demo mode switches. A tab opens its pty only once SwiftTerm reports its grid (the I0 lesson). Output passes through Core's `TerminalOutputFilter` in-process, since iOS needs no pty relay, and the Highlight switch in Settings applies to open tabs at once (Mac key `terminalHighlightOutput`). Keystrokes go through one ordered queue per session. A task per keystroke reordered them: typing "docker" arrived as "docerk", caught in the simulator.
+- **Core** gained `TerminalShell` and `TerminalOpening`, implemented by `EmbeddedSSHTransport`/`EmbeddedShell` (`ShellEnd` became Core's `SessionEnd`) and by the demo.
+- **Demo shell.** The canned banner and answers are now one table, `DemoShell` in RackoonDemo. The Mac's demo terminal runs the bash script generated from it, and iOS answers in-process (`DemoShellSession`, simple line editing). `DemoShellTests` checks both, the bash half on macOS only.
+- **View** (`TerminalScreen.swift`). SwiftTerm's iOS `TerminalView` is kept per tab, so scrollback survives leaving the screen, and themed from the active theme like the Mac's `applyRackoonTheme`. SwiftTerm's own key bar provides esc/ctrl/tab/arrows. A tab strip with + and ×, and a banner while reconnecting (countdown, Now, Cancel) or after the session ended (Reconnect, Close). The tab bar is hidden on this screen. Read-only keeps terminals closed, as on Android.
+- **Checked by hand in the simulator.**
+  - Demo shell: banner, IPs highlighted, `docker ps`.
+  - The lab over SSH with the saved Ed25519 key: login banner, coloured prompt, `top` on the alternate screen (left unhighlighted).
+  - Killing the session's sshd on the lab showed "Reconnecting in 1 s (attempt 1 of 5)", then a fresh login under the kept scrollback.
+- **Not built:** renaming tabs; a font-size control or pinch zoom (portrait gives about 49 columns at 13 pt); keepalive (a dead link is noticed when iOS reports it, or on the next write); opening a container shell (I4).
