@@ -301,11 +301,6 @@ struct DockerScreen: View {
 
 // MARK: - Overview card
 
-extension DockerStack {
-    /// The stack's bookmarks (Homepage labels), first container first.
-    var bookmarkLinks: [Bookmark] { containers.compactMap(\.bookmark) }
-}
-
 /// A bookmark's address as a short label: the host, plus a path when there is one ("app.example.com/tv").
 func shortAddress(_ href: String) -> String {
     guard let url = URL(string: href), let host = url.host else { return href }
