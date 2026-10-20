@@ -115,10 +115,14 @@ jobs:
         run: |
           labenv="$(tools/lab env)"
           eval "$labenv"
+          # The container runs as root (it installs ssh), so everything it writes into the checkout (.build, build/) is
+          # handed back to the runner's user on exit, pass or fail; root-owned files there broke later steps (EACCES).
           docker run --rm --network host -v "$PWD:$PWD" -w "$PWD/apple" \
             -e RACKOON_LAB -e RACKOON_LAB_HOST -e RACKOON_LAB_PORT -e RACKOON_LAB_USER -e RACKOON_LAB_SUDO_USER \
             -e RACKOON_LAB_SUDO_PASSWORD -e RACKOON_LAB_KEY -e RACKOON_LAB_KNOWN_HOSTS \
-            swift:6.2 bash -c 'apt-get update -qq && apt-get install -y -qq openssh-client >/dev/null &&
+            -e OWNER="$(id -u):$(id -g)" \
+            swift:6.2 bash -c 'trap "chown -R \"\$OWNER\" .build build 2>/dev/null || true" EXIT
+              apt-get update -qq && apt-get install -y -qq openssh-client >/dev/null &&
               swift test --filter LabIntegrationTests --parallel --xunit-output build/junit-lab/swift.xml'
       - if: always()
         run: tools/lab down
