@@ -20,9 +20,11 @@ final class Sandbox {
 
     let secrets = MemorySecretStore()
 
-    func app(demo: Bool = false, systemIsDark: Bool = true) -> AppModel {
+    /// `vault`: remembered sudo passwords; none by default (the simulator's real Keychain needs a passcode and Face ID).
+    func app(demo: Bool = false, systemIsDark: Bool = true, vault: SudoVault? = nil) -> AppModel {
         AppModel(appearance: AppearanceStore(themesData: Self.themes, defaults: defaults, systemIsDark: systemIsDark),
-                 safety: SafetyStore(defaults: defaults), defaults: defaults, dataDirectory: directory, secrets: secrets, demo: demo, network: false)
+                 safety: SafetyStore(defaults: defaults), defaults: defaults, dataDirectory: directory, secrets: secrets, demo: demo, network: false,
+                 vault: { _ in vault ?? SudoVault(store: nil, unavailableReason: "tests") })
     }
 
     /// The themes.json the app bundles (the Mac's own file, referenced by the project).

@@ -39,8 +39,8 @@ private struct BookmarkList: View {
             a.isEmpty != b.isEmpty ? !a.isEmpty : a.localizedCaseInsensitiveCompare(b) == .orderedAscending
         }
         List {
-            if let error = docker.state.error {
-                Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(t.warn).listRowBackground(t.card)
+            if docker.state.error != nil || model.elevation.isUnlocked(server.id) {
+                DockerAccessNotice(server: server, error: docker.state.error).listRowBackground(t.card)
             }
             ForEach(names, id: \.self) { name in
                 Section(name.isEmpty ? "Other" : name) {

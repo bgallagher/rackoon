@@ -22,6 +22,15 @@ final class AppModel {
     /// App logos and site icons, cached on this device (a temporary folder in demo mode).
     private(set) var icons: AppIconStore
     private(set) var favicons: FaviconStore
+    /// Remembered sudo passwords (Keychain, unlocked with Face ID); none in demo mode.
+    private(set) var vault: SudoVault
+    /// Docker through sudo, per server, for a limited time.
+    let elevation = DockerElevation()
+    /// Reboots in progress (or just finished), by server id.
+    var reboots: [String: RebootFlow] = [:]
+    /// Each server's Updates screen model, kept so an install's output survives leaving the screen.
+    @ObservationIgnored private var updatesModels: [String: UpdatesModel] = [:]
+    @ObservationIgnored private let makeVault: (Bool) -> SudoVault
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let dataDirectory: URL
@@ -35,7 +44,8 @@ final class AppModel {
     /// `dataDirectory` is where servers.json, known_hosts.json, sign-in.json and the snapshots live (Application
     /// Support/Rackoon in the app). Secrets go to `secrets` (the Keychain in the app).
     init(appearance: AppearanceStore, safety: SafetyStore, defaults: UserDefaults = .standard, dataDirectory: URL,
-         secrets: any SecretStore, deviceName: String = "iPhone", demo: Bool? = nil, network: Bool = true) {
+         secrets: any SecretStore, deviceName: String = "iPhone", demo: Bool? = nil, network: Bool = true,
+         vault: @escaping (Bool) -> SudoVault = { SudoVault.system(demo: $0) }) {
         self.appearance = appearance
         self.safety = safety
         self.defaults = defaults
@@ -47,7 +57,11 @@ final class AppModel {
         isDemo = on
         (servers, trust, signIn) = Self.models(demo: on, dataDirectory: dataDirectory, secrets: secrets)
         (icons, favicons) = Self.iconStores(demo: on, dataDirectory: dataDirectory, network: network)
+        makeVault = vault
+        self.vault = vault(on)
         fleet = makeFleet()
+        self.vault.load(servers.servers)
+        elevation.changed = { [weak self] id in self?.docker.forget(id) }
     }
 
     /// Demo mode keeps its icon choices in a temporary folder, so trying the demo never changes the real ones.
@@ -109,9 +123,15 @@ final class AppModel {
         fleet.pause()
         terminals.closeEverything()
         docker.forgetAll()
+        updatesModels = [:]
+        for flow in reboots.values { flow.cancel() }
+        reboots = [:]
+        for server in servers.servers { elevation.lock(server.id) }
         isDemo = on
         (servers, trust, signIn) = Self.models(demo: on, dataDirectory: dataDirectory, secrets: secrets)
         (icons, favicons) = Self.iconStores(demo: on, dataDirectory: dataDirectory, network: network)
+        vault = makeVault(on)
+        vault.load(servers.servers)
         fleet = makeFleet()
     }
 
@@ -158,14 +178,18 @@ final class AppModel {
     /// The server's Docker model, or why Docker can't be read yet (the host key, a missing secret). Read-only does not
     /// block reading; every action checks it.
     func dockerModel(for server: Server) -> Result<DockerModel, FleetModel.BlockedReason> {
-        if let model = docker.existing(server.id) { return .success(model) }
+        let key = elevation.key(server.id)
+        if let model = docker.existing(server.id), model.accessKey == key { return .success(model) }
         switch trust.state(for: server) {
         case .trusted, .demo: break
         default: return .failure(.init(message: "Trust the server's host key on its Overview first."))
         }
         switch transport(for: server) {
-        case .success(let transport):
-            return .success(docker.model(for: server) { DockerModel(server: server, transport: transport, safety: safety) })
+        case .success(let base):
+            // Through sudo while the user has unlocked Docker for this server; a model made under another key is stale.
+            if docker.existing(server.id) != nil { docker.forget(server.id) }
+            let transport = elevation.transport(for: server.id, base: base)
+            return .success(docker.model(for: server) { DockerModel(server: server, transport: transport, safety: safety, accessKey: key) })
         case .failure(let reason):
             return .failure(reason)
         }
@@ -186,6 +210,9 @@ final class AppModel {
             fleet.reset(id)
             terminals.closeAll(for: id)
             docker.forget(id)
+            updatesModels[id] = nil
+            elevation.lock(id)
+            vault.forget(id)   // a saved sudo password belongs to the old address
         }
         return problem
     }
@@ -193,6 +220,11 @@ final class AppModel {
     func remove(id: String) {
         terminals.closeAll(for: id)
         docker.forget(id)
+        updatesModels[id] = nil
+        reboots[id]?.cancel()
+        reboots[id] = nil
+        elevation.lock(id)
+        vault.forget(id)
         icons.forget(serverID: id)
         fleet.forget(id)
         signIn.forget(id)
@@ -225,6 +257,24 @@ final class AppModel {
         fleet.reset(id)
         terminals.closeAll(for: id)
         docker.forget(id)
+        updatesModels[id] = nil
+    }
+
+    /// The server's Updates model (made on first use, kept while the app runs), or why there is none yet.
+    func updatesModel(for server: Server) -> Result<UpdatesModel, FleetModel.BlockedReason> {
+        if let model = updatesModels[server.id] { return .success(model) }
+        switch trust.state(for: server) {
+        case .trusted, .demo: break
+        default: return .failure(.init(message: "Trust the server's host key on its Overview first."))
+        }
+        switch transport(for: server) {
+        case .success(let transport):
+            let model = UpdatesModel(server: server, transport: transport, safety: safety, vault: vault)
+            updatesModels[server.id] = model
+            return .success(model)
+        case .failure(let reason):
+            return .failure(reason)
+        }
     }
 
     enum SignInChoice: Equatable {

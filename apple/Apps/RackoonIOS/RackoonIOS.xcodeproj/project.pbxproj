@@ -274,6 +274,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rackoon;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Face ID unlocks a sudo password you chose to remember on this device.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Rackoon connects to your servers over SSH, including servers on your local network.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
@@ -348,6 +349,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Rackoon;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Face ID unlocks a sudo password you chose to remember on this device.";
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Rackoon connects to your servers over SSH, including servers on your local network.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;

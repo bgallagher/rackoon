@@ -19,6 +19,12 @@ enum Present {
         return "\(m)m"
     }
 
+    /// "42 s", "1 min 05 s", for short waits.
+    static func duration(_ seconds: TimeInterval) -> String {
+        let s = Int(max(0, seconds).rounded())
+        return s < 60 ? "\(s) s" : String(format: "%d min %02d s", s / 60, s % 60)
+    }
+
     /// The server's own clock now: its reading at the poll plus the time since, shown in its own zone.
     static func serverClock(_ overview: Overview, polledAt: Date, now: Date) -> String {
         let seconds = TimeInterval(overview.serverTime) + now.timeIntervalSince(polledAt)

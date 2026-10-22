@@ -29,6 +29,7 @@ struct OutputPanel: View {
             }
             .padding(.horizontal, 16).padding(.bottom, 8)
             OutputTerminal(output: output, count: output.chunks.count, theme: model.appearance.resolvedTheme)
+                .id(output.id)   // a new run gets a new terminal; a reused one would keep feeding the old run's text
                 .padding(.horizontal, 8)
                 .background(SwiftUI.Color(model.appearance.resolvedTheme.backgroundRGB))
                 .accessibilityIdentifier("outputTerminal")

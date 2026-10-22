@@ -12,12 +12,15 @@ struct OverviewScreen: View {
     @State private var editing = false
     /// Held here, not in the gate's own row: List recreates its rows, which would close the sheet as it opens.
     @State private var confirming: HostKeyInfo?
+    /// The reboot's confirmation (from the attention row).
+    @State private var pending: PendingAction?
 
     var body: some View {
         let t = model.tokens
         if let server = model.servers.server(id: serverID) {
             let state = model.fleet.state(for: serverID)
             List {
+                RebootSection(server: server)
                 GateSection(server: server, edit: { editing = true }, confirm: { confirming = $0 })
                 if let failure = model.failure(for: server, state: state) {
                     FailureSection(failure: failure, raw: state.error ?? "", edit: { editing = true },
@@ -28,8 +31,10 @@ struct OverviewScreen: View {
                 }
                 if let overview = state.overview {
                     HeaderSection(overview: overview, state: state)
-                    if !state.attention.isEmpty { AttentionSection(items: state.attention) }
-                    PlacesSection(server: server)
+                    if !state.attention.isEmpty {
+                        AttentionSection(server: server, items: state.attention, reboot: { pending = model.rebootRequest(server) })
+                    }
+                    PlacesSection(server: server, overview: overview)
                     UsageSection(overview: overview, state: state)
                     DisksSection(disks: overview.disks)
                     AddressSection(overview: overview)
@@ -57,6 +62,7 @@ struct OverviewScreen: View {
             .sheet(isPresented: $settings) { ServerSettingsScreen(serverID: serverID) }
             .sheet(isPresented: $editing) { ServerFormScreen(editing: server) }
             .sheet(item: $confirming) { key in TrustSheet(server: server, key: key) }
+            .confirmAction($pending)
             .task(id: server.host + ":\(server.port ?? 22)") {
                 if case .unchecked = model.trust.state(for: server) { await model.trust.check(server) }
             }
@@ -72,6 +78,7 @@ struct OverviewScreen: View {
 private struct PlacesSection: View {
     @Environment(AppModel.self) private var model
     let server: Server
+    let overview: Overview
 
     var body: some View {
         let t = model.tokens
@@ -80,6 +87,19 @@ private struct PlacesSection: View {
                 Label("Docker", systemImage: "shippingbox")
             }
             .accessibilityIdentifier("openDocker")
+            NavigationLink { UpdatesScreen(serverID: server.id) } label: {
+                HStack {
+                    Label("Updates", systemImage: "arrow.down.circle")
+                    Spacer()
+                    if overview.pendingUpdates > 0 {
+                        Text("\(overview.pendingUpdates)").font(.caption.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(overview.securityUpdates > 0 ? t.warn : t.secondary)
+                            .padding(.horizontal, 7).padding(.vertical, 2)
+                            .background((overview.securityUpdates > 0 ? t.warn : t.idle).opacity(0.15), in: Capsule())
+                    }
+                }
+            }
+            .accessibilityIdentifier("openUpdates")
             NavigationLink { BookmarksScreen(serverID: server.id) } label: {
                 Label("Bookmarks", systemImage: "bookmark")
             }
@@ -168,21 +188,46 @@ private struct HeaderSection: View {
 /// The needs-attention strip: Core's attention rules over this reading. The screens that fix them come in later stages.
 private struct AttentionSection: View {
     @Environment(AppModel.self) private var model
+    let server: Server
     let items: [AttentionItem]
+    let reboot: () -> Void
 
     var body: some View {
         let t = model.tokens
         Section("Needs attention (\(items.count))") {
             ForEach(items) { item in
-                Label {
-                    Text(item.message).foregroundStyle(t.text)
-                } icon: {
-                    Image(systemName: item.severity.symbol).foregroundStyle(item.severity == .critical ? t.danger : t.warn)
+                HStack(spacing: 8) {
+                    label(item)
+                    if Attention.offersReboot(item) {
+                        Spacer(minLength: 4)
+                        Button("Reboot…", action: reboot)
+                            .buttonStyle(.bordered).tint(t.danger)
+                            .disabled(model.safety.readOnly || model.reboots[server.id]?.isActive == true)
+                            .accessibilityIdentifier("attentionReboot")
+                    }
                 }
             }
         }
         .listRowBackground(t.card)
         .accessibilityIdentifier("attention")
+    }
+
+    /// The item, linking to the screen that helps fix it (its `fix`).
+    @ViewBuilder private func label(_ item: AttentionItem) -> some View {
+        let t = model.tokens
+        let text = Label {
+            Text(item.message).foregroundStyle(t.text)
+        } icon: {
+            Image(systemName: item.severity.symbol).foregroundStyle(item.severity == .critical ? t.danger : t.warn)
+        }
+        switch item.fix {
+        case "docker" where !item.id.hasPrefix("disk_high"):
+            NavigationLink { DockerScreen(serverID: server.id) } label: { text }
+        case "updates" where !Attention.offersReboot(item):
+            NavigationLink { UpdatesScreen(serverID: server.id) } label: { text }
+        default:
+            text
+        }
     }
 }
 

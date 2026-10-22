@@ -166,7 +166,9 @@ struct StackScreen: View {
     }
 
     private func openShell(_ c: DockerContainer) {
-        guard let command = DockerSession.shellCommand(id: c.id) else { return }
+        guard let plain = DockerSession.shellCommand(id: c.id) else { return }
+        // Through sudo while Docker is unlocked for this server: sudo asks for the password in the terminal itself.
+        let command = model.elevation.isUnlocked(server.id) ? "sudo " + plain : plain
         if let problem = model.openTerminal(on: server, command: command, title: c.service ?? c.name) {
             shellProblem = problem
         } else {

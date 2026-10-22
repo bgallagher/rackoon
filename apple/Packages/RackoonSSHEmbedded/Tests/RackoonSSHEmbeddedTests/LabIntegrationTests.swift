@@ -334,6 +334,62 @@ final class LabIntegrationTests: XCTestCase {
         let end = await shell.awaitEnd()
         XCTAssertEqual(end, .remoteExit(0))
     }
+
+    // MARK: sudo on iOS (stage I5): the password stream and Docker through sudo, as rkpw (sudo wants its password).
+
+    /// A root script behind the nonce prompt: the password is typed at the one prompt, the script's own `sudo -n` then runs
+    /// as root, and a wrong password is reported as rejected with nothing typed twice.
+    func testAPasswordStreamIsAnsweredOnce() async throws {
+        let lab = try lab()
+        let rkpw = transport(lab, user: lab.sudoUser)
+        let script = "S='sudo -n'; $S id -u"
+        let nonce = SudoElevation.makeNonce()
+        let command = try XCTUnwrap(SudoElevation.withPassword(script, nonce: nonce))
+        let right = await StreamRunner.run(transport: rkpw, command: command, cols: 80, rows: 24,
+                                           sudo: SudoCredential(password: lab.sudoPassword, nonce: nonce), onEvent: { _ in })
+        XCTAssertEqual(right.sudo, .accepted, right.text)
+        XCTAssertEqual(right.exitCode, 0, right.text)
+        XCTAssertTrue(ANSI.strip(right.text).split(whereSeparator: \.isNewline).contains { $0.trimmingCharacters(in: .whitespaces) == "0" }, right.text)
+        XCTAssertFalse(right.text.contains(lab.sudoPassword), "the password is never shown")
+
+        let other = SudoElevation.makeNonce()
+        let wrong = await StreamRunner.run(transport: rkpw, command: try XCTUnwrap(SudoElevation.withPassword(script, nonce: other)),
+                                           cols: 80, rows: 24, sudo: SudoCredential(password: "not-the-password", nonce: other), onEvent: { _ in })
+        XCTAssertEqual(wrong.sudo, .rejected, wrong.text)
+        XCTAssertNotEqual(wrong.exitCode, 0)
+        XCTAssertTrue(wrong.needsSudoPassword, "the app asks again")
+    }
+
+    /// Docker through sudo: every command of the embedded transport runs as root (`run` with the password on stdin,
+    /// `stream` behind the nonce prompt), and a wrong password locks instead of running anything.
+    func testASudoTransportRunsAsRoot() async throws {
+        let lab = try lab()
+        let rkpw = transport(lab, user: lab.sudoUser)
+        let elevated = SudoTransport(base: rkpw, password: lab.sudoPassword, validUntil: Date().addingTimeInterval(120))
+        let run = try await elevated.run("id -u", timeout: 30)
+        XCTAssertEqual(run.exitCode, 0, run.stderr)
+        XCTAssertEqual(run.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "0")
+        let streamed = try await collect(elevated.stream("id -u"))
+        XCTAssertTrue(ANSI.strip(streamed).split(whereSeparator: \.isNewline).contains { $0.trimmingCharacters(in: .whitespaces) == "0" }, streamed)
+
+        let rejected = RejectedFlag()
+        let wrong = SudoTransport(base: rkpw, password: "not-the-password", validUntil: Date().addingTimeInterval(120),
+                                  onRejected: { rejected.set() })
+        do {
+            _ = try await wrong.run("id -u", timeout: 30)
+            XCTFail("a wrong password must not run the command")
+        } catch {
+            XCTAssertEqual(error as? SudoTransportError, .rejected)
+        }
+        XCTAssertTrue(rejected.value, "the app is told, so it locks Docker again")
+    }
+}
+
+private final class RejectedFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _value = false
+    func set() { lock.withLock { _value = true } }
+    var value: Bool { lock.withLock { _value } }
 }
 
 /// Collects a streamed action's events from any thread.

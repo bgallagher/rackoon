@@ -118,6 +118,8 @@ final class DockerModel {
 
     let serverID: String
     let serverName: String
+    /// `DockerElevation.key` when this model was made: plain, or through sudo.
+    let accessKey: String
     @ObservationIgnored let serverUser: String?
     @ObservationIgnored let transport: SSHTransport
     @ObservationIgnored let safety: SafetyStore
@@ -130,8 +132,9 @@ final class DockerModel {
     /// How long an action waits for its Output view to report a size (tests have none).
     @ObservationIgnored var sizeWait = 30
 
-    init(server: Server, transport: SSHTransport, safety: SafetyStore, interval: TimeInterval = 10) {
+    init(server: Server, transport: SSHTransport, safety: SafetyStore, interval: TimeInterval = 10, accessKey: String = "") {
         serverID = server.id
+        self.accessKey = accessKey
         serverName = server.name
         serverUser = server.user
         self.transport = transport

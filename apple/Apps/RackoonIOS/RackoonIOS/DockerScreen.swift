@@ -39,8 +39,8 @@ private struct DockerList: View {
         let shown = all.filter { (filter == nil || $0.health == filter) && $0.matches(query) }
         List {
             Section {
-                if let error = docker.state.error {
-                    Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(t.warn).font(.subheadline)
+                if docker.state.error != nil || model.elevation.isUnlocked(server.id) {
+                    DockerAccessNotice(server: server, error: docker.state.error)
                 }
                 if let snapshot = docker.state.snapshot {
                     Text(snapshot.summary).font(.subheadline).foregroundStyle(t.secondary)
