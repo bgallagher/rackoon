@@ -188,21 +188,30 @@ jobs:
       - run: tools/lab up
       - name: Android (sshj) lab checks
         run: |
-          eval "$(tools/lab env)"
+          # An assignment fails the step if `tools/lab env` fails; a bare eval "$(...)" would carry on with no lab
+          # settings and every check would quietly skip itself.
+          labenv="$(../tools/lab env)"
+          eval "$labenv"
           ./gradlew :ssh:test --tests 'com.bgallagher.rackoon.ssh.LabIntegrationTests'
         working-directory: android
       - name: Mac (OpenSSHTransport, on Linux) lab checks
         run: |
-          eval "$(tools/lab env)"
+          labenv="$(tools/lab env)"
+          eval "$labenv"
+          # The container runs as root (it installs ssh), so everything it writes into the checkout (.build, build/) is
+          # handed back to the runner's user on exit, pass or fail; root-owned files there broke later steps (EACCES).
           docker run --rm --network host -v "$PWD:$PWD" -w "$PWD/apple" \
             -e RACKOON_LAB -e RACKOON_LAB_HOST -e RACKOON_LAB_PORT -e RACKOON_LAB_USER -e RACKOON_LAB_SUDO_USER \
             -e RACKOON_LAB_SUDO_PASSWORD -e RACKOON_LAB_KEY -e RACKOON_LAB_KNOWN_HOSTS \
-            swift:6.2 bash -c 'apt-get update -qq && apt-get install -y -qq openssh-client >/dev/null &&
+            -e OWNER="$(id -u):$(id -g)" \
+            swift:6.2 bash -c 'trap "chown -R \"\$OWNER\" .build build 2>/dev/null || true" EXIT
+              apt-get update -qq && apt-get install -y -qq openssh-client >/dev/null &&
               swift test --filter LabIntegrationTests --parallel --xunit-output build/junit-lab/swift.xml'
       - uses: astral-sh/setup-uv@v6
       - name: Web (asyncssh) lab checks
         run: |
-          eval "$(tools/lab env)"
+          labenv="$(../../tools/lab env)"
+          eval "$labenv"
           uv sync --locked
           uv run pytest tests/test_lab_integration.py tests/test_api_lab.py tests/test_docker_api_lab.py tests/test_updates_api_lab.py tests/test_w7_api_lab.py --junitxml=build/junit-lab/web.xml
         working-directory: web/backend
