@@ -95,10 +95,14 @@ public final class LogFollower {
         state = next
         let commands = containers.compactMap { c in DockerSession.logsCommand(id: c.id).map { (c, $0) } }
         task = Task { [weak self] in
-            await withTaskGroup(of: Void.self) { group in
-                for (container, command) in commands {
-                    group.addTask { await self?.followOne(container, command: command, generation: gen) }
-                }
+            // One child task per container (on the main actor); cancelling `task` cancels them all, and each sends Ctrl-C.
+            let followers = commands.map { container, command in
+                Task { [weak self] in await self?.followOne(container, command: command, generation: gen) }
+            }
+            await withTaskCancellationHandler {
+                for follower in followers { await follower.value }
+            } onCancel: {
+                for follower in followers { follower.cancel() }
             }
             guard let self, self.generation == gen else { return }
             self.flush(gen)
