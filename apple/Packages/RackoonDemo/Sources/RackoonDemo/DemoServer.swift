@@ -180,8 +180,9 @@ public final class DemoTransport: SSHTransport, @unchecked Sendable {
         if let status = DemoServices.read(command) { return CommandResult(stdout: status) }
         if command == UpdatesSession.command || command.contains("apt-get") && !command.contains("autoremove") { return try await updates.run(command, timeout: timeout) }
         if command.contains("/proc/sys/kernel/random/boot_id") && command.count < 80 { return CommandResult(stdout: "demo-boot-1\n") }
-        if command.hasPrefix("F='") || command.contains("F='") && command.contains("##meta") { return fileRead(command) }
+        // A save also starts with F='...', so it is recognised first; nothing is kept, the editor takes the new text as saved.
         if command.contains("##saved") { return CommandResult(stdout: "##saved\n" + sha(DemoData.env) + "\n") }
+        if command.hasPrefix("F='") || command.contains("F='") && command.contains("##meta") { return fileRead(command) }
         if command.contains("##created") { return CommandResult(stdout: "##created\n") }
         if command.contains("docker compose") && command.contains("config -q") { return CommandResult(stdout: "") }
         if command.contains("docker manifest inspect") { return CommandResult(stdout: "found\n") }

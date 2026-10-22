@@ -26,7 +26,7 @@ public struct PortRow: Sendable, Equatable, Identifiable {
     }
     /// Two rows are equal when their text is; the id only identifies a row on screen.
     public static func == (a: PortRow, b: PortRow) -> Bool { a.host == b.host && a.container == b.container }
-    var isBlank: Bool { host.isEmpty && container.isEmpty }
+    public var isBlank: Bool { host.isEmpty && container.isEmpty }
 
     /// The host field is `port`, or `address:port` to publish on one address only (an IPv4 address or `${VAR}`).
     public var bindAddress: String? { host.contains(":") ? String(host[..<host.lastIndex(of: ":")!]) : nil }
@@ -43,7 +43,7 @@ public struct VolumeRow: Sendable, Equatable, Identifiable {
     }
     /// Two rows are equal when their text is; the id only identifies a row on screen.
     public static func == (a: VolumeRow, b: VolumeRow) -> Bool { a.source == b.source && a.target == b.target }
-    var isBlank: Bool { source.isEmpty && target.isEmpty }
+    public var isBlank: Bool { source.isEmpty && target.isEmpty }
 }
 
 public struct EnvRow: Sendable, Equatable, Identifiable {
@@ -56,7 +56,7 @@ public struct EnvRow: Sendable, Equatable, Identifiable {
     }
     /// Two rows are equal when their text is; the id only identifies a row on screen.
     public static func == (a: EnvRow, b: EnvRow) -> Bool { a.key == b.key && a.value == b.value }
-    var isBlank: Bool { key.isEmpty && value.isEmpty }
+    public var isBlank: Bool { key.isEmpty && value.isEmpty }
 }
 
 /// What the Add container form describes: one service, written as compose YAML (and `.env` lines for its

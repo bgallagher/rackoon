@@ -17,28 +17,44 @@ final class AppModel {
     private(set) var fleet: FleetModel!
     /// Terminal tabs per server; they outlive screens and end on close, removal or an edit of the address.
     let terminals = TerminalStore()
+    /// Docker per server; a model keeps its last action's output while the app runs.
+    let docker = DockerStore()
+    /// App logos and site icons, cached on this device (a temporary folder in demo mode).
+    private(set) var icons: AppIconStore
+    private(set) var favicons: FaviconStore
 
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private let dataDirectory: URL
     @ObservationIgnored private let secrets: any SecretStore
     /// "iPhone" or "iPad", for advice that names this device.
     @ObservationIgnored let deviceName: String
+    /// False in tests: icons are never downloaded.
+    @ObservationIgnored private let network: Bool
     static let demoKey = "demoMode"
 
     /// `dataDirectory` is where servers.json, known_hosts.json, sign-in.json and the snapshots live (Application
     /// Support/Rackoon in the app). Secrets go to `secrets` (the Keychain in the app).
     init(appearance: AppearanceStore, safety: SafetyStore, defaults: UserDefaults = .standard, dataDirectory: URL,
-         secrets: any SecretStore, deviceName: String = "iPhone", demo: Bool? = nil) {
+         secrets: any SecretStore, deviceName: String = "iPhone", demo: Bool? = nil, network: Bool = true) {
         self.appearance = appearance
         self.safety = safety
         self.defaults = defaults
         self.dataDirectory = dataDirectory
         self.secrets = secrets
         self.deviceName = deviceName
+        self.network = network
         let on = demo ?? Self.demoRequested(defaults: defaults)
         isDemo = on
         (servers, trust, signIn) = Self.models(demo: on, dataDirectory: dataDirectory, secrets: secrets)
+        (icons, favicons) = Self.iconStores(demo: on, dataDirectory: dataDirectory, network: network)
         fleet = makeFleet()
+    }
+
+    /// Demo mode keeps its icon choices in a temporary folder, so trying the demo never changes the real ones.
+    private static func iconStores(demo: Bool, dataDirectory: URL, network: Bool) -> (AppIconStore, FaviconStore) {
+        let base = demo ? FileManager.default.temporaryDirectory.appendingPathComponent("rackoon-demo-icons", isDirectory: true) : dataDirectory
+        return (AppIconStore(directory: base.appendingPathComponent("app-icons", isDirectory: true), network: network),
+                FaviconStore(directory: base.appendingPathComponent("favicons", isDirectory: true), network: network))
     }
 
     static func live(deviceName: String) -> AppModel {
@@ -92,8 +108,10 @@ final class AppModel {
         guard on != isDemo else { return }
         fleet.pause()
         terminals.closeEverything()
+        docker.forgetAll()
         isDemo = on
         (servers, trust, signIn) = Self.models(demo: on, dataDirectory: dataDirectory, secrets: secrets)
+        (icons, favicons) = Self.iconStores(demo: on, dataDirectory: dataDirectory, network: network)
         fleet = makeFleet()
     }
 
@@ -124,15 +142,32 @@ final class AppModel {
         return embedded(for: server).map { $0 as any TerminalOpening }
     }
 
-    /// Opens a new terminal tab on a server, or says why it can't.
+    /// Opens a new terminal tab on a server, or says why it can't. With `command`, the tab runs that instead of a login shell
+    /// (a container's shell).
     @discardableResult
-    func openTerminal(on server: Server) -> String? {
+    func openTerminal(on server: Server, command: String? = nil, title: String? = nil) -> String? {
         switch terminalOpener(for: server) {
         case .success(let opener):
-            terminals.newTab(for: server.id, opener: opener, highlight: appearance.highlightOutput)
+            terminals.newTab(for: server.id, opener: opener, command: command, title: title, highlight: appearance.highlightOutput)
             return nil
         case .failure(let reason):
             return reason.message
+        }
+    }
+
+    /// The server's Docker model, or why Docker can't be read yet (the host key, a missing secret). Read-only does not
+    /// block reading; every action checks it.
+    func dockerModel(for server: Server) -> Result<DockerModel, FleetModel.BlockedReason> {
+        if let model = docker.existing(server.id) { return .success(model) }
+        switch trust.state(for: server) {
+        case .trusted, .demo: break
+        default: return .failure(.init(message: "Trust the server's host key on its Overview first."))
+        }
+        switch transport(for: server) {
+        case .success(let transport):
+            return .success(docker.model(for: server) { DockerModel(server: server, transport: transport, safety: safety) })
+        case .failure(let reason):
+            return .failure(reason)
         }
     }
 
@@ -150,12 +185,15 @@ final class AppModel {
             trust.reset(server)
             fleet.reset(id)
             terminals.closeAll(for: id)
+            docker.forget(id)
         }
         return problem
     }
 
     func remove(id: String) {
         terminals.closeAll(for: id)
+        docker.forget(id)
+        icons.forget(serverID: id)
         fleet.forget(id)
         signIn.forget(id)
         servers.remove(id: id)
@@ -186,6 +224,7 @@ final class AppModel {
         }
         fleet.reset(id)
         terminals.closeAll(for: id)
+        docker.forget(id)
     }
 
     enum SignInChoice: Equatable {

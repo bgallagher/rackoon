@@ -22,7 +22,7 @@ final class Sandbox {
 
     func app(demo: Bool = false, systemIsDark: Bool = true) -> AppModel {
         AppModel(appearance: AppearanceStore(themesData: Self.themes, defaults: defaults, systemIsDark: systemIsDark),
-                 safety: SafetyStore(defaults: defaults), defaults: defaults, dataDirectory: directory, secrets: secrets, demo: demo)
+                 safety: SafetyStore(defaults: defaults), defaults: defaults, dataDirectory: directory, secrets: secrets, demo: demo, network: false)
     }
 
     /// The themes.json the app bundles (the Mac's own file, referenced by the project).

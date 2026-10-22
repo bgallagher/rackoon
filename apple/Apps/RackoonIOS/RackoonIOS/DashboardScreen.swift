@@ -2,13 +2,14 @@ import Charts
 import RackoonCore
 import SwiftUI
 
-/// The fleet at a glance, as the Mac's Dashboard health and server pages: totals across every server, then per server a
-/// heartbeat bar and uptime over the last hour, CPU and memory sparklines, the fullest disk and what needs attention.
-/// Every server is read once a minute while this screen shows. (The Mac's Docker, Bookmarks, Services and Alerts pages
-/// come with those features in later stages.)
+/// The fleet at a glance, as the Mac's Dashboard: Health (totals across every server, then per server a heartbeat bar and
+/// uptime over the last hour, CPU and memory sparklines, the fullest disk and what needs attention), Docker (each answering
+/// server's container totals and apps) and Bookmarks. Every server is read once a minute while this screen shows; Docker
+/// is read only while its page or Bookmarks shows. (The Mac's Services and Alerts pages come with those features.)
 struct DashboardScreen: View {
     @Environment(AppModel.self) private var model
     @State private var settings = false
+    @AppStorage("dashboardPage") private var page = DashboardPage.health
 
     var body: some View {
         let t = model.tokens
@@ -20,10 +21,22 @@ struct DashboardScreen: View {
                         ContentUnavailableView("No servers yet", systemImage: "server.rack",
                                                description: Text("Add one under Servers, or turn on Demo Mode in Settings."))
                     } else {
-                        TotalsCard(totals: FleetTotals.of(servers.map { model.fleet.state(for: $0.id) }))
-                        ForEach(servers) { server in
-                            NavigationLink(value: server.id) { HealthCard(server: server) }
-                                .buttonStyle(.plain)
+                        Picker("Page", selection: $page) {
+                            ForEach(DashboardPage.allCases) { Text($0.title).tag($0) }
+                        }
+                        .pickerStyle(.segmented)
+                        .accessibilityIdentifier("dashboardPage")
+                        switch page {
+                        case .health:
+                            TotalsCard(totals: FleetTotals.of(servers.map { model.fleet.state(for: $0.id) }))
+                            ForEach(servers) { server in
+                                NavigationLink(value: server.id) { HealthCard(server: server) }
+                                    .buttonStyle(.plain)
+                            }
+                        case .docker:
+                            DockerPage(servers: servers)
+                        case .bookmarks:
+                            BookmarksPage(servers: servers)
                         }
                     }
                 }

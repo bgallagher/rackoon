@@ -280,4 +280,75 @@ final class LabIntegrationTests: XCTestCase {
         let end = await shell.awaitEnd()
         XCTAssertNotEqual(end, .remoteExit(0))
     }
+
+    // MARK: Docker on iOS (stage I4): the actions, files and shell the Docker screens use, on the lab's own stack.
+
+    /// A whole-stack action streams through this transport's pty (the stack's Output) and reports the command's exit code.
+    /// The lab is throwaway, so a real restart is fine here (never on a user's server).
+    func testAStackRestartStreamsWithItsExitCode() async throws {
+        let lab = try lab()
+        let transport = transport(lab)
+        let stack = try await labStack(transport)
+        let session = DockerSession(transport: transport, policy: ActionPolicy())
+        let events = EventBox()
+        await session.performStreaming(.restart, stack: stack, confirmation: try session.confirm(.restart, stack: stack),
+                                       cols: 100, rows: 30, onEvent: { events.add($0) })
+        XCTAssertEqual(events.exitCode, 0, events.text)
+        XCTAssertTrue(events.text.contains("Restart") || events.text.contains("Started"), events.text)
+        let state = await session.state
+        XCTAssertNil(state.actionError)
+        XCTAssertTrue(state.busyStacks.isEmpty)
+    }
+
+    /// The editor's read and server-side check: the stack's compose file reads back, its own text passes
+    /// `docker compose config`, and a broken edit is refused with a line number. Nothing is written.
+    func testTheStackFileReadsAndIsCheckedOnTheServer() async throws {
+        let lab = try lab()
+        let transport = transport(lab)
+        let stack = try await labStack(transport)
+        let session = StackFileSession(transport: transport, stack: stack)
+        let file = try XCTUnwrap(session.files.first { !$0.isEnv })
+        guard case .file(let remote) = try await session.read(file) else { return XCTFail("the compose file reads") }
+        XCTAssertTrue(remote.content.contains("services:"))
+        let same = try await session.validate(file, content: remote.content)
+        XCTAssertTrue(same.isValid, "\(same.issues)")
+        let broken = try await session.validate(file, content: "services:\n  x:\n    image: [\n")
+        XCTAssertFalse(broken.isValid)
+    }
+
+    /// A container's shell (`docker exec -it`, what the Shell button opens) runs in a terminal tab's pty and exits cleanly.
+    func testAContainerShellRunsInAPty() async throws {
+        let lab = try lab()
+        let transport = transport(lab)
+        let stack = try await labStack(transport)
+        let ticker = try XCTUnwrap(stack.containers.first { $0.isRunning })
+        let shell = try await transport.openShell(cols: 80, rows: 24, command: try XCTUnwrap(DockerSession.shellCommand(id: ticker.id)))
+        await shell.write(Array("echo inside-$((6*7))\n".utf8))
+        var text = ""
+        var iterator = shell.output.makeAsyncIterator()
+        let deadline = Date().addingTimeInterval(15)
+        while !text.contains("inside-42"), Date() < deadline, let bytes = await iterator.next() { text += String(decoding: bytes, as: UTF8.self) }
+        XCTAssertTrue(text.contains("inside-42"), text)
+        await shell.write(Array("exit\n".utf8))
+        while await iterator.next() != nil {}
+        let end = await shell.awaitEnd()
+        XCTAssertEqual(end, .remoteExit(0))
+    }
+}
+
+/// Collects a streamed action's events from any thread.
+private final class EventBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _text = ""
+    private var _code: Int32??
+    func add(_ event: ActionStreamEvent) {
+        lock.withLock {
+            switch event {
+            case .output(let t): _text += t
+            case .finished(let c): _code = .some(c)
+            }
+        }
+    }
+    var text: String { lock.withLock { _text } }
+    var exitCode: Int32? { lock.withLock { _code ?? nil } }
 }

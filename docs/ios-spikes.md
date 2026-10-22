@@ -145,3 +145,27 @@ Not built in I1: an app icon (needs an asset catalog), key sign-in, and anything
   - The lab over SSH with the saved Ed25519 key: login banner, coloured prompt, `top` on the alternate screen (left unhighlighted).
   - Killing the session's sshd on the lab showed "Reconnecting in 1 s (attempt 1 of 5)", then a fresh login under the kept scrollback.
 - **Not built:** renaming tabs; a font-size control or pinch zoom (portrait gives about 49 columns at 13 pt); keepalive (a dead link is noticed when iOS reports it, or on the next write); opening a container shell (I4).
+
+## Stage I4 result: Docker D1 to D7 (22 Oct 2026)
+
+| Feature | iOS | Proven by |
+|---|---|---|
+| `safety.confirm` | done | Core `ActionPolicyTests`, `ActionPromptsTests`; `RackoonIOSTests.DockerModelTests` (every change asks with its exact command, Start runs directly, Read-only refuses) |
+| `docker.overview` | done | Core `DockerParserTests`, `DockerSessionTests`, `DockerPresentationTests`; lab `testDockerParses`; `DockerModelTests` |
+| `docker.container-actions`, `docker.stack-actions`, `docker.rebuild-service`, `docker.standalone` | done | Core `ActionPromptsTests` and the existing action tests; lab `testStreamExitStatus`, `testAStackRestartStreamsWithItsExitCode` (a real streamed `compose restart` on the lab stack, exit 0); `DockerModelTests` |
+| `docker.logs` | done | Core `LogFollowerTests`, `LogViewTests` (ported from Kotlin); lab `testLogsCancelLeavesNothing` |
+| `docker.shell` | done | lab `testAContainerShellRunsInAPty` (`docker exec -it` in a terminal pty, exit 0) |
+| `docker.editor` | done | Core `StackEditorTests` (ported); lab `testTheStackFileReadsAndIsCheckedOnTheServer`; `DockerScreenModelTests` |
+| `docker.delete-stack`, `docker.add-container`, `docker.bookmarks` | done | Core `StackRemovalTests`, `AddContainerDraftTests`, `BookmarkEditorTests` (ported); `DockerModelTests`, `DockerScreenModelTests` |
+| `docker.favicons`, `docker.app-icons` | done | Core `FaviconLinksTests`, `AppIconsTests`, `IconChoicesTests`, `IconFetchQueueTests`; `RackoonIOSTests.IconStoreTests` (choices kept and forgotten, a picked photo redrawn at 256 px and deletable, nothing fetched without the network) |
+| `fleet.dashboard` | done | the Docker and Bookmarks pages; `FleetTests`, `DockerModelTests` |
+| `docker.sudo` | planned | stage I5 |
+
+- **Core first.** The Kotlin core's Docker rules were ported to Swift so iOS shares them with tests: `ActionPrompts` (the Mac's wording; restarts count as destructive, as on the Mac, while Android marks them non-destructive), `DockerPresentation` (`LinkScope`, stack status, summary, `LetterTile`, `ImageName`), `LogFollower`/`LogView`, `StackEditor`, `BookmarkEditor` and `AddContainerDraft` (51 Core tests). They are `@MainActor` classes that publish through `onChange`; the iOS `@Observable` models mirror their state. The Mac keeps its own models and views (one private `bookmarkLinks` copy was replaced by Core's identical one).
+- **App.** `DockerModel` (per server, kept by `DockerStore` in `AppModel`, polled every 10 s only while a Docker screen, a stack page or a Dashboard page is attached; dropped on edit, removal, sign-in change and demo switch). The Docker list (search, health filter, summary, swipe to bookmark), the stack page (Containers / Logs / Files / Output, one Stack Actions menu with a reason when disabled, a container menu with Logs, Shell, Restart…, Stop…/Start, Rebuild…), `ConfirmSheet` (exact command, diff, a red button that Return does not press), the read-only SwiftTerm Output with Cancel/Close, the logs panel (container and level chips with counts, filter, Following/Paused, "Latest · N new", copy), the editor (a TextKit 1 `UITextView`: highlighting from the theme, green/red line bands, auto-indent, a key row), the delete sheet (typed name whenever data is lost), Add Container (form or pasted compose, server checks, files preview), Bookmarks (grouped list, add/edit/remove sheet), app icons with the picker (search both collections, Automatic, letter, your own photo) and site icons, and the Dashboard's Docker and Bookmarks pages. Icons and favicons are fetched from the phone; `Info.plist` allows plain http (as the Mac bundle does) because many bookmarks are `http://`.
+- **Found on the way.**
+  - The shared demo answered a file save as if it were a read (both commands start with `F='`), so Save never worked in demo mode on the Mac either. Fixed in `DemoTransport`, with a test.
+  - Text fields bound to computed values over the draft dropped or misplaced keystrokes while the form re-rendered; the Add Container form now edits plain state that is passed on to the draft.
+  - `SwiftTerm` exports its own `Color`; qualify SwiftUI's in files that import both.
+- **Checked in the simulator (demo mode):** Docker list with icons; immich's stack page; Update through the confirm sheet into a live Output; merged logs; editing compose.yaml with the green band, passing checks and Save and Redeploy; Add Container creating and starting a new stack and opening it on its Output; the Dashboard's Docker and Bookmarks pages with fetched site icons.
+- **Not built / not tried:** sudo for Docker (I5); line numbers and horizontal scrolling in the editor (long lines wrap); the two-way compose editing of the Mac's Add Container (a pasted file replaces the form, as on Android); a tablet two-pane layout. Not tried on a device or against a real server from the phone (only the lab, through the same transport).

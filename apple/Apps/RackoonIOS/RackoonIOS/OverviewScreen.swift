@@ -29,6 +29,7 @@ struct OverviewScreen: View {
                 if let overview = state.overview {
                     HeaderSection(overview: overview, state: state)
                     if !state.attention.isEmpty { AttentionSection(items: state.attention) }
+                    PlacesSection(server: server)
                     UsageSection(overview: overview, state: state)
                     DisksSection(disks: overview.disks)
                     AddressSection(overview: overview)
@@ -64,6 +65,29 @@ struct OverviewScreen: View {
         } else {
             ContentUnavailableView("Server removed", systemImage: "server.rack")
         }
+    }
+}
+
+/// The server's other screens.
+private struct PlacesSection: View {
+    @Environment(AppModel.self) private var model
+    let server: Server
+
+    var body: some View {
+        let t = model.tokens
+        Section {
+            NavigationLink { DockerScreen(serverID: server.id) } label: {
+                Label("Docker", systemImage: "shippingbox")
+            }
+            .accessibilityIdentifier("openDocker")
+            NavigationLink { BookmarksScreen(serverID: server.id) } label: {
+                Label("Bookmarks", systemImage: "bookmark")
+            }
+            NavigationLink { TerminalScreen(serverID: server.id) } label: {
+                Label("Terminal", systemImage: "terminal")
+            }
+        }
+        .listRowBackground(t.card)
     }
 }
 

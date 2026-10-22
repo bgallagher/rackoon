@@ -50,6 +50,18 @@ final class DemoDataTests: XCTestCase {
         }
     }
 
+    func testAStackFileOpensAndSavesThroughTheRealSession() async throws {
+        let transport = DemoFleet.transport(for: homelab)
+        let snapshot = try DockerParser.parse(try await transport.run(DockerSession.command, timeout: 5).stdout)
+        let stack = try XCTUnwrap(snapshot.stacks.first { StackFiles.editable(for: $0) != nil })
+        let session = StackFileSession(transport: transport, stack: stack)
+        let file = try XCTUnwrap(session.files.first)
+        guard case .file(let remote) = try await session.read(file) else { return XCTFail("the compose file reads") }
+        let edit = FileEdit(file: file, original: remote.content, originalSHA: remote.sha256, content: remote.content + "# edited\n")
+        // A save starts with F='...' like a read; it must get a save's answer, not the file again.
+        guard case .saved = try await session.save(edit, confirmation: try session.confirm(edit)) else { return XCTFail("the save confirms") }
+    }
+
     func testUpdatesParse() async throws {
         let result = try await DemoUpdatesTransport().run(UpdatesSession.command, timeout: 5)
         let snapshot = try UpdatesParser.parse(result.stdout)
