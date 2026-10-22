@@ -21,6 +21,11 @@ struct RootView: View {
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("rootTab") private var tab = "dashboard"
 
+    private var unseenAlerts: Int {
+        let known = Set(model.servers.servers.map(\.id))
+        return model.alerts.book.active().filter { known.contains($0.serverID) && !$0.acknowledged }.count
+    }
+
     var body: some View {
         let palette = model.appearance.palette
         TabView(selection: $tab) {
@@ -30,11 +35,27 @@ struct RootView: View {
             ServerListScreen()
                 .tabItem { Label("Servers", systemImage: "server.rack") }
                 .tag("servers")
+            NavigationStack { AlertsScreen(serverID: nil) }
+                .tabItem { Label("Alerts", systemImage: "bell") }
+                .badge(unseenAlerts)
+                .tag("alerts")
+            SearchScreen()
+                .tabItem { Label("Search", systemImage: "magnifyingglass") }
+                .tag("search")
         }
             .tint(Color(palette.accent))
+            // While the app is open every server is read once a minute, so the alerts stay current.
+            .watching(model.servers.servers.map(\.id), fast: false)
+            .onAppear { model.alerts.start() }
             .onChange(of: scenePhase) { _, phase in
-                // Polls stop in the background (iOS suspends the app soon anyway) and resume on return.
-                if phase == .background { model.fleet.pause() } else if phase == .active { model.fleet.resume() }
+                // Polls and alert checks stop in the background (iOS suspends the app soon anyway) and resume on return.
+                if phase == .background {
+                    model.fleet.pause()
+                    model.alerts.stop()
+                } else if phase == .active {
+                    model.fleet.resume()
+                    model.alerts.start()
+                }
             }
             .preferredColorScheme(model.appearance.fixedColorScheme)
             .onAppear { model.appearance.setSystemIsDark(colorScheme == .dark) }

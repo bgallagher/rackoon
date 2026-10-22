@@ -383,6 +383,75 @@ final class LabIntegrationTests: XCTestCase {
         }
         XCTAssertTrue(rejected.value, "the app is told, so it locks Docker again")
     }
+
+    /// The Files screen on a phone: a file and a folder (tar made here, unpacked by the server's GNU tar) go up, come back
+    /// down (the server's tar read here), and new folder, rename and delete work, all in a throwaway folder under /tmp.
+    /// An upload whose length is wrong (cut off) changes nothing.
+    func testFilesGoUpAndComeBackDown() async throws {
+        let lab = try lab()
+        let t = transport(lab)
+        let files = FilesSession(transport: t, transfers: t, policy: ActionPolicy())
+        let made = try await t.run("mktemp -d /tmp/rk-ios-files-XXXXXX", timeout: 30)
+        let remote = made.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertTrue(remote.hasPrefix("/tmp/rk-ios-files-"), made.stderr)
+        defer { Task { _ = try? await t.run("rm -rf -- '\(remote)'", timeout: 30) } }
+        let fm = FileManager.default
+        let local = fm.temporaryDirectory.appendingPathComponent("rk-ios-files-\(UUID().uuidString.prefix(8))", isDirectory: true)
+        defer { try? fm.removeItem(at: local) }
+        let folder = local.appendingPathComponent("site", isDirectory: true)
+        try fm.createDirectory(at: folder.appendingPathComponent("assets/img"), withIntermediateDirectories: true)
+        try Data("<h1>hi</h1>\n".utf8).write(to: folder.appendingPathComponent("index.html"))
+        let blob = Data((0..<300_000).map { UInt8($0 % 253) })
+        try blob.write(to: folder.appendingPathComponent("assets/img/blob.bin"))
+        let long = String(repeating: "l", count: 130) + ".txt"
+        try Data("long\n".utf8).write(to: folder.appendingPathComponent(long))
+        try fm.createSymbolicLink(atPath: folder.appendingPathComponent("current").path, withDestinationPath: "assets")
+        let note = local.appendingPathComponent("note.txt")
+        try Data("first\n".utf8).write(to: note)
+
+        func upload(_ source: LocalSource, as name: String) async throws {
+            let intent = try XCTUnwrap(files.uploadIntent(source, toDirectory: remote, as: name))
+            try await files.upload(source, toDirectory: remote, as: name, confirmation: try files.confirm(intent), progress: { _ in })
+        }
+        try await upload(.file(note, bytes: 6), as: "note.txt")
+        let entries = try TarWriter.entries(of: folder, as: "site")
+        try await upload(.folder(folder, bytes: TarWriter.size(of: entries)), as: "site")
+
+        let check = try await t.run("cd '\(remote)' && cat note.txt && cat site/index.html && wc -c < site/assets/img/blob.bin && cat site/\(long) && readlink site/current", timeout: 30)
+        XCTAssertEqual(check.exitCode, 0, check.stderr)
+        XCTAssertEqual(check.stdout.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) },
+                       ["first", "<h1>hi</h1>", "300000", "long", "assets"])
+
+        // Cut off: one byte short of what the command was told to expect. Nothing changes.
+        try Data("second\n".utf8).write(to: note)
+        do {
+            try await upload(.file(note, bytes: 8), as: "note.txt")
+            XCTFail("a short upload must be refused")
+        } catch {
+            XCTAssertTrue("\(error.localizedDescription)".contains("interrupted"), "\(error)")
+        }
+        let kept = try await t.run("cat '\(remote)/note.txt'; ls -A '\(remote)'", timeout: 30)
+        XCTAssertEqual(kept.stdout, "first\nnote.txt\nsite\n", "the old file stays and no part file is left")
+
+        let back = local.appendingPathComponent("back", isDirectory: true)
+        try fm.createDirectory(at: back, withIntermediateDirectories: true)
+        try await files.download(name: "note.txt", isDirectory: false, from: remote, toLocalDirectory: back, as: "note.txt",
+                                 replacing: false, progress: { _ in })
+        try await files.download(name: "site", isDirectory: true, from: remote, toLocalDirectory: back, as: "site",
+                                 replacing: false, progress: { _ in })
+        XCTAssertEqual(try String(contentsOf: back.appendingPathComponent("note.txt"), encoding: .utf8), "first\n")
+        XCTAssertEqual(try Data(contentsOf: back.appendingPathComponent("site/assets/img/blob.bin")), blob)
+        XCTAssertEqual(try String(contentsOf: back.appendingPathComponent("site/\(long)"), encoding: .utf8), "long\n")
+        XCTAssertEqual(try fm.destinationOfSymbolicLink(atPath: back.appendingPathComponent("site/current").path), "assets")
+
+        for op in [FileOperation.makeFolder(in: remote, name: "new"), .rename(in: remote, from: "note.txt", to: "renamed.txt"),
+                   .delete(in: remote, name: "site", isFolder: true)] {
+            let intent = try XCTUnwrap(files.intent(for: op), "\(op)")
+            try await files.perform(op, confirmation: try files.confirm(intent))
+        }
+        let listing = try await files.list(remote)
+        XCTAssertEqual(listing.entries.map(\.name).sorted(), ["new", "renamed.txt"])
+    }
 }
 
 private final class RejectedFlag: @unchecked Sendable {

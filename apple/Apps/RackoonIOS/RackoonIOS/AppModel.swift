@@ -30,6 +30,14 @@ final class AppModel {
     var reboots: [String: RebootFlow] = [:]
     /// Each server's Updates screen model, kept so an install's output survives leaving the screen.
     @ObservationIgnored private var updatesModels: [String: UpdatesModel] = [:]
+    /// Per server, kept while the app runs so a running command, a scan or a transfer survives leaving its screen.
+    @ObservationIgnored private var commandsModels: [String: CommandsModel] = [:]
+    @ObservationIgnored private var servicesModels: [String: ServicesModel] = [:]
+    @ObservationIgnored private var filesModels: [String: FilesModel] = [:]
+    /// Which services to show (and watch for alerts), saved on this device; a temporary folder in demo mode.
+    private(set) var visibility: ServiceVisibilityStore
+    /// Alerts across every server, kept while the app is open.
+    private(set) var alerts: AlertMonitor!
     @ObservationIgnored private let makeVault: (Bool) -> SudoVault
 
     @ObservationIgnored private let defaults: UserDefaults
@@ -59,7 +67,9 @@ final class AppModel {
         (icons, favicons) = Self.iconStores(demo: on, dataDirectory: dataDirectory, network: network)
         makeVault = vault
         self.vault = vault(on)
+        visibility = Self.visibilityStore(demo: on, dataDirectory: dataDirectory, network: network)
         fleet = makeFleet()
+        alerts = makeAlerts()
         self.vault.load(servers.servers)
         elevation.changed = { [weak self] id in self?.docker.forget(id) }
     }
@@ -69,6 +79,35 @@ final class AppModel {
         let base = demo ? FileManager.default.temporaryDirectory.appendingPathComponent("rackoon-demo-icons", isDirectory: true) : dataDirectory
         return (AppIconStore(directory: base.appendingPathComponent("app-icons", isDirectory: true), network: network),
                 FaviconStore(directory: base.appendingPathComponent("favicons", isDirectory: true), network: network))
+    }
+
+    /// Show/hide choices for services: services/visibility.json, a temporary folder in demo mode, memory only in tests.
+    private static func visibilityStore(demo: Bool, dataDirectory: URL, network: Bool) -> ServiceVisibilityStore {
+        guard network else { return ServiceVisibilityStore(directory: nil) }
+        let base = demo ? FileManager.default.temporaryDirectory.appendingPathComponent("rackoon-demo-services", isDirectory: true)
+                        : dataDirectory.appendingPathComponent("services", isDirectory: true)
+        return ServiceVisibilityStore(directory: base)
+    }
+
+    private func makeAlerts() -> AlertMonitor {
+        // Demo mode and tests keep the book in memory, so trying them never changes the real alerts.
+        let monitor = AlertMonitor(
+            file: isDemo || !network ? nil : dataDirectory.appendingPathComponent("alerts.json"),
+            dependencies: AlertMonitor.Dependencies(
+                rows: { [unowned self] in self.alertRows },
+                services: { [unowned self] server in try? self.servicesModel(for: server).get() },
+                isWatched: { [unowned self] service, id in self.visibility.isVisible(service, server: id) },
+                dockerTransport: { [unowned self] server in
+                    guard case .success(let base) = self.readyTransport(for: server) else { return nil }
+                    return self.elevation.transport(for: server.id, base: base)
+                }))
+        monitor.checksCertificates = !isDemo && network
+        return monitor
+    }
+
+    /// Every saved server as the alerts see it.
+    var alertRows: [AlertRow] {
+        servers.servers.map { AlertRow(server: $0, state: fleet.state(for: $0.id), blocked: fleet.blocked[$0.id]) }
     }
 
     static func live(deviceName: String) -> AppModel {
@@ -121,9 +160,11 @@ final class AppModel {
         defaults.set(on, forKey: Self.demoKey)
         guard on != isDemo else { return }
         fleet.pause()
+        alerts.stop()
         terminals.closeEverything()
         docker.forgetAll()
         updatesModels = [:]
+        forgetToolModels()
         for flow in reboots.values { flow.cancel() }
         reboots = [:]
         for server in servers.servers { elevation.lock(server.id) }
@@ -132,7 +173,26 @@ final class AppModel {
         (icons, favicons) = Self.iconStores(demo: on, dataDirectory: dataDirectory, network: network)
         vault = makeVault(on)
         vault.load(servers.servers)
+        visibility = Self.visibilityStore(demo: on, dataDirectory: dataDirectory, network: network)
         fleet = makeFleet()
+        alerts = makeAlerts()
+        alerts.start()
+    }
+
+    /// Drops the Commands, Services and Files models of one server (or of every server), stopping what they run.
+    private func forgetToolModels(_ id: String? = nil) {
+        for key in Array(servicesModels.keys) where id == nil || key == id {
+            servicesModels[key]?.stop()
+            servicesModels[key] = nil
+        }
+        for key in Array(filesModels.keys) where id == nil || key == id {
+            filesModels[key]?.stop()
+            filesModels[key] = nil
+        }
+        for key in Array(commandsModels.keys) where id == nil || key == id {
+            commandsModels[key]?.cancelEverything()
+            commandsModels[key] = nil
+        }
     }
 
     /// The transport for a server: the demo's, or the embedded SSH client signed in the way the user chose.
@@ -211,6 +271,7 @@ final class AppModel {
             terminals.closeAll(for: id)
             docker.forget(id)
             updatesModels[id] = nil
+            forgetToolModels(id)
             elevation.lock(id)
             vault.forget(id)   // a saved sudo password belongs to the old address
         }
@@ -221,6 +282,9 @@ final class AppModel {
         terminals.closeAll(for: id)
         docker.forget(id)
         updatesModels[id] = nil
+        forgetToolModels(id)
+        visibility.forget(serverID: id)
+        alerts.forget(serverID: id)
         reboots[id]?.cancel()
         reboots[id] = nil
         elevation.lock(id)
@@ -258,6 +322,7 @@ final class AppModel {
         terminals.closeAll(for: id)
         docker.forget(id)
         updatesModels[id] = nil
+        forgetToolModels(id)
     }
 
     /// The server's Updates model (made on first use, kept while the app runs), or why there is none yet.
@@ -275,6 +340,82 @@ final class AppModel {
         case .failure(let reason):
             return .failure(reason)
         }
+    }
+
+    /// The transport for reading a server, once its host key is trusted, or why not yet.
+    func readyTransport(for server: Server) -> Result<SSHTransport, FleetModel.BlockedReason> {
+        switch trust.state(for: server) {
+        case .trusted, .demo: return transport(for: server)
+        default: return .failure(.init(message: "Trust the server's host key on its Overview first."))
+        }
+    }
+
+    /// The server's Commands library (made on first use), or why there is none yet.
+    func commandsModel(for server: Server) -> Result<CommandsModel, FleetModel.BlockedReason> {
+        if let model = commandsModels[server.id] { return .success(model) }
+        return readyTransport(for: server).map { transport in
+            let model = makeRunner(server, transport)
+            commandsModels[server.id] = model
+            return model
+        }
+    }
+
+    /// The server's Services model (made on first use), or why there is none yet. Its actions have their own runner.
+    func servicesModel(for server: Server) -> Result<ServicesModel, FleetModel.BlockedReason> {
+        if let model = servicesModels[server.id] { return .success(model) }
+        return readyTransport(for: server).map { transport in
+            let model = ServicesModel(server: server, transport: transport, runner: makeRunner(server, transport))
+            servicesModels[server.id] = model
+            return model
+        }
+    }
+
+    /// The Services model if one was made, without making one (search).
+    func existingServicesModel(_ id: String) -> ServicesModel? { servicesModels[id] }
+
+    /// The server's Files model (made on first use), or why there is none yet.
+    func filesModel(for server: Server) -> Result<FilesModel, FleetModel.BlockedReason> {
+        if let model = filesModels[server.id] { return .success(model) }
+        let transfers: FileTransferring
+        if isDemo {
+            transfers = DemoFileTransfers()
+        } else {
+            switch trust.state(for: server) {
+            case .trusted: break
+            default: return .failure(.init(message: "Trust the server's host key on its Overview first."))
+            }
+            switch embedded(for: server) {
+            case .success(let embedded): transfers = embedded
+            case .failure(let reason): return .failure(reason)
+            }
+        }
+        return readyTransport(for: server).map { transport in
+            let model = FilesModel(server: server, transport: transport, transfers: transfers, safety: safety,
+                                   downloads: downloadsDirectory(for: server))
+            filesModels[server.id] = model
+            return model
+        }
+    }
+
+    /// Documents/Downloads/<server name>, shown in the Files app under On My iPhone › Rackoon; a temporary folder in demo mode.
+    func downloadsDirectory(for server: Server) -> URL {
+        let base = isDemo ? FileManager.default.temporaryDirectory.appendingPathComponent("rackoon-demo-downloads", isDirectory: true)
+                          : FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("Downloads", isDirectory: true)
+        let name = server.name.map { "/:\\".contains($0) ? "-" : $0 }
+        return base.appendingPathComponent(String(name).isEmpty ? server.id : String(name), isDirectory: true)
+    }
+
+    private func makeRunner(_ server: Server, _ transport: SSHTransport) -> CommandsModel {
+        let id = server.id
+        return CommandsModel(
+            server: server, transport: transport, safety: safety, vault: vault,
+            openTerminal: { [weak self] title, command in
+                guard let self, let server = self.servers.server(id: id) else { return "The server was removed." }
+                return self.openTerminal(on: server, command: command, title: title)
+            },
+            containerNames: { [weak self] in
+                (self?.docker.existing(id)?.stacks ?? []).flatMap { $0.containers.map(\.name) }.sorted()
+            })
     }
 
     enum SignInChoice: Equatable {

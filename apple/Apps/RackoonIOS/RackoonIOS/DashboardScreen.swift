@@ -5,7 +5,8 @@ import SwiftUI
 /// The fleet at a glance, as the Mac's Dashboard: Health (totals across every server, then per server a heartbeat bar and
 /// uptime over the last hour, CPU and memory sparklines, the fullest disk and what needs attention), Docker (each answering
 /// server's container totals and apps) and Bookmarks. Every server is read once a minute while this screen shows; Docker
-/// is read only while its page or Bookmarks shows. (The Mac's Services and Alerts pages come with those features.)
+/// is read only while its page or Bookmarks shows. (The Mac's Services and Alerts pages are, on the phone, each server's
+/// Services screen and the Alerts tab.)
 struct DashboardScreen: View {
     @Environment(AppModel.self) private var model
     @State private var settings = false

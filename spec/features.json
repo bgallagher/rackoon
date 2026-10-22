@@ -388,7 +388,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ServicesTests", "RackoonMacTests.DemoServicesTests", "RackoonMacTests.ServiceVisibilityStoreTests"]},
         "android": {"status": "planned", "reason": "core on feature/android-services-alerts; no screen yet"},
-        "ios": {"status": "planned", "reason": "stage I6"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.ServicesTests", "RackoonCoreTests.ServicesPresentationTests", "RackoonIOSTests.ServicesModelTests"]},
         "web": {"status": "planned", "reason": "stage W7"}
       }
     },
@@ -398,7 +398,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.AlertsTests", "RackoonMacTests.DemoAlertsTests"]},
         "android": {"status": "planned", "reason": "core on feature/android-services-alerts; no screen yet"},
-        "ios": {"status": "planned", "reason": "stage I6 (foreground only)"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.AlertsTests", "RackoonIOSTests.AlertMonitorTests"]},
         "web": {"status": "planned", "reason": "stage W7"}
       }
     },
@@ -418,7 +418,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.SearchTests"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
-        "ios": {"status": "planned", "reason": "stage I6"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.SearchTests", "RackoonIOSTests.SearchIndexTests"]},
         "web": {"status": "planned", "reason": "stage W7"}
       }
     },
@@ -428,7 +428,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.CommandLibraryTests", "RackoonCoreTests.NoServerChangeGuardTests"]},
         "android": {"status": "planned", "reason": "core has CommandLibrary; no screen yet"},
-        "ios": {"status": "planned", "reason": "stage I6"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.CommandLibraryTests", "RackoonCoreTests.NoServerChangeGuardTests", "RackoonCoreTests.ServicesPresentationTests", "RackoonIOSTests.CommandsModelTests"]},
         "web": {"status": "planned", "reason": "stage W7"}
       }
     },
@@ -438,7 +438,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.RemoteFilesTests", "RackoonCoreTests.FileTransferTests", "RackoonCoreTests.FileOperationTests", "RackoonSSHSystemTests.LabIntegrationTests/testStdinExactBytes"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
-        "ios": {"status": "planned", "reason": "stage I6"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.RemoteFilesTests", "RackoonCoreTests.FileOperationTests", "RackoonCoreTests.TarArchiveTests", "RackoonIOSTests.FilesModelTests", "RackoonSSHEmbeddedTests.LabIntegrationTests/testFilesGoUpAndComeBackDown"]},
         "web": {"status": "planned", "reason": "stage W7"}
       }
     },
@@ -448,7 +448,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.UnraidTests", "RackoonCoreTests.UnraidEdgeCaseTests", "RackoonMacTests.NASModelTests"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
-        "ios": {"status": "planned", "reason": "stage I6"},
+        "ios": {"status": "planned", "reason": "after stage I7 (not in I6's scope)"},
         "web": {"status": "planned", "reason": "stage W7"}
       }
     },

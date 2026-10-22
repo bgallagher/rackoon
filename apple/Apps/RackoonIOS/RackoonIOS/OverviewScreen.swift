@@ -100,9 +100,36 @@ private struct PlacesSection: View {
                 }
             }
             .accessibilityIdentifier("openUpdates")
+            NavigationLink { ServicesScreen(serverID: server.id) } label: {
+                Label("Services", systemImage: "gearshape.2")
+            }
+            .accessibilityIdentifier("openServices")
             NavigationLink { BookmarksScreen(serverID: server.id) } label: {
                 Label("Bookmarks", systemImage: "bookmark")
             }
+            NavigationLink { FilesScreen(serverID: server.id) } label: {
+                Label("Files", systemImage: "folder")
+            }
+            .accessibilityIdentifier("openFiles")
+            NavigationLink { CommandsScreen(serverID: server.id) } label: {
+                Label("Commands", systemImage: "command")
+            }
+            .accessibilityIdentifier("openCommands")
+            NavigationLink { AlertsScreen(serverID: server.id) } label: {
+                HStack {
+                    Label("Alerts", systemImage: "bell")
+                    Spacer()
+                    let unseen = model.alerts.book.unseenCount(server: server.id)
+                    if unseen > 0 {
+                        let worst = model.alerts.book.worstUnseen(server: server.id)
+                        Text("\(unseen)").font(.caption.weight(.semibold).monospacedDigit())
+                            .foregroundStyle(worst == .critical ? t.danger : t.warn)
+                            .padding(.horizontal, 7).padding(.vertical, 2)
+                            .background((worst == .critical ? t.danger : t.warn).opacity(0.15), in: Capsule())
+                    }
+                }
+            }
+            .accessibilityIdentifier("openAlerts")
             NavigationLink { TerminalScreen(serverID: server.id) } label: {
                 Label("Terminal", systemImage: "terminal")
             }

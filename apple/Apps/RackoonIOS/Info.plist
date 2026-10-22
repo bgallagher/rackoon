@@ -9,5 +9,11 @@
 		<key>NSAllowsArbitraryLoads</key>
 		<true/>
 	</dict>
+	<!-- Downloads from the Files screen land in Documents/Downloads, which these two keys show in the Files app under
+	     On My iPhone › Rackoon, so they can be opened and shared like any other file. -->
+	<key>UIFileSharingEnabled</key>
+	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 </dict>
 </plist>

@@ -56,22 +56,25 @@ public final class EmbeddedSSHTransport: SSHTransport, TerminalOpening {
     }
 
     private func execute(_ command: String, input: Data?, timeout: TimeInterval) async throws -> CommandResult {
+        let (channel, events) = try await openSessionChannel()
+        return try await collect(channel, command: command, input: input, events: events, timeout: timeout)
+    }
+
+    /// A session channel on the shared connection. If the connection died under us (the network changed, the server
+    /// rebooted), nothing was sent yet, so it reconnects once and tries again. A command that already started is never re-run.
+    func openSessionChannel() async throws -> (Channel, AsyncStream<SessionEvent>) {
         var retried = false
         while true {
             let connection = try await connection()
             let (events, continuation) = AsyncStream.makeStream(of: SessionEvent.self)
-            let channel: Channel
             do {
-                channel = try await connection.openSession { SessionHandler(continuation) }
+                let channel = try await connection.openSession { SessionHandler(continuation) }
+                return (channel, events)
             } catch {
-                // The connection died under us (the network changed, the server rebooted): nothing was sent yet, so
-                // reconnect once and try again. A command that already started is never re-run.
                 await shared.invalidate(connection)
                 if retried { throw mapError(error, connecting: false) }
                 retried = true
-                continue
             }
-            return try await collect(channel, command: command, input: input, events: events, timeout: timeout)
         }
     }
 
