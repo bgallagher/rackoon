@@ -36,8 +36,9 @@ public enum OutputHighlighter {
         var found: [HighlightSpan] = []
 
         func add(_ re: NSRegularExpression, group: Int = 0, _ kind: (NSTextCheckingResult) -> HighlightKind?) {
-            re.enumerateMatches(in: text, range: full) { m, _, _ in
-                guard let m, let k = kind(m), let r = Range(m.range(at: group), in: text) else { return }
+            // `matches` rather than `enumerateMatches`: on Linux Foundation the latter takes an escaping closure.
+            for m in re.matches(in: text, range: full) {
+                guard let k = kind(m), let r = Range(m.range(at: group), in: text) else { continue }
                 found.append(HighlightSpan(start: text.utf8.distance(from: text.utf8.startIndex, to: r.lowerBound),
                                            end: text.utf8.distance(from: text.utf8.startIndex, to: r.upperBound), kind: k))
             }

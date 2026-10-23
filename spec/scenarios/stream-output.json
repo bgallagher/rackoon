@@ -1,0 +1,14 @@
+{
+  "feature": "docker.stack-actions",
+  "subject": "stream_output",
+  "about": "StreamOutputParser over the chunks of a streamed command wrapped by stream_wrap: the marker line '##rackoon-exit:<n>' is removed (also when split across chunks) and gives the exit code. No marker means cancelled or dropped: exit code null, never success. 'text' is everything shown, all pushes plus finish() joined.",
+  "cases": [
+    {"name": "marker gives the exit code", "chunks": ["Pulling web\n", "done\n##rackoon-exit:0\n"], "text": "Pulling web\ndone\n", "exitCode": 0},
+    {"name": "failure code", "chunks": ["error: no such service\n##rackoon-exit:1\n"], "text": "error: no such service\n", "exitCode": 1},
+    {"name": "marker split across chunks", "chunks": ["ok\n##rack", "oon-ex", "it:17\n"], "text": "ok\n", "exitCode": 17},
+    {"name": "pty line endings", "chunks": ["line\r\n##rackoon-exit:0\r\n"], "text": "line\r\n", "exitCode": 0},
+    {"name": "no marker is not success", "chunks": ["Pulling web\n", "partial"], "text": "Pulling web\npartial", "exitCode": null},
+    {"name": "a held-back marker prefix that never completes is shown", "chunks": ["text ##rack"], "text": "text ##rack", "exitCode": null},
+    {"name": "progress redraws pass through", "chunks": ["\u001b[2K\r 50%", "\u001b[2K\r100%\n##rackoon-exit:0\n"], "text": "\u001b[2K\r 50%\u001b[2K\r100%\n", "exitCode": 0}
+  ]
+}

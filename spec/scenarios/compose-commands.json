@@ -1,0 +1,25 @@
+{
+  "feature": "docker.stack-actions",
+  "subject": "compose_command",
+  "about": "ComposeAction.command(for: stack, service:) from a stack's compose labels: the exact command, or null when anything is unsafe or missing (then nothing is sent). 'stack.services' become one container each. Only rebuild accepts a service, which must exist in the stack.",
+  "cases": [
+    {"name": "pull", "action": "pull", "stack": {"name": "media", "workingDir": "/srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web"]}, "expect": "cd '/srv/media' && docker compose -p media -f '/srv/media/compose.yaml' pull"},
+    {"name": "up", "action": "up", "stack": {"name": "media", "workingDir": "/srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web"]}, "expect": "cd '/srv/media' && docker compose -p media -f '/srv/media/compose.yaml' up -d"},
+    {"name": "restart", "action": "restart", "stack": {"name": "media", "workingDir": "/srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web"]}, "expect": "cd '/srv/media' && docker compose -p media -f '/srv/media/compose.yaml' restart"},
+    {"name": "rebuild", "action": "rebuild", "stack": {"name": "media", "workingDir": "/srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web"]}, "expect": "cd '/srv/media' && docker compose -p media -f '/srv/media/compose.yaml' up -d --build"},
+    {"name": "recreate", "action": "recreate", "stack": {"name": "media", "workingDir": "/srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web"]}, "expect": "cd '/srv/media' && docker compose -p media -f '/srv/media/compose.yaml' up -d --force-recreate"},
+    {"name": "every compose file in order", "action": "up", "stack": {"name": "app", "workingDir": "/opt/app", "configFiles": ["/opt/app/compose.yaml", "/opt/app/compose.override.yaml"], "services": ["web"]}, "expect": "cd '/opt/app' && docker compose -p app -f '/opt/app/compose.yaml' -f '/opt/app/compose.override.yaml' up -d"},
+    {"name": "paths with spaces and quotes", "action": "pull", "stack": {"name": "bobs-app", "workingDir": "/srv/bob's app", "configFiles": ["/srv/bob's app/compose.yaml"], "services": ["web"]}, "expect": "cd '/srv/bob'\\''s app' && docker compose -p bobs-app -f '/srv/bob'\\''s app/compose.yaml' pull"},
+    {"name": "rebuild one service", "action": "rebuild", "service": "web", "stack": {"name": "media", "workingDir": "/srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web", "db"]}, "expect": "cd '/srv/media' && docker compose -p media -f '/srv/media/compose.yaml' up -d --build --no-deps web"},
+    {"name": "only rebuild takes a service", "action": "restart", "service": "web", "stack": {"name": "media", "workingDir": "/srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web"]}, "expect": null},
+    {"name": "service must be in the stack", "action": "rebuild", "service": "cache", "stack": {"name": "media", "workingDir": "/srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web"]}, "expect": null},
+    {"name": "unsafe service name", "action": "rebuild", "service": "web; reboot", "stack": {"name": "media", "workingDir": "/srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web; reboot"]}, "expect": null},
+    {"name": "unsafe project name", "action": "up", "stack": {"name": "Media;reboot", "workingDir": "/srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web"]}, "expect": null},
+    {"name": "project name may not start with a dash", "action": "up", "stack": {"name": "-p", "workingDir": "/srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web"]}, "expect": null},
+    {"name": "relative working dir", "action": "up", "stack": {"name": "media", "workingDir": "srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web"]}, "expect": null},
+    {"name": "relative compose file", "action": "up", "stack": {"name": "media", "workingDir": "/srv/media", "configFiles": ["compose.yaml"], "services": ["web"]}, "expect": null},
+    {"name": "no working dir", "action": "up", "stack": {"name": "media", "workingDir": null, "configFiles": ["/srv/media/compose.yaml"], "services": ["web"]}, "expect": null},
+    {"name": "no compose files", "action": "up", "stack": {"name": "media", "workingDir": "/srv/media", "configFiles": [], "services": ["web"]}, "expect": null},
+    {"name": "standalone container has no compose command", "action": "up", "stack": {"name": "media", "workingDir": "/srv/media", "configFiles": ["/srv/media/compose.yaml"], "services": ["web"], "standalone": true}, "expect": null}
+  ]
+}

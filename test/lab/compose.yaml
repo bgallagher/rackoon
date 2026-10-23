@@ -1,0 +1,27 @@
+# Integration lab (docs/parity.md): a disposable Ubuntu server that every platform's SSH transport is tested against,
+# with Docker provided by a dind sidecar. Started and stopped by tools/lab; never reachable from outside this machine.
+name: rackoon-lab
+services:
+  dind:
+    image: docker:27-dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""   # plain TCP on the lab's private network only
+    command: ["--host=tcp://0.0.0.0:2375"]
+    healthcheck:
+      test: ["CMD", "docker", "-H", "tcp://127.0.0.1:2375", "info"]
+      interval: 2s
+      retries: 60
+  target:
+    build: target
+    depends_on:
+      dind:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:${RACKOON_LAB_PORT:-2222}:22"
+    volumes:
+      - ./.state/id_ed25519.pub:/lab/authorized_key:ro
+    healthcheck:
+      test: ["CMD", "test", "-f", "/run/rackoon-lab/ready"]
+      interval: 2s
+      retries: 90

@@ -12,7 +12,9 @@ Run from the repo root unless noted. In interactive zsh, don't paste commands wi
 
 ```
 python3 tools/test-pty-relay [--ssh <host>]  # end-to-end tests of the output-highlighting relay under a real pty (build first)
-python3 tools/check-spec                  # validate spec/ (JSON parses, every command has fixtures + expected output)
+python3 tools/check-spec                  # validate spec/ (JSON parses, every command has fixtures + expected output, the parity matrix, scenarios, lab checks)
+tools/check-parity --summary mac=<junit dir> android=<junit dir>   # every test spec/features.json names for a done feature ran and passed
+tools/lab up                              # start the integration lab (test/lab: throwaway Ubuntu + dind); then eval "$(tools/lab env)"; tools/lab down
 cd apple && swift build --product RackoonMac
 tools/make-app [version]                  # builds build/Rackoon.app (ad-hoc signed, not notarized; bundle id com.bgallagher.rackoon)
 tools/make-app --dev [version]            # builds build/"Rackoon Dev.app" (bundle id com.bgallagher.rackoon.dev, caution-tape icon)
@@ -21,6 +23,8 @@ cd apple && swift run RackoonMac         # launches the Mac app window (Ctrl+C t
 cd apple && swift test                    # needs full Xcode with its licence accepted (XCTest)
 cd apple && swift test --filter ModelsTests/testServerRoundTripsThroughJSON   # single test
 cd apple && swift test --filter RackoonMacTests  # the Mac app's own tests (icon store files and uploads, NAS model; AppKit, no network)
+cd apple && swift test --filter LabIntegrationTests   # OpenSSHTransport against the lab (skipped unless tools/lab env is loaded)
+cd apple && swift test --parallel --skip LabIntegrationTests --xunit-output build/junit/swift.xml   # JUnit for check-parity (xUnit only with --parallel; it reports a skip as a pass, hence --skip)
 ```
 
 ```
@@ -36,11 +40,13 @@ cd apple && swift run rackoon-probe <host> file-test     # REAL read/validate/sa
 cd apple && swift run rackoon-probe <host> hostkey     # unknown -> trust -> tampered flow, using a throwaway known_hosts
 ```
 
-No linter or formatter is configured yet (`swift-format` is not installed). CI is `.github/workflows/ci.yml` (check-spec on Linux; `swift test`, build and `tools/make-app` on `macos-26`, because SwiftTerm 1.99 needs Swift 6.2+ and on an older runner SwiftPM silently fell back to SwiftTerm 1.20.0). Every push uploads `Rackoon-<version>-macos-arm64.zip` plus a `.sha256` as the `Rackoon-macOS-arm64` workflow artifact (14 days); pushing a `mac-v*` tag (e.g. `mac-v0.1.0-alpha.2`) also publishes them as the GitHub Release "Rackoon for Mac <version>" (a version with a suffix is a pre-release; Apple silicon, ad-hoc signed, not notarized, so first launch needs right-click Open). Each platform has its own tag prefix and release (`mac-v*`, `android-v*`) so a release page is about one platform; the first release, `v0.1.0-alpha.1`, predates this and is the Mac one. Notarizing needs a Developer ID certificate and secrets, which are not set up.
+No linter or formatter is configured yet (`swift-format` is not installed). CI is `.github/workflows/ci.yml` (check-spec on Linux; the `lab` job runs every transport's `LabIntegrationTests` against the integration lab on Linux, the Mac's OpenSSHTransport inside the `swift:6.2` image; the `parity` job runs `tools/check-parity` over every job's JUnit reports; `swift test`, build and `tools/make-app` on `macos-26`, because SwiftTerm 1.99 needs Swift 6.2+ and on an older runner SwiftPM silently fell back to SwiftTerm 1.20.0). Every push uploads `Rackoon-<version>-macos-arm64.zip` plus a `.sha256` as the `Rackoon-macOS-arm64` workflow artifact (14 days); pushing a `mac-v*` tag (e.g. `mac-v0.1.0-alpha.2`) also publishes them as the GitHub Release "Rackoon for Mac <version>" (a version with a suffix is a pre-release; Apple silicon, ad-hoc signed, not notarized, so first launch needs right-click Open). Each platform has its own tag prefix and release (`mac-v*`, `android-v*`) so a release page is about one platform; the first release, `v0.1.0-alpha.1`, predates this and is the Mac one. Notarizing needs a Developer ID certificate and secrets, which are not set up.
 
 Xcode is installed on the dev machine. There is no `.xcodeproj` yet. The Mac app is a SwiftPM executable target, which needs the `AppDelegate` activation-policy workaround in `RackoonApp.swift` to show a window under `swift run`. A real Xcode project is needed before signing and notarizing.
 
 ## Architecture
+
+**Parity across platforms (docs/parity.md; read it before changing a feature).** Four platforms: mac, android, ios (planned) and web (the planned self-hosted Docker image, with its own Python core). `spec/features.json` lists every feature for every platform as done (naming the JUnit tests that prove it), planned or na (with a reason); every spec command belongs to one feature. Shared rules are data in `spec/scenarios/*.json`, run by each core's `SharedScenarioTests` while the feature is done on that platform; transports are checked against the integration lab (`test/lab`, `tools/lab`, `spec/integration/checks.json`, `LabIntegrationTests` on each platform, same feature gating). Definition of done for any change: spec first, every core with the feature passes, `features.json` updated for all four platforms, `check-spec` and the `parity` CI job pass. `apple/Package.swift` builds only `RackoonCore`, `RackoonSSHSystem` and their tests on Linux (the Mac targets are `#if os(macOS)`), and the Secure Enclave secret store is compiled only on Apple platforms; keep Core and SSHSystem building on Linux (e.g. `enumerateMatches` takes an escaping closure there, and long `+` chains of arrays time out the type checker).
 
 **Two native cores kept in parity by a shared spec.** The server logic (shell commands, text parsers, attention rules) is small. It is implemented twice: Swift in `apple/` and, in Phase 4, Kotlin in `android/`. `spec/` is the language-neutral source of truth, so edit `spec/` first and make platform code follow:
 - `spec/commands.json`: every shell command we run on a server (id, script, timeout, distros).

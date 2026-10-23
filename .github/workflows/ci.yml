@@ -32,6 +32,15 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
       - run: ./gradlew :core:test :ssh:test :app:assembleDebug
         working-directory: android
+      - uses: actions/upload-artifact@v4
+        if: always()   # the parity job reports failing tests too
+        with:
+          name: junit-android
+          path: |
+            android/core/build/test-results/test/*.xml
+            android/ssh/build/test-results/test/*.xml
+          retention-days: 7
+          if-no-files-found: error
   swift-macos:
     # SwiftTerm 1.99 needs Swift 6.2+. On an older toolchain SwiftPM silently picked SwiftTerm 1.20.0, which lacks the
     # APIs the app uses, so CI failed on every push. macos-26 ships Xcode 26 (Swift 6.2+).
@@ -41,8 +50,17 @@ jobs:
         with:
           fetch-depth: 0   # the app's build number is the commit count
       - run: swift --version
-      - run: swift test
+      # SwiftPM writes XCTest's xUnit only in parallel mode, and reports a skipped XCTest as passed: the lab tests are left
+      # out here so that only the lab job's report can count them (check-parity would otherwise accept a skip).
+      - run: swift test --parallel --skip LabIntegrationTests --xunit-output build/junit/swift.xml
         working-directory: apple
+      - uses: actions/upload-artifact@v4
+        if: always()   # the parity job reports failing tests too
+        with:
+          name: junit-mac
+          path: apple/build/junit/*.xml
+          retention-days: 7
+          if-no-files-found: error
       - run: swift build --product RackoonMac
         working-directory: apple
       - name: Build the app bundle
@@ -71,6 +89,76 @@ jobs:
             build/Rackoon-*-macos-arm64.zip.sha256
           retention-days: 14
           if-no-files-found: error
+
+  # Integration lab (test/lab, docs/parity.md): a throwaway Ubuntu server with Docker in containers on this runner, and
+  # every transport's LabIntegrationTests against it. macOS runners have no Docker, so the Mac's OpenSSHTransport runs
+  # here on Linux (same code, built in the swift:6.2 image with the repo mounted at the same path).
+  lab:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+      - run: tools/lab up
+      - name: Android (sshj) lab checks
+        run: |
+          # An assignment fails the step if `tools/lab env` fails; a bare eval "$(...)" would carry on with no lab
+          # settings and every check would quietly skip itself.
+          labenv="$(../tools/lab env)"
+          eval "$labenv"
+          ./gradlew :ssh:test --tests 'com.bgallagher.rackoon.ssh.LabIntegrationTests'
+        working-directory: android
+      - name: Mac (OpenSSHTransport, on Linux) lab checks
+        run: |
+          labenv="$(tools/lab env)"
+          eval "$labenv"
+          # The container runs as root (it installs ssh), so everything it writes into the checkout (.build, build/) is
+          # handed back to the runner's user on exit, pass or fail; root-owned files there broke later steps (EACCES).
+          docker run --rm --network host -v "$PWD:$PWD" -w "$PWD/apple" \
+            -e RACKOON_LAB -e RACKOON_LAB_HOST -e RACKOON_LAB_PORT -e RACKOON_LAB_USER -e RACKOON_LAB_SUDO_USER \
+            -e RACKOON_LAB_SUDO_PASSWORD -e RACKOON_LAB_KEY -e RACKOON_LAB_KNOWN_HOSTS \
+            -e OWNER="$(id -u):$(id -g)" \
+            swift:6.2 bash -c 'trap "chown -R \"\$OWNER\" .build build 2>/dev/null || true" EXIT
+              apt-get update -qq && apt-get install -y -qq openssh-client >/dev/null &&
+              swift test --filter LabIntegrationTests --parallel --xunit-output build/junit-lab/swift.xml'
+      - if: always()
+        run: tools/lab down
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-android-lab
+          path: android/ssh/build/test-results/test/TEST-com.bgallagher.rackoon.ssh.LabIntegrationTests.xml
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-mac-lab
+          path: apple/build/junit-lab/*.xml
+          retention-days: 7
+          if-no-files-found: error
+
+  # Feature parity (docs/parity.md): every test spec/features.json names for a done feature must have run and passed in
+  # that platform's JUnit report. Runs even when a test job failed, so the summary names what broke parity.
+  parity:
+    needs: [spec, swift-macos, android-core, lab]
+    if: always() && needs.spec.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: junit-*
+          path: junit
+      - run: |
+          tools/check-parity --summary --require mac,android \
+            mac=junit/junit-mac,junit/junit-mac-lab android=junit/junit-android,junit/junit-android-lab | tee parity.txt
+          status=${PIPESTATUS[0]}
+          { echo '## Feature parity'; echo; cat parity.txt; } >> "$GITHUB_STEP_SUMMARY"
+          exit $status
 
   # A mac-v* tag publishes the build from this same run as the Mac release. Each platform has its own tag prefix (mac-v*, and
   # android-v* when that app ships), so a release page is about exactly one platform.

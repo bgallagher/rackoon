@@ -1,0 +1,15 @@
+{
+  "about": "Checks every platform's real SSH transport and core run against the integration lab (test/lab, started by tools/lab up; docs/parity.md). Like the scenarios, a check runs on a platform only while its feature is done there, and every such check must have a runner on that platform. The lab is disposable: checks may change it, never anything else.",
+  "lab": {"user": "rk", "sudoUser": "rkpw", "stack": "labstack", "service": "ticker", "tailscaleIP": "100.101.102.103",
+          "pending": ["rackoon-lab-secure", "rackoon-lab-tool"], "security": ["rackoon-lab-secure"]},
+  "checks": [
+    {"id": "overview_parses", "feature": "overview", "about": "The overview script runs as rk and parses: a hostname, at least one disk, non-zero CPU counters, reboot required, the stub Tailscale IP."},
+    {"id": "updates_parse", "feature": "updates.list", "about": "The updates script reports exactly the lab's two pending packages, one of them security, and the reboot flag."},
+    {"id": "docker_parses", "feature": "docker.overview", "about": "The docker script finds labstack with its ticker container running, and the stack's labels resolve to a compose command."},
+    {"id": "stream_exit_status", "feature": "docker.stack-actions", "about": "A command wrapped by stream_wrap and streamed over a pty ends with its real exit status (3) and its output."},
+    {"id": "logs_cancel_leaves_nothing", "feature": "docker.logs", "about": "Following the ticker's logs yields a line; after cancelling, no `docker logs` process is left on the server."},
+    {"id": "hostkey_mismatch_blocked", "feature": "connect.hostkey", "about": "With a different key recorded for the lab, the connection is refused and nothing runs."},
+    {"id": "stdin_exact_bytes", "feature": "files", "about": "1 MiB written to a remote command's standard input arrives byte for byte (wc -c)."},
+    {"id": "sudo_password_checked", "feature": "sudo.password", "about": "As rkpw, a wrong sudo password is classified as a bad password and the right one runs as root (id -u = 0), the password travelling only on stdin."}
+  ]
+}

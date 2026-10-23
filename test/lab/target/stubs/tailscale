@@ -1,0 +1,4 @@
+#!/bin/sh
+# Lab stand-in for the Tailscale CLI: a fixed tailnet address.
+[ "${1:-}" = ip ] && { echo 100.101.102.103; exit 0; }
+exit 1

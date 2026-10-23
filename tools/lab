@@ -1,0 +1,68 @@
+#!/usr/bin/env bash
+# The integration lab (test/lab, docs/parity.md): a throwaway Ubuntu server in Docker that every platform's SSH
+# transport runs the same checks against. Nothing here touches ~/.ssh or a real server.
+#
+#   tools/lab up      build and start it, wait until ssh and the lab stack answer, write test/lab/.state/env
+#   tools/lab env     print the environment the lab tests read (source it: `eval "$(tools/lab env)"`)
+#   tools/lab ssh     open a shell on the lab as rk (handy when a check fails)
+#   tools/lab down    stop it and delete its containers and volumes
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+lab="$root/test/lab"
+state="$lab/.state"
+port="${RACKOON_LAB_PORT:-2222}"
+compose=(docker compose -f "$lab/compose.yaml")
+
+write_env() {
+  # shellcheck disable=SC1091
+  source "$lab/lab.env"
+  cat > "$state/env" <<EOF
+export RACKOON_LAB=1
+export RACKOON_LAB_HOST=127.0.0.1
+export RACKOON_LAB_PORT=$port
+export RACKOON_LAB_USER=$RACKOON_LAB_USER
+export RACKOON_LAB_SUDO_USER=$RACKOON_LAB_SUDO_USER
+export RACKOON_LAB_SUDO_PASSWORD=$RACKOON_LAB_SUDO_PASSWORD
+export RACKOON_LAB_KEY=$state/id_ed25519
+export RACKOON_LAB_KNOWN_HOSTS=$state/known_hosts
+EOF
+}
+
+lab_ssh() {
+  ssh -p "$port" -i "$state/id_ed25519" -o IdentitiesOnly=yes -o BatchMode=yes \
+      -o UserKnownHostsFile="$state/known_hosts" -o StrictHostKeyChecking=yes rk@127.0.0.1 "$@"
+}
+
+case "${1:-}" in
+  up)
+    mkdir -p "$state"
+    [ -f "$state/id_ed25519" ] || ssh-keygen -q -t ed25519 -N '' -C rackoon-lab -f "$state/id_ed25519"
+    RACKOON_LAB_PORT="$port" "${compose[@]}" up -d --build --wait
+    # The host key is new on every build: scan it fresh, and only from the lab's own loopback port.
+    ssh-keyscan -p "$port" -t ed25519 127.0.0.1 2>/dev/null > "$state/known_hosts"
+    [ -s "$state/known_hosts" ] || { echo "lab: ssh-keyscan found no host key on port $port" >&2; exit 1; }
+    for _ in $(seq 1 30); do
+      lab_ssh 'docker ps --format "{{.Names}}"' 2>/dev/null | grep -q labstack-ticker && break
+      sleep 1
+    done
+    lab_ssh 'docker ps --format "{{.Names}}"' | grep -q labstack-ticker || { echo "lab: labstack is not running" >&2; exit 1; }
+    write_env
+    echo "lab is up on 127.0.0.1:$port (eval \"\$(tools/lab env)\" to use it)"
+    ;;
+  env)
+    [ -f "$state/env" ] || { echo "lab: not up (tools/lab up)" >&2; exit 1; }
+    cat "$state/env"
+    ;;
+  ssh)
+    shift
+    lab_ssh "$@"
+    ;;
+  down)
+    "${compose[@]}" down -v --remove-orphans
+    rm -f "$state/known_hosts" "$state/env"
+    ;;
+  *)
+    sed -n '2,9p' "$0" | sed 's/^# \{0,1\}//'
+    exit 2
+    ;;
+esac

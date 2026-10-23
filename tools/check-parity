@@ -1,0 +1,164 @@
+#!/usr/bin/env python3
+"""Check spec/features.json against real test results.
+
+Every test named by a platform's done entry must appear in that platform's JUnit report(s) and must have passed:
+a `Class` reference needs at least one test case of that class and no failing one; `Class/method` needs that test case.
+
+    tools/check-parity mac=apple/.build/junit android=android/core/build/test-results/test,android/ssh/build/test-results/test
+    tools/check-parity --summary ...        # also print the matrix as Markdown (CI writes it to the job summary)
+    tools/check-parity --require mac,android ...   # fail if a listed platform has no report
+
+Each argument is platform=path[,path...]; a path is a JUnit XML file or a folder searched recursively for *.xml.
+Platforms without a report are skipped (and reported), unless --require names them.
+"""
+import json
+import sys
+import xml.etree.ElementTree as ET
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+MARK = {"done": "✅", "planned": "🕓", "na": "—"}
+
+
+PASS, SKIP, FAIL = "pass", "skip", "fail"
+
+
+def merge(old, new):
+    """One test seen in several reports (the lab tests skip in the main job and run in the lab job): any failure wins,
+    then any pass; skipped everywhere stays skipped."""
+    for outcome in (FAIL, PASS):
+        if outcome in (old, new):
+            return outcome
+    return SKIP
+
+
+def load_reports(paths):
+    """{classname: {method: outcome}} from every JUnit file under paths."""
+    results = {}
+    files = []
+    for p in paths:
+        p = Path(p)
+        if p.is_dir():
+            files += sorted(p.rglob("*.xml"))
+        elif p.is_file():
+            files.append(p)
+        else:
+            raise SystemExit(f"check-parity: no such report: {p}")
+    for f in files:
+        try:
+            root = ET.parse(f).getroot()
+        except ET.ParseError as e:
+            raise SystemExit(f"check-parity: {f}: {e}")
+        for case in root.iter("testcase"):
+            cls = case.get("classname", "")
+            name = case.get("name", "").removesuffix("()")
+            if any(case.find(tag) is not None for tag in ("failure", "error")):
+                outcome = FAIL
+            elif case.find("skipped") is not None:
+                outcome = SKIP   # proves nothing, so it does not count as passing
+            else:
+                outcome = PASS
+            cases = results.setdefault(cls, {})
+            cases[name] = merge(cases[name], outcome) if name in cases else outcome
+    return results, len(files)
+
+
+def check(ref, results):
+    cls, _, method = ref.partition("/")
+    cases = results.get(cls)
+    if not cases:
+        return "did not run"
+    if method:
+        method = method.removesuffix("()")
+        if method not in cases:
+            return "did not run"
+        return {PASS: None, SKIP: "skipped (did the lab job run?)", FAIL: "failed"}[cases[method]]
+    failing = [m for m, outcome in cases.items() if outcome == FAIL]
+    if failing:
+        return f"{len(failing)} failing: {', '.join(failing[:3])}"
+    if all(outcome == SKIP for outcome in cases.values()):
+        return "every test skipped (did the lab job run?)"
+    return None
+
+
+def main(argv):
+    summary = "--summary" in argv
+    require = []
+    reports = {}
+    args = [a for a in argv if a != "--summary"]
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a == "--require":
+            require = args[i + 1].split(",")
+            i += 2
+            continue
+        platform, sep, paths = a.partition("=")
+        if not sep:
+            raise SystemExit(__doc__)
+        reports[platform] = paths.split(",")
+        i += 1
+
+    doc = json.loads((ROOT / "spec" / "features.json").read_text())
+    platforms = doc["platforms"]
+    errors = []
+    for p in list(reports) + require:
+        if p not in platforms:
+            errors.append(f"unknown platform {p!r}")
+    for p in require:
+        if p not in reports:
+            errors.append(f"{p}: no JUnit report given, but --require names it")
+
+    checked = {}
+    for p, paths in reports.items():
+        if p not in platforms:
+            continue
+        results, nfiles = load_reports(paths)
+        if not results:
+            errors.append(f"{p}: the report(s) hold no test cases ({nfiles} file(s))")
+            continue
+        n = 0
+        for f in doc["features"]:
+            e = f["platforms"][p]
+            if e["status"] != "done":
+                continue
+            for ref in e.get("tests", []):
+                n += 1
+                problem = check(ref, results)
+                if problem:
+                    errors.append(f"{f['id']}/{p}: {ref}: {problem}")
+        checked[p] = n
+
+    for p in platforms:
+        if p in checked:
+            print(f"{p}: {checked[p]} test reference(s) checked")
+        elif p not in reports:
+            print(f"{p}: no report, skipped")
+
+    if summary:
+        print()
+        print("| Feature | " + " | ".join(platforms) + " |")
+        print("|---|" + "---|" * len(platforms))
+        for f in doc["features"]:
+            cells = []
+            for p in platforms:
+                e = f["platforms"][p]
+                cell = MARK[e["status"]]
+                if e["status"] == "done" and e.get("untested"):
+                    cell += " (untested)"
+                cells.append(cell)
+            print(f"| {f['title']} (`{f['id']}`) | " + " | ".join(cells) + " |")
+        totals = {p: sum(f["platforms"][p]["status"] == "done" for f in doc["features"]) for p in platforms}
+        print()
+        print("Done: " + ", ".join(f"{p} {totals[p]}/{len(doc['features'])}" for p in platforms))
+
+    if errors:
+        print()
+        print("\n".join(errors))
+        return 1
+    print("parity ok")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

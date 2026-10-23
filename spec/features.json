@@ -1,0 +1,466 @@
+{
+  "about": "Feature parity matrix. Every feature has an entry for every platform: done (with the tests that prove it), planned (with a reason) or na (with a reason). tools/check-spec validates the shape; tools/check-parity checks that every test named by a done entry ran and passed in that platform's JUnit report. See docs/parity.md.",
+  "platforms": ["mac", "android", "ios", "web"],
+  "features": [
+    {
+      "id": "core.shell-safety", "title": "Every value reaching a server's shell is quoted or refused; templates fill in one pass",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ShellQuoteTests", "RackoonCoreTests.SharedScenarioTests/testShellQuote", "RackoonCoreTests.SharedScenarioTests/testTemplateFill"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.SharedScenarioTests/shellQuote", "com.bgallagher.rackoon.core.SharedScenarioTests/templateFill"]},
+        "ios": {"status": "planned", "reason": "stage I1 (shares RackoonCore)"},
+        "web": {"status": "planned", "reason": "stage W1 (Python core)"}
+      }
+    },
+    {
+      "id": "servers.saved", "title": "Saved servers, cached snapshot painted on select",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ServerStoreTests", "RackoonCoreTests.CachedSessionTests", "RackoonCoreTests.ServerModelTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ModelsAndSessionTests"]},
+        "ios": {"status": "planned", "reason": "stage I1"},
+        "web": {"status": "planned", "reason": "stage W2"}
+      }
+    },
+    {
+      "id": "servers.edit", "title": "Add and edit a connection (name, host, user, port, key file)",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ServerInputTests", "RackoonCoreTests.SharedScenarioTests/testServerInput"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ServerInputTests", "com.bgallagher.rackoon.core.ServerConnectsLikeTests", "com.bgallagher.rackoon.core.SharedScenarioTests/serverInput"]},
+        "ios": {"status": "planned", "reason": "stage I1"},
+        "web": {"status": "planned", "reason": "stage W2"}
+      }
+    },
+    {
+      "id": "servers.sshconfig-import", "title": "Import servers from ~/.ssh/config",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.SSHConfigParserTests"]},
+        "android": {"status": "na", "reason": "a phone has no ~/.ssh/config"},
+        "ios": {"status": "na", "reason": "a phone has no ~/.ssh/config"},
+        "web": {"status": "planned", "reason": "stage W2: read a mounted ~/.ssh/config"}
+      }
+    },
+    {
+      "id": "servers.menu", "title": "Server switcher: filter, reorder, move up/down",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ServerListTests"]},
+        "android": {"status": "done", "tests": [], "untested": "server switcher list in Compose; no filter/reorder logic to test yet"},
+        "ios": {"status": "planned", "reason": "stage I1"},
+        "web": {"status": "planned", "reason": "stage W3"}
+      }
+    },
+    {
+      "id": "connect.hostkey", "title": "Host key trust on first use; a changed key is blocked",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonSSHSystemTests.HostKeyVerifierTests", "RackoonSSHSystemTests.LabIntegrationTests/testHostKeyMismatchBlocked"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.ssh.HostKeyTests", "com.bgallagher.rackoon.ssh.LabIntegrationTests/hostKeyMismatchBlocked"]},
+        "ios": {"status": "planned", "reason": "stage I1"},
+        "web": {"status": "planned", "reason": "stage W2"}
+      }
+    },
+    {
+      "id": "connect.keys", "title": "Key file and key-based sign-in",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonSSHSystemTests.OpenSSHArgumentsTests", "RackoonSSHSystemTests.ControlDirectoryTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.ssh.KeyLoadingTests", "com.bgallagher.rackoon.ssh.EndpointTests"]},
+        "ios": {"status": "planned", "reason": "stage I1"},
+        "web": {"status": "planned", "reason": "stage W2"}
+      }
+    },
+    {
+      "id": "connect.failure-explained", "title": "Connection failures explained with advice",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ConnectionFailureTests", "RackoonCoreTests.SSHAttemptTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ConnectionFailureTests"]},
+        "ios": {"status": "planned", "reason": "stage I2"},
+        "web": {"status": "planned", "reason": "stage W3"}
+      }
+    },
+    {
+      "id": "overview", "title": "Overview: CPU, memory, disks, uptime, IPs, polled every 5 s",
+      "commands": ["overview"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonCoreTests.OverviewIPTests", "RackoonCoreTests.ServerSessionTests", "RackoonSSHSystemTests.LabIntegrationTests/testOverviewParses"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.OverviewTests", "com.bgallagher.rackoon.ssh.LabIntegrationTests/overviewParses"]},
+        "ios": {"status": "planned", "reason": "stage I2"},
+        "web": {"status": "planned", "reason": "stage W3"}
+      }
+    },
+    {
+      "id": "overview.system-info", "title": "System info card (vendor, kernel, boot id, clock)",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.SystemInfoParserTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.OverviewTests"]},
+        "ios": {"status": "planned", "reason": "stage I2"},
+        "web": {"status": "planned", "reason": "stage W3"}
+      }
+    },
+    {
+      "id": "attention", "title": "Needs-attention strip from the attention rules",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonCoreTests.RebootOfferTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.AttentionTests", "com.bgallagher.rackoon.core.AttentionPresentationTests"]},
+        "ios": {"status": "planned", "reason": "stage I2"},
+        "web": {"status": "planned", "reason": "stage W3"}
+      }
+    },
+    {
+      "id": "fleet.dashboard", "title": "Dashboard: fleet health, heartbeat history, server tiles, Docker and bookmark pages",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.FleetTests"]},
+        "android": {"status": "planned", "reason": "not built on Android yet"},
+        "ios": {"status": "planned", "reason": "stage I2"},
+        "web": {"status": "planned", "reason": "stage W3"}
+      }
+    },
+    {
+      "id": "themes", "title": "45 themes driving app and terminal colours, WCAG-clamped palette",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.TerminalThemeTests", "RackoonCoreTests.AppPaletteTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.TerminalThemeTests", "com.bgallagher.rackoon.core.AppPaletteTests"]},
+        "ios": {"status": "planned", "reason": "stage I1"},
+        "web": {"status": "planned", "reason": "stage W3"}
+      }
+    },
+    {
+      "id": "safety.read-only", "title": "Read-only switch: every mutation refused while on",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ActionPolicyTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ActionPolicyTests", "com.bgallagher.rackoon.core.ReadOnlyAutoTests"]},
+        "ios": {"status": "planned", "reason": "stage I1"},
+        "web": {"status": "planned", "reason": "stage W3"}
+      }
+    },
+    {
+      "id": "safety.confirm", "title": "Every mutation confirms the exact command first",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ActionPolicyTests", "RackoonCoreTests.SharedScenarioTests/testActionPolicy"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ActionPolicyTests", "com.bgallagher.rackoon.core.ActionPromptsTests", "com.bgallagher.rackoon.core.SharedScenarioTests/actionPolicy"]},
+        "ios": {"status": "planned", "reason": "stage I1"},
+        "web": {"status": "planned", "reason": "stage W3"}
+      }
+    },
+    {
+      "id": "demo", "title": "Demo mode with made-up servers (nothing is sent)",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonMacTests.DemoServicesTests", "RackoonMacTests.DemoAlertsTests"]},
+        "android": {"status": "done", "tests": [], "untested": "debug-build demo mode; demo data is not unit-tested"},
+        "ios": {"status": "planned", "reason": "stage I1"},
+        "web": {"status": "planned", "reason": "stage W3"}
+      }
+    },
+    {
+      "id": "terminal.tabs", "title": "Terminal tabs that survive switching screens and servers",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": [], "untested": "SwiftTerm view; verified by hand"},
+        "android": {"status": "done", "tests": [], "untested": "termlib view; verified by hand"},
+        "ios": {"status": "planned", "reason": "stage I3"},
+        "web": {"status": "planned", "reason": "stage W4"}
+      }
+    },
+    {
+      "id": "terminal.highlight", "title": "Highlight IPs, errors and high percentages in terminal output",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.TerminalOutputFilterTests", "RackoonCoreTests.OutputHighlighterTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.TerminalOutputFilterTests", "com.bgallagher.rackoon.core.OutputHighlighterTests"]},
+        "ios": {"status": "planned", "reason": "stage I3"},
+        "web": {"status": "planned", "reason": "stage W4"}
+      }
+    },
+    {
+      "id": "terminal.reconnect", "title": "Auto-reconnect a dropped terminal with backoff",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": [], "untested": "TerminalTab.ended retry; verified by hand with Wi-Fi off/on"},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ReconnectPolicyTests"]},
+        "ios": {"status": "planned", "reason": "stage I3"},
+        "web": {"status": "planned", "reason": "stage W4"}
+      }
+    },
+    {
+      "id": "docker.overview", "title": "Docker stacks and containers with usage",
+      "commands": ["docker"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.DockerParserTests", "RackoonCoreTests.DockerSessionTests", "RackoonCoreTests.StackSummaryTests", "RackoonCoreTests.ComposeOverviewTests", "RackoonSSHSystemTests.LabIntegrationTests/testDockerParses"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.DockerParserTests", "com.bgallagher.rackoon.core.DockerSessionTests", "com.bgallagher.rackoon.core.DockerPresentationTests", "com.bgallagher.rackoon.ssh.LabIntegrationTests/dockerParses"]},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.container-actions", "title": "Start, stop, restart a container with live output",
+      "commands": ["docker_start", "docker_stop", "docker_restart"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.DockerSessionTests", "RackoonCoreTests.StreamingActionTests", "RackoonCoreTests.SharedScenarioTests/testDockerIDs"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.DockerSessionTests", "com.bgallagher.rackoon.core.StreamingActionTests", "com.bgallagher.rackoon.core.SharedScenarioTests/dockerIDs"]},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.logs", "title": "Live container logs; cancelling leaves no remote process",
+      "commands": ["docker_logs"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.LogBufferTests", "RackoonCoreTests.LogLineParserTests", "RackoonCoreTests.LogBufferCountTests", "RackoonSSHSystemTests.LabIntegrationTests/testLogsCancelLeavesNothing"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.LogFollowerTests", "com.bgallagher.rackoon.core.LogBufferTests", "com.bgallagher.rackoon.core.LogLineParserTests", "com.bgallagher.rackoon.core.LogViewTests", "com.bgallagher.rackoon.ssh.LabIntegrationTests/logsCancelLeavesNothing"]},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.stack-actions", "title": "Stack pull, update, restart, rebuild, recreate with live output",
+      "commands": ["compose_pull", "compose_up", "compose_restart", "compose_rebuild", "compose_recreate", "stream_wrap"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ComposeActionTests", "RackoonCoreTests.StreamParserTests", "RackoonCoreTests.Utf8ChunkerTests", "RackoonCoreTests.SharedScenarioTests/testComposeCommand", "RackoonCoreTests.SharedScenarioTests/testStreamOutput", "RackoonSSHSystemTests.LabIntegrationTests/testStreamExitStatus"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.DockerSessionTests", "com.bgallagher.rackoon.core.StreamParserTests", "com.bgallagher.rackoon.core.Utf8ChunkerTests", "com.bgallagher.rackoon.core.SharedScenarioTests/composeCommand", "com.bgallagher.rackoon.core.SharedScenarioTests/streamOutput", "com.bgallagher.rackoon.ssh.LabIntegrationTests/streamExitStatus"]},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.rebuild-service", "title": "Rebuild one service from its Dockerfile",
+      "commands": ["compose_rebuild_service"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ComposeActionTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.DockerSessionTests"]},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.standalone", "title": "Standalone (docker run) containers: pull image, delete",
+      "commands": ["docker_pull_image", "docker_remove"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.StandaloneStackTests", "RackoonCoreTests.StandaloneActionTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.StandaloneStackTests", "com.bgallagher.rackoon.core.StandaloneActionTests"]},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.shell", "title": "Shell into a container in a terminal tab",
+      "commands": ["docker_shell"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ComposeActionTests"]},
+        "android": {"status": "done", "tests": [], "untested": "opens docker exec in a terminal tab; command built in DockerSession"},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.editor", "title": "Compose and .env editor checked on the server, sha-guarded save",
+      "commands": ["file_read", "file_validate", "file_write", "file_write_expect_existing", "file_write_expect_none"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.StackFileParserTests", "RackoonCoreTests.ComposeIssueParserTests", "RackoonCoreTests.LineDiffTests", "RackoonCoreTests.StackFileCommandTests", "RackoonCoreTests.StackFileSessionTests", "RackoonCoreTests.SyntaxHighlighterTests", "RackoonCoreTests.EnvSyntaxTests", "RackoonCoreTests.EditorChecksTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.StackFileParserTests", "com.bgallagher.rackoon.core.ComposeIssueParserTests", "com.bgallagher.rackoon.core.LineDiffTests", "com.bgallagher.rackoon.core.StackFileCommandTests", "com.bgallagher.rackoon.core.StackFileSessionTests", "com.bgallagher.rackoon.core.StackEditorTests", "com.bgallagher.rackoon.core.SyntaxHighlighterTests", "com.bgallagher.rackoon.core.EnvSyntaxTests", "com.bgallagher.rackoon.core.EditorChecksTests"]},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.delete-stack", "title": "Delete a stack, optionally its volumes and folder",
+      "commands": ["compose_down", "compose_down_folder"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.StackRemovalTests", "RackoonCoreTests.StackRemovalLabelsTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.StackRemovalTests"]},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.add-container", "title": "Add a container: form, checks, new or existing stack",
+      "commands": ["stack_new_check", "stack_create", "stack_new_check_env", "stack_create_env", "image_exists", "listening_ports"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ContainerSpecTests", "RackoonCoreTests.ComposeFormParserTests", "RackoonCoreTests.NewStackTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ContainerSpecTests", "com.bgallagher.rackoon.core.NewStackTests", "com.bgallagher.rackoon.core.AddContainerDraftTests"]},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.bookmarks", "title": "Bookmarks from Homepage labels, edited in compose",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.BookmarkTests", "RackoonCoreTests.ComposeLabelsTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.BookmarkTests", "com.bgallagher.rackoon.core.ComposeLabelsTests", "com.bgallagher.rackoon.core.BookmarkEditorTests"]},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.favicons", "title": "Site icons for bookmarks",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.FaviconLinksTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.FaviconLinksTests"]},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.app-icons", "title": "App icons from dashboard-icons and selfh.st, picker, uploads",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.AppIconsTests", "RackoonCoreTests.IconSourcesTests", "RackoonCoreTests.IconChoicesTests", "RackoonCoreTests.IconFetchQueueTests", "RackoonMacTests.AppIconStoreTests"]},
+        "android": {"status": "planned", "reason": "not built on Android yet"},
+        "ios": {"status": "planned", "reason": "stage I4"},
+        "web": {"status": "planned", "reason": "stage W5"}
+      }
+    },
+    {
+      "id": "docker.sudo", "title": "Unlock Docker with sudo when the ssh user may not use it",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.DockerAccessTests", "RackoonCoreTests.ElevationWindowTests", "RackoonCoreTests.SudoTransportTests", "RackoonCoreTests.SudoTransportEdgeTests"]},
+        "android": {"status": "planned", "reason": "Android has no sudo password flow yet"},
+        "ios": {"status": "planned", "reason": "stage I5"},
+        "web": {"status": "planned", "reason": "stage W6"}
+      }
+    },
+    {
+      "id": "updates.list", "title": "Pending apt updates, security and held packages",
+      "commands": ["updates"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.UpdatesParserTests", "RackoonSSHSystemTests.LabIntegrationTests/testUpdatesParse"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.UpdatesParserTests", "com.bgallagher.rackoon.core.UpdatesPresentationTests", "com.bgallagher.rackoon.ssh.LabIntegrationTests/updatesParse"]},
+        "ios": {"status": "planned", "reason": "stage I5"},
+        "web": {"status": "planned", "reason": "stage W6"}
+      }
+    },
+    {
+      "id": "updates.install", "title": "Refresh lists, install all or security updates, live output",
+      "commands": ["apt_refresh", "apt_upgrade", "apt_upgrade_packages"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.AptActionTests", "RackoonCoreTests.UpdatesSessionActionTests", "RackoonCoreTests.AptStreamingTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.AptActionTests", "com.bgallagher.rackoon.core.UpdatesSessionActionTests", "com.bgallagher.rackoon.core.AptStreamingTests"]},
+        "ios": {"status": "planned", "reason": "stage I5"},
+        "web": {"status": "planned", "reason": "stage W6"}
+      }
+    },
+    {
+      "id": "reboot", "title": "Reboot and wait for a new boot id",
+      "commands": ["reboot", "boot_id"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.RebootSessionTests", "RackoonCoreTests.RebootOfferTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.RebootTests"]},
+        "ios": {"status": "planned", "reason": "stage I5"},
+        "web": {"status": "planned", "reason": "stage W6"}
+      }
+    },
+    {
+      "id": "sudo.password", "title": "Sudo password sheet for root actions (nonce prompt handshake)",
+      "commands": ["reboot_sudo", "sudo_prompt"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.SudoElevationTests", "RackoonCoreTests.SudoHandshakeTests", "RackoonCoreTests.SudoStreamTests", "RackoonCoreTests.SudoAuthFailureTests", "RackoonSSHSystemTests.LabIntegrationTests/testSudoPasswordChecked"]},
+        "android": {"status": "planned", "reason": "Android has no sudo password flow yet"},
+        "ios": {"status": "planned", "reason": "stage I5"},
+        "web": {"status": "planned", "reason": "stage W6"}
+      }
+    },
+    {
+      "id": "sudo.remember", "title": "Remember the sudo password, unlocked by Touch ID / Watch / password",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonSSHSystemTests.SudoSecretStoreTests", "RackoonSSHSystemTests.SSHResolvedTests"]},
+        "android": {"status": "planned", "reason": "Android has no sudo password flow yet"},
+        "ios": {"status": "planned", "reason": "stage I5: Keychain + Face ID"},
+        "web": {"status": "planned", "reason": "needs a sealed-secret design for a server process"}
+      }
+    },
+    {
+      "id": "services", "title": "Services outside Docker (systemd units, listeners, hand-started processes)",
+      "commands": ["services"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ServicesTests", "RackoonMacTests.DemoServicesTests", "RackoonMacTests.ServiceVisibilityStoreTests"]},
+        "android": {"status": "planned", "reason": "core on feature/android-services-alerts; no screen yet"},
+        "ios": {"status": "planned", "reason": "stage I6"},
+        "web": {"status": "planned", "reason": "stage W7"}
+      }
+    },
+    {
+      "id": "alerts", "title": "Alerts across every server, with history",
+      "commands": ["docker_states"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.AlertsTests", "RackoonMacTests.DemoAlertsTests"]},
+        "android": {"status": "planned", "reason": "core on feature/android-services-alerts; no screen yet"},
+        "ios": {"status": "planned", "reason": "stage I6 (foreground only)"},
+        "web": {"status": "planned", "reason": "stage W7"}
+      }
+    },
+    {
+      "id": "alerts.notifications", "title": "Local notifications for new and escalated alerts",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.AlertsTests"]},
+        "android": {"status": "planned", "reason": "not built on Android yet"},
+        "ios": {"status": "planned", "reason": "needs a push relay: an iPhone cannot poll while asleep"},
+        "web": {"status": "planned", "reason": "stage W7: Web Push, ntfy or webhook"}
+      }
+    },
+    {
+      "id": "search", "title": "Search everything on every server",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.SearchTests"]},
+        "android": {"status": "planned", "reason": "not built on Android yet"},
+        "ios": {"status": "planned", "reason": "stage I6"},
+        "web": {"status": "planned", "reason": "stage W7"}
+      }
+    },
+    {
+      "id": "commands.library", "title": "Commands library with dry runs, plus a free-form box",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.CommandLibraryTests", "RackoonCoreTests.NoServerChangeGuardTests"]},
+        "android": {"status": "planned", "reason": "core has CommandLibrary; no screen yet"},
+        "ios": {"status": "planned", "reason": "stage I6"},
+        "web": {"status": "planned", "reason": "stage W7"}
+      }
+    },
+    {
+      "id": "files", "title": "Files: browse, upload, download, rename, delete",
+      "commands": ["files_list", "files_home", "files_upload_file", "files_upload_folder", "files_download_file", "files_download_folder", "files_mkdir", "files_rename", "files_delete_file", "files_delete_folder"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.RemoteFilesTests", "RackoonCoreTests.FileTransferTests", "RackoonCoreTests.FileOperationTests", "RackoonSSHSystemTests.LabIntegrationTests/testStdinExactBytes"]},
+        "android": {"status": "planned", "reason": "not built on Android yet"},
+        "ios": {"status": "planned", "reason": "stage I6"},
+        "web": {"status": "planned", "reason": "stage W7"}
+      }
+    },
+    {
+      "id": "unraid", "title": "Unraid NAS overview: array, pools, parity, temperatures",
+      "commands": ["unraid"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.UnraidTests", "RackoonCoreTests.UnraidEdgeCaseTests", "RackoonMacTests.NASModelTests"]},
+        "android": {"status": "planned", "reason": "not built on Android yet"},
+        "ios": {"status": "planned", "reason": "stage I6"},
+        "web": {"status": "planned", "reason": "stage W7"}
+      }
+    },
+    {
+      "id": "supporter.licence", "title": "Supporter licence key checked offline",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.LicenceKeyTests"]},
+        "android": {"status": "planned", "reason": "not built on Android yet"},
+        "ios": {"status": "na", "reason": "App Store rules do not allow an outside payment link"},
+        "web": {"status": "na", "reason": "self-hosted builds are free"}
+      }
+    }
+  ]
+}

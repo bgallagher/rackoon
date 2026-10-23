@@ -1,0 +1,12 @@
+{
+  "subject": "template_fill",
+  "about": "Template.fill fills {name} placeholders in ONE pass: inserted values are never rescanned, unknown placeholders stay as written.",
+  "cases": [
+    {"name": "fills each placeholder", "template": "cd {dir} && docker compose -p {project} up -d", "values": {"dir": "'/srv/a'", "project": "a"}, "expect": "cd '/srv/a' && docker compose -p a up -d"},
+    {"name": "a value holding a placeholder is not filled again", "template": "{a} {b}", "values": {"a": "{b}", "b": "x"}, "expect": "{b} x"},
+    {"name": "unknown placeholder stays", "template": "echo {missing} {id}", "values": {"id": "1"}, "expect": "echo {missing} 1"},
+    {"name": "same placeholder twice", "template": "{x}-{x}", "values": {"x": "y"}, "expect": "y-y"},
+    {"name": "unclosed brace stays", "template": "echo {id", "values": {"id": "1"}, "expect": "echo {id"},
+    {"name": "awk braces are untouched", "template": "awk '{print $1}' {f}", "values": {"f": "'/etc/x'"}, "expect": "awk '{print $1}' '/etc/x'"}
+  ]
+}

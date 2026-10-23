@@ -1,0 +1,25 @@
+{
+  "feature": "docker.container-actions",
+  "subject": "docker_ids",
+  "about": "Values interpolated into remote commands must pass these checks first: a container id is 12 to 64 lowercase hex characters; a compose service name starts with a letter or digit and holds only letters, digits, '.', '_' and '-'.",
+  "cases": [
+    {"name": "short id", "kind": "container_id", "value": "abcdef012345", "ok": true},
+    {"name": "full id", "kind": "container_id", "value": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789", "ok": true},
+    {"name": "too short", "kind": "container_id", "value": "abcdef01234", "ok": false},
+    {"name": "too long", "kind": "container_id", "value": "abcdef0123456789abcdef0123456789abcdef0123456789abcdef01234567890", "ok": false},
+    {"name": "uppercase hex", "kind": "container_id", "value": "ABCDEF012345", "ok": false},
+    {"name": "container name is not an id", "kind": "container_id", "value": "media-web-1", "ok": false},
+    {"name": "injection", "kind": "container_id", "value": "abcdef012345;reboot", "ok": false},
+    {"name": "service name", "kind": "service_name", "value": "my_app.v2-web", "ok": true},
+    {"name": "digit first", "kind": "service_name", "value": "2fa", "ok": true},
+    {"name": "empty service", "kind": "service_name", "value": "", "ok": false},
+    {"name": "dash first", "kind": "service_name", "value": "-x", "ok": false},
+    {"name": "dot first", "kind": "service_name", "value": ".hidden", "ok": false},
+    {"name": "space", "kind": "service_name", "value": "a b", "ok": false},
+    {"name": "substitution", "kind": "service_name", "value": "$(id)", "ok": false},
+    {"name": "semicolon", "kind": "service_name", "value": "web; reboot", "ok": false},
+    {"name": "64 characters is the longest", "kind": "service_name", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "ok": true},
+    {"name": "65 characters is too long", "kind": "service_name", "value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "ok": false},
+    {"name": "non-ASCII letter", "kind": "service_name", "value": "café", "ok": false}
+  ]
+}
