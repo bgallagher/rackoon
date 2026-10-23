@@ -1710,6 +1710,7 @@ name = "rackoon-web"
 version = "0.0.0"
 source = { editable = "." }
 dependencies = [
+    { name = "anyio" },
     { name = "argon2-cffi" },
     { name = "asyncssh", extra = ["bcrypt"] },
     { name = "fastapi" },
@@ -1732,6 +1733,7 @@ spike = [
 
 [package.metadata]
 requires-dist = [
+    { name = "anyio", specifier = ">=4.5" },
     { name = "argon2-cffi", specifier = ">=23.1" },
     { name = "asyncssh", extras = ["bcrypt"], specifier = ">=2.21" },
     { name = "fastapi", specifier = ">=0.115" },

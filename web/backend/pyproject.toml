@@ -7,6 +7,7 @@ dependencies = [
     "asyncssh[bcrypt]>=2.21",
     "argon2-cffi>=23.1",
     "fastapi>=0.115",
+    "anyio>=4.5",   # shielded cleanup in socket handlers (already a FastAPI dependency)
     "uvicorn[standard]>=0.34",
     "httpx>=0.28",
     "pywebpush>=2.0",

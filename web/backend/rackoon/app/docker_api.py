@@ -20,6 +20,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any, Literal
 
+import anyio
 from fastapi import Depends, FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import Response
 from pydantic import Field
@@ -636,8 +637,10 @@ def register(app: FastAPI, rackoon: Rackoon, authenticated: Callable[[Request], 
             pass
         finally:
             sending.cancel()
-            # gather collects the writer's own cancellation; a cancellation of this task still propagates.
-            await asyncio.gather(sending, return_exceptions=True)
+            # Shielded: if this task is being cancelled (server shutdown, or a test client leaving), a second
+            # cancellation delivered while it waits here would escape the server's own cancel scope.
+            with anyio.CancelScope(shield=True):
+                await asyncio.gather(sending, return_exceptions=True)
 
     @app.websocket("/api/runs/{run_id}/ws")
     async def run_socket(ws: WebSocket, run_id: str) -> None:
@@ -722,7 +725,10 @@ def register(app: FastAPI, rackoon: Rackoon, authenticated: Callable[[Request], 
         finally:
             for task in tasks:
                 task.cancel()  # each stream's exit sends Ctrl-C before its connection closes
-            await asyncio.gather(*tasks, return_exceptions=True)
+            # Shielded (at most 5 s), so the Ctrl-C reaches every `docker logs -f` even when this handler is itself
+            # being cancelled; unshielded, a cancellation landing here also escaped the server's cancel scope.
+            with anyio.move_on_after(5, shield=True):
+                await asyncio.gather(*tasks, return_exceptions=True)
 
     # --- the compose/.env editor
 
