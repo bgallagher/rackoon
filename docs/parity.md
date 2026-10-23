@@ -34,6 +34,13 @@ Every user-facing feature has one entry per platform:
 tools/check-parity --summary mac=apple/build/junit android=android/core/build/test-results/test,android/ssh/build/test-results/test
 ```
 
+The iOS report comes from the simulator: the app's test plan (`apple/Apps/RackoonIOS`, opened through `RackoonIOS.xcworkspace`) runs the app's own tests and the package tests that build for iOS (RackoonCore, RackoonSSHEmbedded, RackoonDemo) on iOS itself, and `tools/xcresult-junit` turns the result bundle into JUnit with the same `<bundle>.<Class>` names, so `RackoonCoreTests.ShellQuoteTests` means the same tests on mac and ios. Core tests that run a command in a real `/bin/sh` are skipped on iOS (no shell there), and a skip never counts.
+
+```bash
+(cd apple/Apps/RackoonIOS && xcodebuild test -workspace RackoonIOS.xcworkspace -scheme RackoonIOS -destination 'platform=iOS Simulator,name=iPhone 17' -resultBundlePath ../../build/ios.xcresult -skipPackagePluginValidation)
+tools/xcresult-junit apple/build/ios.xcresult apple/build/junit-ios/ios.xml
+```
+
 SwiftPM writes XCTest results as xUnit only with `--parallel`, and it reports a skipped XCTest as **passed**. The Swift lab tests are therefore left out of the main report with `--skip LabIntegrationTests` and come only from a run against the lab. Gradle reports skips correctly, and `check-parity` never counts a skip as proof.
 
 ## 2. Golden fixtures: `spec/fixtures/`
@@ -67,7 +74,7 @@ eval "$(tools/lab env)"
 tools/lab down
 ```
 
-- Every transport runs the same checks with its real SSH code: `LabIntegrationTests` in `RackoonSSHSystemTests` and in `android/ssh`. The checks cover parsing real output, streamed exit status, a cancelled `docker logs` leaving nothing behind, a changed host key blocked, exact stdin bytes, and sudo password checking.
+- Every transport runs the same checks with its real SSH code: `LabIntegrationTests` in `RackoonSSHSystemTests` and in `android/ssh`, and for iOS in `RackoonSSHEmbeddedTests` (the SwiftNIO SSH transport; it runs every check, because the transport and core already exist while the iOS screens come later; `docs/ios-spikes.md`). The checks cover parsing real output, streamed exit status, a cancelled `docker logs` leaving nothing behind, a changed host key blocked, exact stdin bytes, and sudo password checking.
 - Feature gating works as for the scenarios. The tests skip themselves when the lab isn't configured, so a normal `swift test` is unaffected.
 - Each checkout (every worktree) has its own lab, so parallel sessions don't recreate each other's container: the compose project is `rackoon-lab-<hash of the checkout's path>` and the port is derived from the same hash (20000–29999, moved on past one already in use). `tools/lab up` records both in `test/lab/.state/env` (`RACKOON_LAB_PROJECT`, `RACKOON_LAB_PORT`); `env`, `ssh` and `down` use that lab only, and a later `up` keeps its port. `COMPOSE_PROJECT_NAME=… RACKOON_LAB_PORT=… tools/lab up` overrides both. A lab started before this change is the project `rackoon-lab` on 2222; remove it with `docker compose -p rackoon-lab down -v` once nobody uses it.
 - The Mac transport is pointed at the lab with `-F /dev/null` and the lab's own known_hosts. Nothing in `~/.ssh` is read or written.

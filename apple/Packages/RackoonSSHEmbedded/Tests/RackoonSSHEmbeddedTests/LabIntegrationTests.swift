@@ -1,0 +1,479 @@
+import Citadel
+import Crypto
+import Foundation
+@preconcurrency import NIOSSH
+@testable import RackoonCore
+@testable import RackoonSSHEmbedded
+import XCTest
+
+/// The checks in spec/integration/checks.json, run with the embedded (SwiftNIO SSH) transport against the integration lab
+/// (test/lab; `tools/lab up`, then `eval "$(tools/lab env)"`). Skipped when the lab is not configured. The lab's host key
+/// is read from the known_hosts file tools/lab scanned, never trusted on first use, and nothing in ~/.ssh is read.
+///
+/// Unlike the Mac and Android runners, every check runs regardless of the iOS feature matrix: these checks prove the
+/// transport and the shared core it feeds, which already exist, while the iOS screens that use them come in later stages
+/// (docs/ios-spikes.md). So every check must have a runner here.
+final class LabIntegrationTests: XCTestCase {
+    private static let specDir: URL = {
+        var url = URL(fileURLWithPath: #filePath)
+        for _ in 0..<6 { url.deleteLastPathComponent() }
+        return url.appendingPathComponent("spec")
+    }()
+
+    private struct Lab {
+        let host: String
+        let port: Int
+        let user: String
+        let sudoUser: String
+        let sudoPassword: String
+        let key: String
+        let hostKey: HostKeyInfo
+    }
+
+    private static func json(_ name: String) throws -> [String: Any] {
+        try JSONSerialization.jsonObject(with: Data(contentsOf: specDir.appendingPathComponent(name))) as! [String: Any]
+    }
+
+    private static var labFacts: [String: Any] { ((try? json("integration/checks.json")) ?? [:])["lab"] as? [String: Any] ?? [:] }
+
+    private static let implemented: Set<String> = [
+        "overview_parses", "updates_parse", "docker_parses", "stream_exit_status", "logs_cancel_leaves_nothing",
+        "hostkey_mismatch_blocked", "stdin_exact_bytes", "sudo_password_checked",
+    ]
+
+    private func lab() throws -> Lab {
+        let env = ProcessInfo.processInfo.environment
+        guard env["RACKOON_LAB"] == "1", let host = env["RACKOON_LAB_HOST"], let keyPath = env["RACKOON_LAB_KEY"],
+              let knownHosts = env["RACKOON_LAB_KNOWN_HOSTS"] else {
+            throw XCTSkip("integration lab not configured (tools/lab up, then eval \"$(tools/lab env)\")")
+        }
+        // known_hosts line: `[127.0.0.1]:2222 ssh-ed25519 AAAA…`
+        let line = try String(contentsOfFile: knownHosts, encoding: .utf8).split(separator: "\n").first { !$0.hasPrefix("#") }
+        let fields = try XCTUnwrap(line).split(separator: " ", maxSplits: 1)
+        let hostKey = try XCTUnwrap(HostKeyInfo(openSSH: String(fields[1])), "unreadable lab known_hosts")
+        return Lab(host: host, port: Int(env["RACKOON_LAB_PORT"] ?? "") ?? 2222, user: env["RACKOON_LAB_USER"] ?? "rk",
+                   sudoUser: env["RACKOON_LAB_SUDO_USER"] ?? "rkpw", sudoPassword: env["RACKOON_LAB_SUDO_PASSWORD"] ?? "",
+                   key: try String(contentsOfFile: keyPath, encoding: .utf8), hostKey: hostKey)
+    }
+
+    private func transport(_ lab: Lab, user: String? = nil, hostKey: HostKeyInfo? = nil) -> EmbeddedSSHTransport {
+        let known = InMemoryKnownHosts()
+        known.trust(host: lab.host, port: lab.port, key: hostKey ?? lab.hostKey)
+        return EmbeddedSSHTransport(endpoint: SSHEndpoint(host: lab.host, port: lab.port, user: user ?? lab.user,
+                                                          auth: .privateKey(lab.key)),
+                                    knownHosts: known, connectTimeout: 20)
+    }
+
+    private func collect(_ stream: AsyncThrowingStream<String, Error>) async throws -> String {
+        var text = ""
+        for try await chunk in stream { text += chunk }
+        return text
+    }
+
+    func testEveryCheckHasARunner() throws {
+        let checks = try Self.json("integration/checks.json")["checks"] as! [[String: Any]]
+        for id in checks.map({ $0["id"] as! String }) {
+            XCTAssertTrue(Self.implemented.contains(id), "\(id) has no runner for the embedded transport")
+        }
+    }
+
+    func testOverviewParses() async throws {
+        let lab = try lab()
+        let result = try await transport(lab).run(ServerSession.overviewCommand, timeout: 30)
+        XCTAssertEqual(result.exitCode, 0, result.stderr)
+        let overview = try OverviewParser.parse(result.stdout)
+        XCTAssertFalse(overview.hostname.isEmpty)
+        XCTAssertFalse(overview.disks.isEmpty)
+        XCTAssertGreaterThan(overview.cpu.total, 0)
+        XCTAssertTrue(overview.rebootRequired)
+        XCTAssertEqual(overview.tailscaleIP, Self.labFacts["tailscaleIP"] as? String)
+        XCTAssertEqual(overview.pendingUpdates, (Self.labFacts["pending"] as? [String])?.count)
+        XCTAssertEqual(overview.securityUpdates, (Self.labFacts["security"] as? [String])?.count)
+    }
+
+    func testUpdatesParse() async throws {
+        let lab = try lab()
+        let result = try await transport(lab).run(UpdatesSession.command, timeout: 60)
+        XCTAssertEqual(result.exitCode, 0, result.stderr)
+        let snapshot = try UpdatesParser.parse(result.stdout)
+        XCTAssertEqual(snapshot.packages.map(\.name).sorted(), Self.labFacts["pending"] as? [String])
+        XCTAssertEqual(snapshot.packages.filter(\.isSecurity).map(\.name).sorted(), Self.labFacts["security"] as? [String])
+        XCTAssertTrue(snapshot.rebootRequired)
+    }
+
+    private func labStack(_ transport: EmbeddedSSHTransport) async throws -> DockerStack {
+        let result = try await transport.run(DockerSession.command, timeout: 60)
+        XCTAssertEqual(result.exitCode, 0, result.stderr)
+        let snapshot = try DockerParser.parse(result.stdout)
+        return try XCTUnwrap(snapshot.stacks.first { $0.name == Self.labFacts["stack"] as? String }, "labstack not found")
+    }
+
+    func testDockerParses() async throws {
+        let lab = try lab()
+        let stack = try await labStack(transport(lab))
+        let ticker = try XCTUnwrap(stack.containers.first { $0.service == Self.labFacts["service"] as? String })
+        XCTAssertEqual(ticker.state, "running")
+        XCTAssertNotNil(ComposeAction.up.command(for: stack))
+    }
+
+    func testStreamExitStatus() async throws {
+        let lab = try lab()
+        let text = try await collect(transport(lab).stream(StreamedCommand.wrap("echo lab-out; exit 3", cols: 80, rows: 24)))
+        var parser = StreamOutputParser()
+        let shown = parser.push(text)
+        let end = parser.finish()
+        XCTAssertEqual(end.exitCode, 3, text)
+        XCTAssertTrue((shown + end.text).contains("lab-out"))
+    }
+
+    func testLogsCancelLeavesNothing() async throws {
+        let lab = try lab()
+        let transport = transport(lab)
+        let stack = try await labStack(transport)
+        let ticker = try XCTUnwrap(stack.containers.first)
+        let command = try XCTUnwrap(DockerSession.logsCommand(id: ticker.id))
+        var seen = ""
+        for try await chunk in transport.stream(command) {
+            seen += chunk
+            if seen.contains("tick") { break }   // leaving the loop cancels the stream: Ctrl-C, then teardown
+        }
+        XCTAssertTrue(seen.contains("tick"))
+        // `[l]` keeps the pattern from matching the shell that runs pgrep itself.
+        var left = "?"
+        for _ in 0..<10 {
+            try await Task.sleep(nanoseconds: 500_000_000)
+            left = try await transport.run("pgrep -f 'docker [l]ogs -f' | wc -l", timeout: 15).stdout
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if left == "0" { break }
+        }
+        XCTAssertEqual(left, "0", "docker logs is still running on the server after cancelling")
+    }
+
+    func testHostKeyMismatchBlocked() async throws {
+        let lab = try lab()
+        // A fresh key that is certainly not the lab's, recorded for the lab's address.
+        let wrong = HostKeyInfo(openSSH: String(openSSHPublicKey: NIOSSHPrivateKey(ed25519Key: .init()).publicKey))!
+        let marker = "/tmp/rk-lab-hostkey-\(UUID().uuidString)"
+        do {
+            _ = try await transport(lab, hostKey: wrong).run("touch \(marker)", timeout: 20)
+            XCTFail("a changed host key must block the connection")
+        } catch EmbeddedSSHError.hostKeyChanged(let trusted, let presented) {
+            XCTAssertEqual(trusted.fingerprint, wrong.fingerprint)
+            XCTAssertEqual(presented, lab.hostKey)
+        }
+        let check = try await transport(lab).run("test -e \(marker) && echo present || echo absent", timeout: 15)
+        XCTAssertEqual(check.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "absent")
+    }
+
+    func testStdinExactBytes() async throws {
+        let lab = try lab()
+        let size = 1 << 20
+        let result = try await transport(lab).run("wc -c", input: String(repeating: "r", count: size), timeout: 30)
+        XCTAssertEqual(result.exitCode, 0, result.stderr)
+        XCTAssertEqual(result.stdout.trimmingCharacters(in: .whitespacesAndNewlines), String(size))
+    }
+
+    func testSudoPasswordChecked() async throws {
+        let lab = try lab()
+        let sudo = transport(lab, user: lab.sudoUser)
+        // -k: ignore any cached credential, so the password is really checked each time.
+        let wrong = try await sudo.run("sudo -k -S -p '' id -u", input: "not-the-password\n", timeout: 30)
+        XCTAssertNotEqual(wrong.exitCode, 0)
+        XCTAssertEqual(RebootSession.classifySudoFailure(wrong.stdout + "\n" + wrong.stderr, exitCode: wrong.exitCode), .badPassword,
+                       wrong.stderr)
+        let right = try await sudo.run("sudo -k -S -p '' id -u", input: lab.sudoPassword + "\n", timeout: 30)
+        XCTAssertEqual(right.exitCode, 0, right.stderr)
+        XCTAssertEqual(right.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "0")
+    }
+
+    // MARK: Transport checks beyond checks.json (terminals, first contact)
+
+    /// An unknown host key is reported with the key to show, and nothing is signed in or run.
+    func testUnknownHostKeyIsReportedNotTrusted() async throws {
+        let lab = try lab()
+        let empty = EmbeddedSSHTransport(endpoint: SSHEndpoint(host: lab.host, port: lab.port, user: lab.user, auth: .privateKey(lab.key)),
+                                         knownHosts: InMemoryKnownHosts(), connectTimeout: 20)
+        do {
+            _ = try await empty.run("true", timeout: 10)
+            XCTFail("an unknown host key must not be trusted silently")
+        } catch EmbeddedSSHError.hostKeyUnknown(let presented) {
+            XCTAssertEqual(presented, lab.hostKey)
+        }
+        let scanned = try await EmbeddedSSHTransport.scanHostKey(host: lab.host, port: lab.port)
+        XCTAssertEqual(scanned, lab.hostKey)
+    }
+
+    /// A key the server does not know is refused, and the refusal is explained as a sign-in problem, not a network one.
+    func testARefusedKeyIsExplained() async throws {
+        let lab = try lab()
+        let stranger = Curve25519.Signing.PrivateKey().makeSSHRepresentation()
+        let known = InMemoryKnownHosts()
+        known.trust(host: lab.host, port: lab.port, key: lab.hostKey)
+        let transport = EmbeddedSSHTransport(endpoint: SSHEndpoint(host: lab.host, port: lab.port, user: lab.user, auth: .privateKey(stranger)),
+                                             knownHosts: known, connectTimeout: 20)
+        do {
+            _ = try await transport.run("true", timeout: 10)
+            XCTFail("an unknown key must be refused")
+        } catch let error as EmbeddedSSHError {
+            guard case .authFailed = error else { return XCTFail("expected a refused sign-in, got \(error)") }
+            XCTAssertEqual(ConnectionFailure.explain(error.localizedDescription, signIn: .key, device: "iPhone")?.kind, .authRefused)
+        }
+    }
+
+    /// A shell gets a pty of the size asked for, follows a resize, and reports its exit status.
+    func testShellSizeResizeAndExit() async throws {
+        let lab = try lab()
+        let transport = transport(lab)
+        let shell = try await transport.openShell(cols: 100, rows: 30)
+        var output = Data()
+        var iterator = shell.output.makeAsyncIterator()
+        func readUntil(_ needle: String) async -> Bool {
+            let deadline = Date().addingTimeInterval(10)
+            while Date() < deadline {
+                guard let bytes = await iterator.next() else { return false }
+                output.append(contentsOf: bytes)
+                if String(decoding: output, as: UTF8.self).contains(needle) { return true }
+            }
+            return false
+        }
+        await shell.write(Array("stty size; echo size-done\n".utf8))
+        let sized = await readUntil("30 100\r\nsize-done")
+        XCTAssertTrue(sized, String(decoding: output, as: UTF8.self))
+        await shell.resize(cols: 132, rows: 40)
+        await shell.write(Array("stty size; echo resized-done\n".utf8))
+        let resized = await readUntil("40 132\r\nresized-done")
+        XCTAssertTrue(resized, String(decoding: output, as: UTF8.self))
+        await shell.write(Array("exit 7\n".utf8))
+        while await iterator.next() != nil {}
+        let end = await shell.awaitEnd()
+        XCTAssertEqual(end, .remoteExit(7))
+    }
+
+    /// A dropped link reads as a lost connection (which the terminal retries), not as the shell exiting (which it never
+    /// retries). The session's own sshd process is killed from a second connection. As rkpw, so no other test's rk shell
+    /// running in parallel is touched.
+    func testADroppedTerminalIsALostConnection() async throws {
+        let lab = try lab()
+        let shell = try await transport(lab, user: lab.sudoUser).openShell(cols: 80, rows: 24)
+        var iterator = shell.output.makeAsyncIterator()
+        await shell.write(Array("echo ready-to-drop\n".utf8))
+        var seen = ""
+        while !seen.contains("ready-to-drop\r\n"), let bytes = await iterator.next() { seen += String(decoding: bytes, as: UTF8.self) }
+        // `[s]shd` keeps pkill from matching the shell that runs it; `.*` covers both sshd and the newer sshd-session.
+        _ = try await transport(lab, user: lab.sudoUser).run("pkill -KILL -f '[s]shd.*\(lab.sudoUser)@pts'", timeout: 15)
+        while await iterator.next() != nil {}
+        let end = await shell.awaitEnd()
+        XCTAssertEqual(end, .connectionLost)
+        var policy = ReconnectPolicy()
+        XCTAssertEqual(policy.onEnded(end, connectedFor: 1), .retry(delay: 1, attempt: 1, of: 5), "a dropped terminal is retried")
+    }
+
+    /// A Ctrl-C typed into a shell interrupts the foreground program, as in a terminal.
+    func testCtrlCInterruptsAShellProgram() async throws {
+        let lab = try lab()
+        let shell = try await transport(lab).openShell(cols: 80, rows: 24, command: "sleep 30; echo not-interrupted")
+        try await Task.sleep(nanoseconds: 500_000_000)
+        await shell.write([0x03])
+        var text = ""
+        for await bytes in shell.output { text += String(decoding: bytes, as: UTF8.self) }
+        XCTAssertFalse(text.contains("not-interrupted"))
+        let end = await shell.awaitEnd()
+        XCTAssertNotEqual(end, .remoteExit(0))
+    }
+
+    // MARK: Docker on iOS (stage I4): the actions, files and shell the Docker screens use, on the lab's own stack.
+
+    /// A whole-stack action streams through this transport's pty (the stack's Output) and reports the command's exit code.
+    /// The lab is throwaway, so a real restart is fine here (never on a user's server).
+    func testAStackRestartStreamsWithItsExitCode() async throws {
+        let lab = try lab()
+        let transport = transport(lab)
+        let stack = try await labStack(transport)
+        let session = DockerSession(transport: transport, policy: ActionPolicy())
+        let events = EventBox()
+        await session.performStreaming(.restart, stack: stack, confirmation: try session.confirm(.restart, stack: stack),
+                                       cols: 100, rows: 30, onEvent: { events.add($0) })
+        XCTAssertEqual(events.exitCode, 0, events.text)
+        XCTAssertTrue(events.text.contains("Restart") || events.text.contains("Started"), events.text)
+        let state = await session.state
+        XCTAssertNil(state.actionError)
+        XCTAssertTrue(state.busyStacks.isEmpty)
+    }
+
+    /// The editor's read and server-side check: the stack's compose file reads back, its own text passes
+    /// `docker compose config`, and a broken edit is refused with a line number. Nothing is written.
+    func testTheStackFileReadsAndIsCheckedOnTheServer() async throws {
+        let lab = try lab()
+        let transport = transport(lab)
+        let stack = try await labStack(transport)
+        let session = StackFileSession(transport: transport, stack: stack)
+        let file = try XCTUnwrap(session.files.first { !$0.isEnv })
+        guard case .file(let remote) = try await session.read(file) else { return XCTFail("the compose file reads") }
+        XCTAssertTrue(remote.content.contains("services:"))
+        let same = try await session.validate(file, content: remote.content)
+        XCTAssertTrue(same.isValid, "\(same.issues)")
+        let broken = try await session.validate(file, content: "services:\n  x:\n    image: [\n")
+        XCTAssertFalse(broken.isValid)
+    }
+
+    /// A container's shell (`docker exec -it`, what the Shell button opens) runs in a terminal tab's pty and exits cleanly.
+    func testAContainerShellRunsInAPty() async throws {
+        let lab = try lab()
+        let transport = transport(lab)
+        let stack = try await labStack(transport)
+        let ticker = try XCTUnwrap(stack.containers.first { $0.isRunning })
+        let shell = try await transport.openShell(cols: 80, rows: 24, command: try XCTUnwrap(DockerSession.shellCommand(id: ticker.id)))
+        await shell.write(Array("echo inside-$((6*7))\n".utf8))
+        var text = ""
+        var iterator = shell.output.makeAsyncIterator()
+        let deadline = Date().addingTimeInterval(15)
+        while !text.contains("inside-42"), Date() < deadline, let bytes = await iterator.next() { text += String(decoding: bytes, as: UTF8.self) }
+        XCTAssertTrue(text.contains("inside-42"), text)
+        await shell.write(Array("exit\n".utf8))
+        while await iterator.next() != nil {}
+        let end = await shell.awaitEnd()
+        XCTAssertEqual(end, .remoteExit(0))
+    }
+
+    // MARK: sudo on iOS (stage I5): the password stream and Docker through sudo, as rkpw (sudo wants its password).
+
+    /// A root script behind the nonce prompt: the password is typed at the one prompt, the script's own `sudo -n` then runs
+    /// as root, and a wrong password is reported as rejected with nothing typed twice.
+    func testAPasswordStreamIsAnsweredOnce() async throws {
+        let lab = try lab()
+        let rkpw = transport(lab, user: lab.sudoUser)
+        let script = "S='sudo -n'; $S id -u"
+        let nonce = SudoElevation.makeNonce()
+        let command = try XCTUnwrap(SudoElevation.withPassword(script, nonce: nonce))
+        let right = await StreamRunner.run(transport: rkpw, command: command, cols: 80, rows: 24,
+                                           sudo: SudoCredential(password: lab.sudoPassword, nonce: nonce), onEvent: { _ in })
+        XCTAssertEqual(right.sudo, .accepted, right.text)
+        XCTAssertEqual(right.exitCode, 0, right.text)
+        XCTAssertTrue(ANSI.strip(right.text).split(whereSeparator: \.isNewline).contains { $0.trimmingCharacters(in: .whitespaces) == "0" }, right.text)
+        XCTAssertFalse(right.text.contains(lab.sudoPassword), "the password is never shown")
+
+        let other = SudoElevation.makeNonce()
+        let wrong = await StreamRunner.run(transport: rkpw, command: try XCTUnwrap(SudoElevation.withPassword(script, nonce: other)),
+                                           cols: 80, rows: 24, sudo: SudoCredential(password: "not-the-password", nonce: other), onEvent: { _ in })
+        XCTAssertEqual(wrong.sudo, .rejected, wrong.text)
+        XCTAssertNotEqual(wrong.exitCode, 0)
+        XCTAssertTrue(wrong.needsSudoPassword, "the app asks again")
+    }
+
+    /// Docker through sudo: every command of the embedded transport runs as root (`run` with the password on stdin,
+    /// `stream` behind the nonce prompt), and a wrong password locks instead of running anything.
+    func testASudoTransportRunsAsRoot() async throws {
+        let lab = try lab()
+        let rkpw = transport(lab, user: lab.sudoUser)
+        let elevated = SudoTransport(base: rkpw, password: lab.sudoPassword, validUntil: Date().addingTimeInterval(120))
+        let run = try await elevated.run("id -u", timeout: 30)
+        XCTAssertEqual(run.exitCode, 0, run.stderr)
+        XCTAssertEqual(run.stdout.trimmingCharacters(in: .whitespacesAndNewlines), "0")
+        let streamed = try await collect(elevated.stream("id -u"))
+        XCTAssertTrue(ANSI.strip(streamed).split(whereSeparator: \.isNewline).contains { $0.trimmingCharacters(in: .whitespaces) == "0" }, streamed)
+
+        let rejected = RejectedFlag()
+        let wrong = SudoTransport(base: rkpw, password: "not-the-password", validUntil: Date().addingTimeInterval(120),
+                                  onRejected: { rejected.set() })
+        do {
+            _ = try await wrong.run("id -u", timeout: 30)
+            XCTFail("a wrong password must not run the command")
+        } catch {
+            XCTAssertEqual(error as? SudoTransportError, .rejected)
+        }
+        XCTAssertTrue(rejected.value, "the app is told, so it locks Docker again")
+    }
+
+    /// The Files screen on a phone: a file and a folder (tar made here, unpacked by the server's GNU tar) go up, come back
+    /// down (the server's tar read here), and new folder, rename and delete work, all in a throwaway folder under /tmp.
+    /// An upload whose length is wrong (cut off) changes nothing.
+    func testFilesGoUpAndComeBackDown() async throws {
+        let lab = try lab()
+        let t = transport(lab)
+        let files = FilesSession(transport: t, transfers: t, policy: ActionPolicy())
+        let made = try await t.run("mktemp -d /tmp/rk-ios-files-XXXXXX", timeout: 30)
+        let remote = made.stdout.trimmingCharacters(in: .whitespacesAndNewlines)
+        XCTAssertTrue(remote.hasPrefix("/tmp/rk-ios-files-"), made.stderr)
+        defer { Task { _ = try? await t.run("rm -rf -- '\(remote)'", timeout: 30) } }
+        let fm = FileManager.default
+        let local = fm.temporaryDirectory.appendingPathComponent("rk-ios-files-\(UUID().uuidString.prefix(8))", isDirectory: true)
+        defer { try? fm.removeItem(at: local) }
+        let folder = local.appendingPathComponent("site", isDirectory: true)
+        try fm.createDirectory(at: folder.appendingPathComponent("assets/img"), withIntermediateDirectories: true)
+        try Data("<h1>hi</h1>\n".utf8).write(to: folder.appendingPathComponent("index.html"))
+        let blob = Data((0..<300_000).map { UInt8($0 % 253) })
+        try blob.write(to: folder.appendingPathComponent("assets/img/blob.bin"))
+        let long = String(repeating: "l", count: 130) + ".txt"
+        try Data("long\n".utf8).write(to: folder.appendingPathComponent(long))
+        try fm.createSymbolicLink(atPath: folder.appendingPathComponent("current").path, withDestinationPath: "assets")
+        let note = local.appendingPathComponent("note.txt")
+        try Data("first\n".utf8).write(to: note)
+
+        func upload(_ source: LocalSource, as name: String) async throws {
+            let intent = try XCTUnwrap(files.uploadIntent(source, toDirectory: remote, as: name))
+            try await files.upload(source, toDirectory: remote, as: name, confirmation: try files.confirm(intent), progress: { _ in })
+        }
+        try await upload(.file(note, bytes: 6), as: "note.txt")
+        let entries = try TarWriter.entries(of: folder, as: "site")
+        try await upload(.folder(folder, bytes: TarWriter.size(of: entries)), as: "site")
+
+        let check = try await t.run("cd '\(remote)' && cat note.txt && cat site/index.html && wc -c < site/assets/img/blob.bin && cat site/\(long) && readlink site/current", timeout: 30)
+        XCTAssertEqual(check.exitCode, 0, check.stderr)
+        XCTAssertEqual(check.stdout.split(separator: "\n").map { $0.trimmingCharacters(in: .whitespaces) },
+                       ["first", "<h1>hi</h1>", "300000", "long", "assets"])
+
+        // Cut off: one byte short of what the command was told to expect. Nothing changes.
+        try Data("second\n".utf8).write(to: note)
+        do {
+            try await upload(.file(note, bytes: 8), as: "note.txt")
+            XCTFail("a short upload must be refused")
+        } catch {
+            XCTAssertTrue("\(error.localizedDescription)".contains("interrupted"), "\(error)")
+        }
+        let kept = try await t.run("cat '\(remote)/note.txt'; ls -A '\(remote)'", timeout: 30)
+        XCTAssertEqual(kept.stdout, "first\nnote.txt\nsite\n", "the old file stays and no part file is left")
+
+        let back = local.appendingPathComponent("back", isDirectory: true)
+        try fm.createDirectory(at: back, withIntermediateDirectories: true)
+        try await files.download(name: "note.txt", isDirectory: false, from: remote, toLocalDirectory: back, as: "note.txt",
+                                 replacing: false, progress: { _ in })
+        try await files.download(name: "site", isDirectory: true, from: remote, toLocalDirectory: back, as: "site",
+                                 replacing: false, progress: { _ in })
+        XCTAssertEqual(try String(contentsOf: back.appendingPathComponent("note.txt"), encoding: .utf8), "first\n")
+        XCTAssertEqual(try Data(contentsOf: back.appendingPathComponent("site/assets/img/blob.bin")), blob)
+        XCTAssertEqual(try String(contentsOf: back.appendingPathComponent("site/\(long)"), encoding: .utf8), "long\n")
+        XCTAssertEqual(try fm.destinationOfSymbolicLink(atPath: back.appendingPathComponent("site/current").path), "assets")
+
+        for op in [FileOperation.makeFolder(in: remote, name: "new"), .rename(in: remote, from: "note.txt", to: "renamed.txt"),
+                   .delete(in: remote, name: "site", isFolder: true)] {
+            let intent = try XCTUnwrap(files.intent(for: op), "\(op)")
+            try await files.perform(op, confirmation: try files.confirm(intent))
+        }
+        let listing = try await files.list(remote)
+        XCTAssertEqual(listing.entries.map(\.name).sorted(), ["new", "renamed.txt"])
+    }
+}
+
+private final class RejectedFlag: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _value = false
+    func set() { lock.withLock { _value = true } }
+    var value: Bool { lock.withLock { _value } }
+}
+
+/// Collects a streamed action's events from any thread.
+private final class EventBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var _text = ""
+    private var _code: Int32??
+    func add(_ event: ActionStreamEvent) {
+        lock.withLock {
+            switch event {
+            case .output(let t): _text += t
+            case .finished(let c): _code = .some(c)
+            }
+        }
+    }
+    var text: String { lock.withLock { _text } }
+    var exitCode: Int32? { lock.withLock { _code ?? nil } }
+}

@@ -11,3 +11,6 @@ local.properties
 
 # raw captures from real servers: never commit, sanitize into named fixtures first
 spec/fixtures/**/raw-*
+
+# Personal iOS signing (team id, own bundle id): never committed
+apple/Apps/RackoonIOS/Signing.local.xcconfig

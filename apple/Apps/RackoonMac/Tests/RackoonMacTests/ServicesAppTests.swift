@@ -1,6 +1,7 @@
 import Foundation
 @testable import RackoonCore
 import XCTest
+@testable import RackoonDemo
 @testable import RackoonMac
 
 /// The demo's services data goes through the real parser, so the demo shows what a real server would.
