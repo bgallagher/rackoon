@@ -33,7 +33,7 @@ Self-hosters manage servers through raw SSH, Compose commands and scattered book
 
 **Non-goals for the MVP**
 
-- Windows, Linux desktop or web versions.
+- Windows or Linux desktop versions. (A web version was listed here until 2026-10-16; it is now Phase 5, below.)
 - Kubernetes, multi-user teams, or cloud-provider management.
 - A server-side agent or hosted backend.
 
@@ -99,6 +99,14 @@ The MVP is a signed Mac app (macOS 14+, Apple Silicon) that the author can use d
 - Mac App Store build: sandboxing, key import flow, privacy policy, pricing and review notes.
 - Backup status (restic, borg), security view (open ports, fail2ban, SSH logins), reverse-proxy route map.
 - Gate: 5 outside testers use it for 4 weeks and at least 3 would pay.
+
+**Phase 5: Self-hosted web version**
+
+- A Docker image the user runs on their own tailnet: a Python (FastAPI) backend that holds the SSH connections and a React + TypeScript frontend that only renders. Nothing is installed on the managed servers; the web host is just another SSH client.
+- A third core in Python, kept in step with Swift and Kotlin through `spec/` only (golden fixtures, shared scenarios, lab checks; docs/parity.md). The browser holds no server logic.
+- Single user: argon2id admin password (from a file or a one-time setup token), optional TOTP, HttpOnly/Secure/SameSite=Strict session cookie, CSRF on mutations, login rate limit, optional forward-auth header from trusted proxies only. Every mutation uses the same confirm-the-exact-command policy. Non-root container; the docs say keep it on the tailnet.
+- Stages W0 (spike: asyncssh transport, browser terminal latency) to W8 (end-to-end tests, image hardening, release), each approved before the next. Spike results: docs/web-spikes.md.
+- Gate: the author uses it from a browser on a machine with no Rackoon app installed for 2 weeks.
 
 **Parked ideas:** file browser, cron and user management, log search, multi-server dashboards, team sharing.
 

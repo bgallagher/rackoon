@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""Smoke test of the web image (web/Dockerfile), run the way docs/web.md says to run it: read-only root, a tmpfs /tmp,
+no capabilities, no new privileges. Checks: it becomes healthy, runs as uid 10001 with no pip and no setuid files, the
+page carries its CSP, demo mode needs no sign-in and lists the made-up servers, and a fresh /data asks for the one-time
+setup token (kept 0700/0600).
+
+    tools/test-web-image [image]      (default rackoon-web:test; build it first)
+"""
+
+import json
+import subprocess
+import sys
+import time
+import urllib.request
+
+IMAGE = sys.argv[1] if len(sys.argv) > 1 else "rackoon-web:test"
+PORT = 18089
+HARDENED = ["--read-only", "--tmpfs", "/tmp", "--cap-drop", "ALL", "--security-opt", "no-new-privileges"]
+
+
+def sh(*args: str, check: bool = True) -> str:
+    return subprocess.run(args, check=check, capture_output=True, text=True).stdout
+
+
+def get(path: str) -> tuple[int, dict[str, str], bytes]:
+    with urllib.request.urlopen(f"http://127.0.0.1:{PORT}{path}", timeout=5) as r:
+        return r.status, {k.lower(): v for k, v in r.headers.items()}, r.read()
+
+
+def start(name: str, *extra: str) -> None:
+    sh("docker", "rm", "-f", name, check=False)
+    sh("docker", "run", "-d", "--name", name, *HARDENED, "-p", f"127.0.0.1:{PORT}:8080", *extra, IMAGE)
+    for _ in range(60):
+        try:
+            if get("/api/health")[0] == 200:
+                return
+        except OSError:
+            pass
+        time.sleep(1)
+    print(sh("docker", "logs", name, check=False))
+    raise SystemExit(f"{name}: never answered /api/health")
+
+
+def check(ok: bool, what: str) -> None:
+    print(("ok   " if ok else "FAIL ") + what)
+    if not ok:
+        global failed
+        failed = True
+
+
+failed = False
+try:
+    start("rk-image-demo", "-e", "RACKOON_DEMO=1")
+    check(sh("docker", "exec", "rk-image-demo", "id", "-u").strip() == "10001", "runs as uid 10001")
+    check("no-pip" in sh("docker", "exec", "rk-image-demo", "sh", "-c", "command -v pip pip3 || echo no-pip"), "no pip")
+    setuid = sh("docker", "exec", "rk-image-demo", "sh", "-c", "find / -xdev -perm /6000 -type f 2>/dev/null; true")
+    check(setuid.strip() == "", "no setuid or setgid files")
+    check(json.loads(get("/api/health")[2]).get("version") not in (None, ""), "the health check names the version")
+    status, headers, body = get("/")
+    check(status == 200 and b'<div id="root">' in body, "serves the UI")
+    check("frame-ancestors 'none'" in headers.get("content-security-policy", ""), "the page has its CSP")
+    state = json.loads(get("/api/auth/state")[2])
+    check(state["demo"] and state["authenticated"], "demo mode needs no sign-in")
+    servers = json.loads(get("/api/servers")[2])
+    check([s["name"] for s in servers][:2] == ["homelab", "garage-nuc"], "demo servers are listed")
+    for _ in range(45):
+        health = sh("docker", "inspect", "-f", "{{.State.Health.Status}}", "rk-image-demo").strip()
+        if health != "starting":
+            break
+        time.sleep(1)
+    check(health == "healthy", f"Docker reports it healthy ({health})")
+finally:
+    sh("docker", "rm", "-f", "rk-image-demo", check=False)
+
+volume = "rk-image-data"
+try:
+    sh("docker", "volume", "rm", volume, check=False)
+    start("rk-image-fresh", "-v", f"{volume}:/data")
+    state = json.loads(get("/api/auth/state")[2])
+    check(state["setupRequired"] and not state["authenticated"] and not state["demo"], "a fresh /data asks for setup")
+    logs = sh("docker", "logs", "rk-image-fresh") + subprocess.run(["docker", "logs", "rk-image-fresh"],
+                                                                     capture_output=True, text=True).stderr
+    check("one-time setup token" in logs, "the setup token is in the log")
+    modes = sh("docker", "exec", "rk-image-fresh", "stat", "-c", "%a %U %n", "/data", "/data/secret", "/data/setup-token")
+    check(modes.split("\n")[:3] == ["700 rackoon /data", "600 rackoon /data/secret", "600 rackoon /data/setup-token"],
+          "/data is 0700 and its files 0600")
+finally:
+    sh("docker", "rm", "-f", "rk-image-fresh", check=False)
+    sh("docker", "volume", "rm", volume, check=False)
+
+sys.exit(1 if failed else 0)

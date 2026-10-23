@@ -6,7 +6,7 @@ Rackoon ships, or is planned to ship, on four platforms: **mac** (`apple/Apps/Ra
 |---|---|---|
 | `apple/Packages/RackoonCore` | Swift | mac, ios |
 | `android/core` | Kotlin | android |
-| `web/backend/rackoon/core` (planned) | Python | web |
+| `web/backend/rackoon/core` | Python | web |
 
 The rule: **a change to one app keeps the others honest.** Platforms may lag, but only visibly, and nothing can claim to be done without a passing test. Four layers enforce it.
 
@@ -32,6 +32,8 @@ Every user-facing feature has one entry per platform:
 ```bash
 (cd apple && swift test --parallel --skip LabIntegrationTests --xunit-output build/junit/swift.xml)
 tools/check-parity --summary mac=apple/build/junit android=android/core/build/test-results/test,android/ssh/build/test-results/test
+(cd web/backend && uv run pytest --junitxml=build/junit/web.xml)
+tools/check-parity --summary web=web/backend/build/junit
 ```
 
 The iOS report comes from the simulator: the app's test plan (`apple/Apps/RackoonIOS`, opened through `RackoonIOS.xcworkspace`) runs the app's own tests and the package tests that build for iOS (RackoonCore, RackoonSSHEmbedded, RackoonDemo) on iOS itself, and `tools/xcresult-junit` turns the result bundle into JUnit with the same `<bundle>.<Class>` names, so `RackoonCoreTests.ShellQuoteTests` means the same tests on mac and ios. Core tests that run a command in a real `/bin/sh` are skipped on iOS (no shell there), and a skip never counts.
@@ -56,7 +58,8 @@ Rules that are not parsers, written once as data and run by every core: shell qu
  "cases": [{"name": "rebuild one service", "action": "rebuild", "service": "web", "stack": {…}, "expect": "cd '/srv/media' && …"}]}
 ```
 
-- Each core has one runner, `SharedScenarioTests` (Swift `RackoonCoreTests`, Kotlin `android/core`), with a test per `subject`.
+- Each core has one runner, `SharedScenarioTests` (Swift `RackoonCoreTests`, Kotlin `android/core`; Python `web/backend/tests/test_shared_scenarios.py`), with a test per `subject`.
+- The Python runners (scenarios and lab checks) also take `RACKOON_PARITY_ALL=1`, which runs the files and checks whose feature is not done on web yet. CI runs the scenarios that way too, to keep work ahead of the matrix honest; only the gated run's report counts as proof.
 - **A file runs on a platform only while its `feature` is done there**, so marking a feature done switches its scenarios on. A runner fails if an applicable file has a subject it does not know. A file without a `feature` runs on every core.
 - Wording stays each app's own: scenarios compare results (a command, null, ok or refused), not message text.
 

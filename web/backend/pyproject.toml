@@ -1,0 +1,48 @@
+[project]
+name = "rackoon-web"
+version = "0.0.0"
+description = "Rackoon's self-hosted web backend: the Python core and the asyncssh transport"
+requires-python = ">=3.12"
+dependencies = [
+    "asyncssh[bcrypt]>=2.21",
+    "argon2-cffi>=23.1",
+    "fastapi>=0.115",
+    "anyio>=4.5",   # shielded cleanup in socket handlers (already a FastAPI dependency)
+    "uvicorn[standard]>=0.34",
+    "httpx>=0.28",
+    "pywebpush>=2.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3",
+    "pytest-asyncio>=0.25",
+    "mypy>=1.15",
+    "jsonschema>=4.23",
+    "types-jsonschema>=4.23",
+]
+spike = [
+    "websockets>=14",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["rackoon"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+testpaths = ["tests"]
+pythonpath = ["."]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+packages = ["rackoon", "tests"]
+
+[[tool.mypy.overrides]]
+module = ["asyncssh.*"]
+follow_untyped_imports = true

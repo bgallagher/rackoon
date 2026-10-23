@@ -1,0 +1,27 @@
+# Rackoon for the web, on a host that is already on your tailnet (docs/web.md, option A).
+# HTTPS comes from `tailscale serve` on the host:   tailscale serve --bg --https=443 http://127.0.0.1:8080
+services:
+  rackoon:
+    image: ghcr.io/bgallagher/rackoon-web:latest
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8080:8080"     # only tailscale serve reaches it; never publish it on the LAN or the internet
+    volumes:
+      - rackoon-data:/data
+      # - ~/.ssh/config:/ssh/config:ro   # optional: import servers from your ssh_config (then set RACKOON_SSH_CONFIG)
+    environment:
+      # RACKOON_ADMIN_PASSWORD_FILE: /run/secrets/rackoon_admin   # optional; otherwise the first start logs a setup token
+      # RACKOON_SSH_CONFIG: /ssh/config
+      TZ: Etc/UTC
+    # secrets: [rackoon_admin]
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+
+volumes:
+  rackoon-data:
+
+# secrets:
+#   rackoon_admin:
+#     file: ./rackoon-admin-password.txt

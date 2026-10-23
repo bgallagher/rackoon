@@ -41,6 +41,89 @@ jobs:
             android/ssh/build/test-results/test/*.xml
           retention-days: 7
           if-no-files-found: error
+  web-core:
+    # The Python core of the self-hosted web version (web/backend/rackoon/core) and its asyncssh transport. Core reads spec/
+    # directly, so every golden fixture is checked here too; the lab tests skip (no RACKOON_LAB). The second pytest run
+    # also runs the scenarios whose feature is not done on web yet, to keep work ahead of the matrix honest; only the
+    # first run's report counts for parity.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv sync --locked
+        working-directory: web/backend
+      - run: uv run mypy
+        working-directory: web/backend
+      - run: uv run pytest --junitxml=build/junit/web.xml
+        working-directory: web/backend
+      - run: RACKOON_PARITY_ALL=1 uv run pytest -q tests/test_shared_scenarios.py
+        working-directory: web/backend
+      - uses: actions/upload-artifact@v4
+        if: always()   # the parity job reports failing tests too
+        with:
+          name: junit-web
+          path: web/backend/build/junit/*.xml
+          retention-days: 7
+          if-no-files-found: error
+  web-frontend:
+    # The self-hosted web version's React + TypeScript UI (web/frontend). It only renders what the backend computes;
+    # this checks the types, runs its few formatting tests and builds the bundle the image will serve.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: web/frontend
+      - run: npm run typecheck
+        working-directory: web/frontend
+      - run: npm test
+        working-directory: web/frontend
+      - run: npx vite build
+        working-directory: web/frontend
+  web-image:
+    # The self-hosted web image (web/Dockerfile): built, smoke-tested the hardened way docs/web.md runs it (read-only root,
+    # no capabilities, no new privileges; tools/test-web-image), then the Playwright end-to-end tests (web/e2e) run against
+    # it in demo mode, where nothing is sent anywhere.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: web/Dockerfile
+          load: true
+          tags: rackoon-web:test
+          build-args: VERSION=ci-${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+      - run: python3 tools/test-web-image rackoon-web:test
+      - name: Start the image in demo mode
+        run: |
+          docker run -d --name rk-e2e --read-only --tmpfs /tmp --cap-drop ALL --security-opt no-new-privileges \
+            -e RACKOON_DEMO=1 -p 127.0.0.1:18090:8080 rackoon-web:test
+          for i in $(seq 60); do curl -sf http://127.0.0.1:18090/api/health && break; sleep 1; done
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci
+        working-directory: web/e2e
+      - run: npx playwright install --with-deps chromium
+        working-directory: web/e2e
+      - run: npx playwright test
+        working-directory: web/e2e
+        env:
+          RACKOON_E2E_URL: http://127.0.0.1:18090
+      - if: failure()
+        run: docker logs rk-e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: web-e2e-results
+          path: web/e2e/test-results
+          retention-days: 7
   swift-macos:
     # SwiftTerm 1.99 needs Swift 6.2+. On an older toolchain SwiftPM silently picked SwiftTerm 1.20.0, which lacks the
     # APIs the app uses, so CI failed on every push. macos-26 ships Xcode 26 (Swift 6.2+).
@@ -174,6 +257,14 @@ jobs:
             swift:6.2 bash -c 'trap "chown -R \"\$OWNER\" .build build 2>/dev/null || true" EXIT
               swift test --filter RackoonSSHEmbeddedTests.LabIntegrationTests --parallel --num-workers 4 \
                 --xunit-output build/junit-ios-lab/swift.xml'
+      - uses: astral-sh/setup-uv@v6
+      - name: Web (asyncssh) lab checks
+        run: |
+          labenv="$(../../tools/lab env)"
+          eval "$labenv"
+          uv sync --locked
+          uv run pytest tests/test_lab_integration.py tests/test_api_lab.py tests/test_docker_api_lab.py tests/test_updates_api_lab.py tests/test_w7_api_lab.py --junitxml=build/junit-lab/web.xml
+        working-directory: web/backend
       - if: always()
         run: tools/lab down
       - uses: actions/upload-artifact@v4
@@ -197,11 +288,18 @@ jobs:
           path: apple/build/junit-ios-lab/*.xml
           retention-days: 7
           if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: junit-web-lab
+          path: web/backend/build/junit-lab/*.xml
+          retention-days: 7
+          if-no-files-found: error
 
   # Feature parity (docs/parity.md): every test spec/features.json names for a done feature must have run and passed in
   # that platform's JUnit report. Runs even when a test job failed, so the summary names what broke parity.
   parity:
-    needs: [spec, swift-macos, android-core, ios, lab]
+    needs: [spec, swift-macos, android-core, ios, web-core, lab]
     if: always() && needs.spec.result == 'success'
     runs-on: ubuntu-latest
     steps:
@@ -211,9 +309,9 @@ jobs:
           pattern: junit-*
           path: junit
       - run: |
-          tools/check-parity --summary --require mac,android,ios \
+          tools/check-parity --summary --require mac,android,ios,web \
             mac=junit/junit-mac,junit/junit-mac-lab android=junit/junit-android,junit/junit-android-lab \
-            ios=junit/junit-ios,junit/junit-ios-lab | tee parity.txt
+            ios=junit/junit-ios,junit/junit-ios-lab web=junit/junit-web,junit/junit-web-lab | tee parity.txt
           status=${PIPESTATUS[0]}
           { echo '## Feature parity'; echo; cat parity.txt; } >> "$GITHUB_STEP_SUMMARY"
           exit $status
@@ -296,3 +394,59 @@ jobs:
             --title "Rackoon for Android ${VERSION}" \
             --generate-notes \
             --notes "**Platform: Android (APK, Android 8.0 or later).** Developed by Brian Gallagher (https://github.com/bgallagher). One universal APK, signed with the Rackoon release key; it is not on Google Play, so open the file on your phone and allow \"Install unknown apps\" for your browser or file manager when Android asks. Updates install over the top as long as they come from this release series. Verify the download with the .sha256 file. Looking for the Mac app? See the releases named \"Rackoon for Mac\"."
+
+  # A web-v* tag publishes the self-hosted web image to GHCR (linux/amd64 and linux/arm64, with an SBOM and build
+  # provenance) and a release page "Rackoon for the web <version>". A version with a suffix is a pre-release and does not
+  # move the `latest` tag.
+  web-release:
+    needs: [spec, web-core, web-frontend, web-image]
+    if: startsWith(github.ref, 'refs/tags/web-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+      - name: Image name and tags
+        id: names
+        run: |
+          VERSION="${GITHUB_REF_NAME#web-v}"
+          IMAGE="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/rackoon-web"
+          TAGS="$IMAGE:$VERSION"
+          if [[ "$VERSION" != *-* ]]; then TAGS="$TAGS,$IMAGE:latest"; fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
+          echo "tags=$TAGS" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        id: push
+        with:
+          context: .
+          file: web/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.names.outputs.tags }}
+          build-args: VERSION=${{ steps.names.outputs.version }}
+          sbom: true
+          provenance: mode=max
+          cache-from: type=gha
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE: ${{ steps.names.outputs.image }}
+          VERSION: ${{ steps.names.outputs.version }}
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          PRE=""
+          if [[ "$VERSION" == *-* ]]; then PRE="--prerelease"; fi
+          gh release create "$GITHUB_REF_NAME" $PRE \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Rackoon for the web ${VERSION}" \
+            --generate-notes \
+            --notes "**Platform: self-hosted web (Docker image, linux/amd64 and linux/arm64).** \`docker pull ${IMAGE}:${VERSION}\` (digest \`${DIGEST}\`). Run it on your tailnet, never on the open internet: see docs/web.md for the compose file, HTTPS through Tailscale and the first sign-in. Looking for the apps? See the releases named \"Rackoon for Mac\" and \"Rackoon for Android\"."

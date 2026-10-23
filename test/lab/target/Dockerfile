@@ -8,12 +8,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=docker:27-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker:27-cli /usr/local/libexec/docker/cli-plugins/ /usr/local/libexec/docker/cli-plugins/
 
-# Users: rk (key login, passwordless sudo), rkpw (key login, sudo wants its password).
+# Users: rk (key login, passwordless sudo), rkpw (key login, sudo wants its password; sudo keeps DOCKER_HOST so Docker
+# through sudo reaches dind, as the socket would on a real server).
 RUN useradd -m -s /bin/bash rk && useradd -m -s /bin/bash rkpw \
     && echo 'rkpw:lab-sudo-password' | chpasswd \
     && echo 'rk ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/rk \
     && echo 'rkpw ALL=(ALL) ALL' > /etc/sudoers.d/rkpw \
     && echo 'Defaults:rkpw passwd_tries=1' >> /etc/sudoers.d/rkpw \
+    && echo 'Defaults:rkpw env_keep += "DOCKER_HOST"' >> /etc/sudoers.d/rkpw \
     && chmod 440 /etc/sudoers.d/*
 
 # A local apt archive with one ordinary and one security update, so `apt list --upgradable` has a known answer offline.
