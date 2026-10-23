@@ -209,3 +209,24 @@ Not built in I1: an app icon (needs an asset catalog), key sign-in, and anything
 - **Found on the way.** Value-based `NavigationLink(value:)` rows did nothing on a screen that was itself pushed by a view-based link (the alert → Services path), so the new screens use view-based links like the rest of the app. A command opened from Search showed no title when pushed twice, so it now opens straight on the command's page.
 - **Checked in the simulator (demo mode).** Alerts after the first look (failed backup-sync, crash-looping cloudflared, unhealthy promtail, security updates, reboot required) with the tab badge; an alert opening Services filtered to its service; Status streaming; Restart's confirm sheet with its dry run, then the run; Search for "jelly" (stack, container, bookmark from the alert check's reading) and "disk usage" (opens and runs the command); Files listing the home folder and a download landing in Downloads with Share. Against the lab (rk, a throwaway /tmp folder): `testFilesGoUpAndComeBackDown` uploads a file and a folder (unpacked by the server's GNU tar), refuses a cut-off upload without touching the old file, downloads both back intact, then makes, renames and deletes.
 - **Not built / not tried:** uploading from the Files app on a device (the picker was not driven in the simulator; the model and transport are tested), choosing service icons, a Services or Alerts page on the Dashboard, the certificate check on iOS 17.
+
+## Stage I7 result: XCUITest flows in demo mode (22 Oct 2026)
+
+A UI test target, `RackoonIOSUITests` (folder-synchronised like the others, in the scheme's test plan, so the CI `ios` job runs it and its results reach `junit-ios`), drives the app end to end in demo mode. Every flow launches with `RACKOON_DEMO=1` and `RACKOON_UI_TEST=1`; the second makes `RackoonIOSApp.prepareForUITests()` clear the app's saved preferences (tab, Dashboard page, Read-only, toggles) and turn animations off, so each launch starts the same. Nothing is sent anywhere.
+
+| Flow (`RackoonIOSUITests.…`) | What it walks through | Feature rows it now also proves on iOS |
+|---|---|---|
+| `OverviewFlowTests` | Dashboard with the fleet totals, Servers → homelab, its attention list and every place it links to | `fleet.dashboard`, `overview`, `attention`, `demo` |
+| `DockerFlowTests` | Docker → the jellyfin stack → Stack Actions → Restart All… → the confirm sheet with the exact command → Run Command → the streamed run finishes | `docker.stack-actions`, `safety.confirm` |
+| `UpdatesFlowTests` | Updates → Install All → confirm → apt's output | `updates.install` |
+| `ServicesFlowTests` | Services → cloudflared → Status streams → Restart… asks first → runs | `services` |
+| `CommandsFlowTests` | Commands → Disk usage runs; Run a Command… → typed `uptime` asks first → runs | `commands.library` |
+| `FilesFlowTests` | Files → swipe notes.txt → Download → Share appears; into backups | `files` |
+| `AlertsFlowTests` | Alerts tab → the crash-looping cloudflared alert (after the first look) → Services filtered to it → its page | `alerts` |
+| `SearchFlowTests` | Search "disk usage" → the command → Run | `search` |
+| `ReadOnlyFlowTests` | the Read-only chip on, then a service's Restart is off and Status still on | `safety.read-only` |
+
+- **Running them.** They are part of `RackoonIOS.xctestplan`, so the usual `xcodebuild test … -scheme RackoonIOS` runs them (about 3 minutes on the iPhone 17 simulator); add `-only-testing:RackoonIOSUITests` for the flows alone. CI's `ios` job runs them with everything else; no workflow change was needed.
+- **Writing more.** Flows find things by accessibility identifier (`openServices`, `service-<id>`, `stack-<id>`, `confirmRun`, `outputClose`…). A segmented picker does not expose its own identifier (use its segment buttons), a menu item's label also carries its description line (match with `BEGINSWITH`), and a tab tap right after launch can be lost, so `DemoFlow.tab` checks the tab opened and taps again.
+- **Found on the way.** Clearing the preferences was not enough to start on the Dashboard every time (a run stopped by the test could leave its tab behind), so the UI-test launch sets the start tab and Dashboard page explicitly.
+- **Not covered by a flow:** terminals (the demo shell is unit-tested), the stack editor, Add Container, the sudo sheet and Face ID (no password in demo mode), host-key trust and sign-in (demo servers skip them), uploads (the Files picker is outside the app).

@@ -88,7 +88,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonCoreTests.OverviewIPTests", "RackoonCoreTests.ServerSessionTests", "RackoonSSHSystemTests.LabIntegrationTests/testOverviewParses"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.OverviewTests", "com.bgallagher.rackoon.ssh.LabIntegrationTests/overviewParses"]},
-        "ios": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonCoreTests.OverviewIPTests", "RackoonCoreTests.ServerSessionTests", "RackoonSSHEmbeddedTests.LabIntegrationTests/testOverviewParses", "RackoonIOSTests.FleetTests"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonCoreTests.OverviewIPTests", "RackoonCoreTests.ServerSessionTests", "RackoonSSHEmbeddedTests.LabIntegrationTests/testOverviewParses", "RackoonIOSTests.FleetTests", "RackoonIOSUITests.OverviewFlowTests"]},
         "web": {"status": "planned", "reason": "stage W3"}
       }
     },
@@ -108,7 +108,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonCoreTests.RebootOfferTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.AttentionTests", "com.bgallagher.rackoon.core.AttentionPresentationTests"]},
-        "ios": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonDemoTests.DemoDataTests/testOverviewParsesWithAttentionItems", "RackoonIOSTests.DemoModeTests/testDemoShowsTheSharedDemoServersAndAnswersWithoutANetwork"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.OverviewTests", "RackoonDemoTests.DemoDataTests/testOverviewParsesWithAttentionItems", "RackoonIOSTests.DemoModeTests/testDemoShowsTheSharedDemoServersAndAnswersWithoutANetwork", "RackoonIOSUITests.OverviewFlowTests"]},
         "web": {"status": "planned", "reason": "stage W3"}
       }
     },
@@ -118,7 +118,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.FleetTests"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
-        "ios": {"status": "done", "tests": ["RackoonCoreTests.FleetTests", "RackoonIOSTests.FleetTests", "RackoonIOSTests.DockerModelTests"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.FleetTests", "RackoonIOSTests.FleetTests", "RackoonIOSTests.DockerModelTests", "RackoonIOSUITests.OverviewFlowTests"]},
         "web": {"status": "planned", "reason": "stage W3"}
       }
     },
@@ -138,7 +138,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ActionPolicyTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ActionPolicyTests", "com.bgallagher.rackoon.core.ReadOnlyAutoTests"]},
-        "ios": {"status": "done", "tests": ["RackoonCoreTests.ActionPolicyTests", "RackoonIOSTests.ReadOnlyTests"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.ActionPolicyTests", "RackoonIOSTests.ReadOnlyTests", "RackoonIOSUITests.ReadOnlyFlowTests"]},
         "web": {"status": "planned", "reason": "stage W3"}
       }
     },
@@ -148,7 +148,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ActionPolicyTests", "RackoonCoreTests.SharedScenarioTests/testActionPolicy"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ActionPolicyTests", "com.bgallagher.rackoon.core.ActionPromptsTests", "com.bgallagher.rackoon.core.SharedScenarioTests/actionPolicy"]},
-        "ios": {"status": "done", "tests": ["RackoonCoreTests.ActionPolicyTests", "RackoonCoreTests.ActionPromptsTests", "RackoonCoreTests.SharedScenarioTests/testActionPolicy", "RackoonIOSTests.DockerModelTests"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.ActionPolicyTests", "RackoonCoreTests.ActionPromptsTests", "RackoonCoreTests.SharedScenarioTests/testActionPolicy", "RackoonIOSTests.DockerModelTests", "RackoonIOSUITests.DockerFlowTests"]},
         "web": {"status": "planned", "reason": "stage W3"}
       }
     },
@@ -158,7 +158,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonMacTests.DemoServicesTests", "RackoonMacTests.DemoAlertsTests", "RackoonDemoTests.DemoDataTests", "RackoonDemoTests.DemoShellTests"]},
         "android": {"status": "done", "tests": [], "untested": "debug-build demo mode; demo data is not unit-tested"},
-        "ios": {"status": "done", "tests": ["RackoonDemoTests.DemoDataTests", "RackoonDemoTests.DemoShellTests", "RackoonIOSTests.DemoModeTests", "RackoonIOSTests.TerminalStoreTests/testTheDemoTerminalAnswers"]},
+        "ios": {"status": "done", "tests": ["RackoonDemoTests.DemoDataTests", "RackoonDemoTests.DemoShellTests", "RackoonIOSTests.DemoModeTests", "RackoonIOSTests.TerminalStoreTests/testTheDemoTerminalAnswers", "RackoonIOSUITests.OverviewFlowTests"]},
         "web": {"status": "planned", "reason": "stage W3"}
       }
     },
@@ -228,7 +228,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ComposeActionTests", "RackoonCoreTests.StreamParserTests", "RackoonCoreTests.Utf8ChunkerTests", "RackoonCoreTests.SharedScenarioTests/testComposeCommand", "RackoonCoreTests.SharedScenarioTests/testStreamOutput", "RackoonSSHSystemTests.LabIntegrationTests/testStreamExitStatus"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.DockerSessionTests", "com.bgallagher.rackoon.core.StreamParserTests", "com.bgallagher.rackoon.core.Utf8ChunkerTests", "com.bgallagher.rackoon.core.SharedScenarioTests/composeCommand", "com.bgallagher.rackoon.core.SharedScenarioTests/streamOutput", "com.bgallagher.rackoon.ssh.LabIntegrationTests/streamExitStatus"]},
-        "ios": {"status": "done", "tests": ["RackoonCoreTests.ComposeActionTests", "RackoonCoreTests.StreamParserTests", "RackoonCoreTests.Utf8ChunkerTests", "RackoonCoreTests.SharedScenarioTests/testComposeCommand", "RackoonCoreTests.SharedScenarioTests/testStreamOutput", "RackoonCoreTests.ActionPromptsTests", "RackoonSSHEmbeddedTests.LabIntegrationTests/testStreamExitStatus", "RackoonSSHEmbeddedTests.LabIntegrationTests/testAStackRestartStreamsWithItsExitCode", "RackoonIOSTests.DockerModelTests"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.ComposeActionTests", "RackoonCoreTests.StreamParserTests", "RackoonCoreTests.Utf8ChunkerTests", "RackoonCoreTests.SharedScenarioTests/testComposeCommand", "RackoonCoreTests.SharedScenarioTests/testStreamOutput", "RackoonCoreTests.ActionPromptsTests", "RackoonSSHEmbeddedTests.LabIntegrationTests/testStreamExitStatus", "RackoonSSHEmbeddedTests.LabIntegrationTests/testAStackRestartStreamsWithItsExitCode", "RackoonIOSTests.DockerModelTests", "RackoonIOSUITests.DockerFlowTests"]},
         "web": {"status": "planned", "reason": "stage W5"}
       }
     },
@@ -348,7 +348,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.AptActionTests", "RackoonCoreTests.UpdatesSessionActionTests", "RackoonCoreTests.AptStreamingTests"]},
         "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.AptActionTests", "com.bgallagher.rackoon.core.UpdatesSessionActionTests", "com.bgallagher.rackoon.core.AptStreamingTests"]},
-        "ios": {"status": "done", "tests": ["RackoonCoreTests.AptActionTests", "RackoonCoreTests.UpdatesSessionActionTests", "RackoonCoreTests.AptStreamingTests", "RackoonCoreTests.UpdatesPresentationTests", "RackoonIOSTests.UpdatesModelTests"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.AptActionTests", "RackoonCoreTests.UpdatesSessionActionTests", "RackoonCoreTests.AptStreamingTests", "RackoonCoreTests.UpdatesPresentationTests", "RackoonIOSTests.UpdatesModelTests", "RackoonIOSUITests.UpdatesFlowTests"]},
         "web": {"status": "planned", "reason": "stage W6"}
       }
     },
@@ -388,7 +388,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.ServicesTests", "RackoonMacTests.DemoServicesTests", "RackoonMacTests.ServiceVisibilityStoreTests"]},
         "android": {"status": "planned", "reason": "core on feature/android-services-alerts; no screen yet"},
-        "ios": {"status": "done", "tests": ["RackoonCoreTests.ServicesTests", "RackoonCoreTests.ServicesPresentationTests", "RackoonIOSTests.ServicesModelTests"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.ServicesTests", "RackoonCoreTests.ServicesPresentationTests", "RackoonIOSTests.ServicesModelTests", "RackoonIOSUITests.ServicesFlowTests"]},
         "web": {"status": "planned", "reason": "stage W7"}
       }
     },
@@ -398,7 +398,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.AlertsTests", "RackoonMacTests.DemoAlertsTests"]},
         "android": {"status": "planned", "reason": "core on feature/android-services-alerts; no screen yet"},
-        "ios": {"status": "done", "tests": ["RackoonCoreTests.AlertsTests", "RackoonIOSTests.AlertMonitorTests"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.AlertsTests", "RackoonIOSTests.AlertMonitorTests", "RackoonIOSUITests.AlertsFlowTests"]},
         "web": {"status": "planned", "reason": "stage W7"}
       }
     },
@@ -418,7 +418,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.SearchTests"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
-        "ios": {"status": "done", "tests": ["RackoonCoreTests.SearchTests", "RackoonIOSTests.SearchIndexTests"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.SearchTests", "RackoonIOSTests.SearchIndexTests", "RackoonIOSUITests.SearchFlowTests"]},
         "web": {"status": "planned", "reason": "stage W7"}
       }
     },
@@ -428,7 +428,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.CommandLibraryTests", "RackoonCoreTests.NoServerChangeGuardTests"]},
         "android": {"status": "planned", "reason": "core has CommandLibrary; no screen yet"},
-        "ios": {"status": "done", "tests": ["RackoonCoreTests.CommandLibraryTests", "RackoonCoreTests.NoServerChangeGuardTests", "RackoonCoreTests.ServicesPresentationTests", "RackoonIOSTests.CommandsModelTests"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.CommandLibraryTests", "RackoonCoreTests.NoServerChangeGuardTests", "RackoonCoreTests.ServicesPresentationTests", "RackoonIOSTests.CommandsModelTests", "RackoonIOSUITests.CommandsFlowTests"]},
         "web": {"status": "planned", "reason": "stage W7"}
       }
     },
@@ -438,7 +438,7 @@
       "platforms": {
         "mac": {"status": "done", "tests": ["RackoonCoreTests.RemoteFilesTests", "RackoonCoreTests.FileTransferTests", "RackoonCoreTests.FileOperationTests", "RackoonSSHSystemTests.LabIntegrationTests/testStdinExactBytes"]},
         "android": {"status": "planned", "reason": "not built on Android yet"},
-        "ios": {"status": "done", "tests": ["RackoonCoreTests.RemoteFilesTests", "RackoonCoreTests.FileOperationTests", "RackoonCoreTests.TarArchiveTests", "RackoonIOSTests.FilesModelTests", "RackoonSSHEmbeddedTests.LabIntegrationTests/testFilesGoUpAndComeBackDown"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.RemoteFilesTests", "RackoonCoreTests.FileOperationTests", "RackoonCoreTests.TarArchiveTests", "RackoonIOSTests.FilesModelTests", "RackoonSSHEmbeddedTests.LabIntegrationTests/testFilesGoUpAndComeBackDown", "RackoonIOSUITests.FilesFlowTests"]},
         "web": {"status": "planned", "reason": "stage W7"}
       }
     },

@@ -3,20 +3,23 @@
     {
       "id" : "5D0C2E8A-7B1F-4C6E-9A3D-2F8E1B4C7A60",
       "name" : "Default",
-      "options" : {
-
-      }
+      "options" : {}
     }
   ],
-  "defaultOptions" : {
-
-  },
+  "defaultOptions" : {},
   "testTargets" : [
     {
       "target" : {
         "containerPath" : "container:RackoonIOS.xcodeproj",
         "identifier" : "EB441FB4F42650CB3146523A",
         "name" : "RackoonIOSTests"
+      }
+    },
+    {
+      "target" : {
+        "containerPath" : "container:RackoonIOS.xcodeproj",
+        "identifier" : "A3B4849843D6C59FC0EE3DC5",
+        "name" : "RackoonIOSUITests"
       }
     },
     {

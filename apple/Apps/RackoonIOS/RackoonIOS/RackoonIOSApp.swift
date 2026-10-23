@@ -4,7 +4,23 @@ import UIKit
 
 @main
 struct RackoonIOSApp: App {
-    @State private var model = AppModel.live(deviceName: UIDevice.current.model)
+    @State private var model: AppModel
+
+    init() {
+        Self.prepareForUITests()
+        _model = State(initialValue: AppModel.live(deviceName: UIDevice.current.model))
+    }
+
+    /// An XCUITest run (`RACKOON_UI_TEST=1`, always with `RACKOON_DEMO=1`): every launch starts clean (no remembered tab,
+    /// page, Read-only switch or toggles) and without animations, so the flows are the same each time and quicker.
+    static func prepareForUITests() {
+        guard ProcessInfo.processInfo.environment["RACKOON_UI_TEST"] == "1" else { return }
+        if let id = Bundle.main.bundleIdentifier { UserDefaults.standard.removePersistentDomain(forName: id) }
+        // Set, not only removed: a value the last run wrote as it was stopped could otherwise still come back.
+        UserDefaults.standard.set("dashboard", forKey: "rootTab")
+        UserDefaults.standard.set("health", forKey: "dashboardPage")
+        UIView.setAnimationsEnabled(false)
+    }
 
     var body: some Scene {
         WindowGroup {

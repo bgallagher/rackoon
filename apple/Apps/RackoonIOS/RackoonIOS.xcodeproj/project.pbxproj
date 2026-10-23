@@ -22,6 +22,13 @@
 			remoteGlobalIDString = C13732C8E715C9BEE4FA51C9;
 			remoteInfo = RackoonIOS;
 		};
+		F313AE656F0E52DC4F16F650 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C13732C8E715C9BEE4FA51C9;
+			remoteInfo = RackoonIOS;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
@@ -29,9 +36,15 @@
 		80BEB3E0E20DFE942A9E0748 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
 		8BCD5BC4CDFDF0918087C782 /* RackoonIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RackoonIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D43E6F042E6A901F12BCDD03 /* RackoonIOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RackoonIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EDA1D044165F30AACBAACA49 /* RackoonIOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RackoonIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
+		406942D57D6289AF40C271F7 /* RackoonIOSUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = RackoonIOSUITests;
+			sourceTree = "<group>";
+		};
 		68DE481A39400A49757EB7B7 /* RackoonIOSTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = RackoonIOSTests;
@@ -45,6 +58,13 @@
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		0E4890DCBC8382691E0E7F44 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		32BD75FE04B3CDF992A510FD /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -79,6 +99,7 @@
 			children = (
 				8BCD5BC4CDFDF0918087C782 /* RackoonIOS.app */,
 				D43E6F042E6A901F12BCDD03 /* RackoonIOSTests.xctest */,
+				EDA1D044165F30AACBAACA49 /* RackoonIOSUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -89,6 +110,7 @@
 				80BEB3E0E20DFE942A9E0748 /* Signing.xcconfig */,
 				69F8D45498D7E20DA99BB780 /* RackoonIOS */,
 				68DE481A39400A49757EB7B7 /* RackoonIOSTests */,
+				406942D57D6289AF40C271F7 /* RackoonIOSUITests */,
 				1F102E3D417D501151200524 /* Shared */,
 				328EC33DF3954DC9B83FA285 /* Products */,
 			);
@@ -97,6 +119,27 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		A3B4849843D6C59FC0EE3DC5 /* RackoonIOSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EC201DB08680D65047D00BF0 /* Build configuration list for PBXNativeTarget "RackoonIOSUITests" */;
+			buildPhases = (
+				61569D999AE77B406C009E39 /* Sources */,
+				0E4890DCBC8382691E0E7F44 /* Frameworks */,
+				4E1B40FFA5B08A146186F8C4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				807A2257FCCD5B7FD3539C2D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				406942D57D6289AF40C271F7 /* RackoonIOSUITests */,
+			);
+			name = RackoonIOSUITests;
+			productName = RackoonIOSUITests;
+			productReference = EDA1D044165F30AACBAACA49 /* RackoonIOSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		C13732C8E715C9BEE4FA51C9 /* RackoonIOS */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 5333CCA39857637925FB3D0C /* Build configuration list for PBXNativeTarget "RackoonIOS" */;
@@ -154,6 +197,10 @@
 				LastSwiftUpdateCheck = 2700;
 				LastUpgradeCheck = 2700;
 				TargetAttributes = {
+					A3B4849843D6C59FC0EE3DC5 = {
+						CreatedOnToolsVersion = 27.1;
+						TestTargetID = C13732C8E715C9BEE4FA51C9;
+					};
 					C13732C8E715C9BEE4FA51C9 = {
 						CreatedOnToolsVersion = 27.1;
 					};
@@ -183,6 +230,7 @@
 			targets = (
 				C13732C8E715C9BEE4FA51C9 /* RackoonIOS */,
 				EB441FB4F42650CB3146523A /* RackoonIOSTests */,
+				A3B4849843D6C59FC0EE3DC5 /* RackoonIOSUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -203,9 +251,23 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		4E1B40FFA5B08A146186F8C4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		61569D999AE77B406C009E39 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		87578F7D47DE44A504256C73 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -223,6 +285,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		807A2257FCCD5B7FD3539C2D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C13732C8E715C9BEE4FA51C9 /* RackoonIOS */;
+			targetProxy = F313AE656F0E52DC4F16F650 /* PBXContainerItemProxy */;
+		};
 		87F75CA355C5294767588B49 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = C13732C8E715C9BEE4FA51C9 /* RackoonIOS */;
@@ -260,6 +327,22 @@
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				TARGETED_DEVICE_FAMILY = "1,2";
 				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RackoonIOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RackoonIOS";
+			};
+			name = Release;
+		};
+		2768A6D2725C3630052338E5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 80BEB3E0E20DFE942A9E0748 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(RACKOON_BUNDLE_ID).uitests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = RackoonIOS;
 			};
 			name = Release;
 		};
@@ -313,6 +396,22 @@
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;
+		};
+		C83CFB19A90830D1A4CF9225 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 80BEB3E0E20DFE942A9E0748 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(RACKOON_BUNDLE_ID).uitests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = RackoonIOS;
+			};
+			name = Debug;
 		};
 		D08DD63EED508AD30D0CB0B4 /* Debug */ = {
 			isa = XCBuildConfiguration;
@@ -394,6 +493,15 @@
 			buildConfigurations = (
 				D08DD63EED508AD30D0CB0B4 /* Debug */,
 				811CB99F7A296F7846C18A7F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EC201DB08680D65047D00BF0 /* Build configuration list for PBXNativeTarget "RackoonIOSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C83CFB19A90830D1A4CF9225 /* Debug */,
+				2768A6D2725C3630052338E5 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

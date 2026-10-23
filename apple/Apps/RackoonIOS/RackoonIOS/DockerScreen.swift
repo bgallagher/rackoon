@@ -65,6 +65,7 @@ private struct DockerList: View {
                     } label: {
                         StackRow(stack: stack, serverID: server.id, busy: docker.isBusy(stack))
                     }
+                    .accessibilityIdentifier("stack-\(stack.id)")
                     .swipeActions(edge: .trailing) {
                         if canBookmark(stack) {
                             Button { bookmarking = BookmarkTarget(stack: stack, service: nil) } label: {
