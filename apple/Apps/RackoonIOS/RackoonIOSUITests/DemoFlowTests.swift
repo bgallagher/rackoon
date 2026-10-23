@@ -30,7 +30,9 @@ class DemoFlow: XCTestCase {
 
     func tap(_ id: String, _ timeout: TimeInterval = 15, file: StaticString = #filePath, line: UInt = #line) {
         let e = waitFor(element(id), timeout, file: file, line: line)
-        if !e.isHittable { app.swipeUp() }
+        // Rows below the fold: scroll until it can be tapped (a CI simulator may be shorter than the local one).
+        var tries = 0
+        while !e.isHittable && tries < 6 { app.swipeUp(); tries += 1 }
         e.tap()
     }
 
@@ -137,9 +139,16 @@ final class FilesFlowTests: DemoFlow {
     func testBrowseAndDownloadIntoDownloads() {
         openHomelab()
         openPlace("openFiles")
-        let notes = waitFor(element("file-notes.txt"), 20)
-        notes.swipeLeft()
-        waitFor(app.buttons["Download"]).tap()
+        waitFor(element("file-notes.txt"), 20)
+        // Swipe the row itself: the identifier also lands on the row's icon, and a swipe there opens nothing.
+        let row = app.cells.containing(.any, identifier: "file-notes.txt").firstMatch
+        row.swipeLeft()
+        let download = app.buttons["Download"]
+        if !download.waitForExistence(timeout: 5) {
+            // The same action is in the row's long-press menu.
+            row.press(forDuration: 1.2)
+        }
+        waitFor(download).tap()
         waitFor(app.buttons["Share notes.txt"], 15)
         tap("folder-backups")
         waitFor(element("file-photos-2026-09.tar.gz"))
