@@ -65,3 +65,34 @@ final class FakeTransport: SSHTransport, @unchecked Sendable {
         }
     }
 }
+
+#if os(iOS)
+import XCTest
+
+/// For a test that checks a command in a real shell: on iOS (no shell) it is skipped, elsewhere it runs.
+func requireShell() throws {
+    throw XCTSkip("needs a real shell, which iOS does not have")
+}
+
+/// iOS has no `Process` and no `/bin/sh`. The tests that prove a command by running it in a real shell (quoting, guards,
+/// tar) use this stand-in there: it compiles, and `run()` skips the test, so iOS reports them as skipped, never as passed.
+/// They still run on macOS and Linux, where the shell exists. Everything else in RackoonCoreTests runs on iOS as is.
+final class Process {
+    var executableURL: URL?
+    var arguments: [String]?
+    var environment: [String: String]?
+    var currentDirectoryURL: URL?
+    var standardInput: Any?
+    var standardOutput: Any?
+    var standardError: Any?
+    private(set) var terminationStatus: Int32 = -1
+
+    func run() throws {
+        throw XCTSkip("needs a real shell (\(executableURL?.path ?? "a program")), which iOS does not have")
+    }
+
+    func waitUntilExit() {}
+}
+#else
+func requireShell() throws {}
+#endif

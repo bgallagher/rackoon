@@ -1,0 +1,550 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		076002896E07B962AE44C01A /* RackoonDemo in Frameworks */ = {isa = PBXBuildFile; productRef = 6FC4104E2400FFE754EA1CEC /* RackoonDemo */; };
+		6695618281BBF56101D30F9E /* themes.json in Resources */ = {isa = PBXBuildFile; fileRef = 4337FECCA4ABC17EFB6A79F0 /* themes.json */; };
+		7D04DA3F288E45B9FA45A7A9 /* RackoonSSHEmbedded in Frameworks */ = {isa = PBXBuildFile; productRef = ED2153C783A64DD4430B33A1 /* RackoonSSHEmbedded */; };
+		BAF25A90929912BA8CB8FBBF /* RackoonCore in Frameworks */ = {isa = PBXBuildFile; productRef = 8AFF3563EFB15534FEE6B6D6 /* RackoonCore */; };
+		F5F9ACD1985968BE116911B3 /* SwiftTerm in Frameworks */ = {isa = PBXBuildFile; productRef = 235C005E9B3067049B7B6721 /* SwiftTerm */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		D799BAE6088A90139B415FCC /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C13732C8E715C9BEE4FA51C9;
+			remoteInfo = RackoonIOS;
+		};
+		F313AE656F0E52DC4F16F650 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C13732C8E715C9BEE4FA51C9;
+			remoteInfo = RackoonIOS;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		4337FECCA4ABC17EFB6A79F0 /* themes.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; name = themes.json; path = ../RackoonMac/Resources/themes.json; sourceTree = "<group>"; };
+		80BEB3E0E20DFE942A9E0748 /* Signing.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Signing.xcconfig; sourceTree = "<group>"; };
+		8BCD5BC4CDFDF0918087C782 /* RackoonIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RackoonIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D43E6F042E6A901F12BCDD03 /* RackoonIOSTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RackoonIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		EDA1D044165F30AACBAACA49 /* RackoonIOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = RackoonIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		406942D57D6289AF40C271F7 /* RackoonIOSUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = RackoonIOSUITests;
+			sourceTree = "<group>";
+		};
+		68DE481A39400A49757EB7B7 /* RackoonIOSTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = RackoonIOSTests;
+			sourceTree = "<group>";
+		};
+		69F8D45498D7E20DA99BB780 /* RackoonIOS */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = RackoonIOS;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		0E4890DCBC8382691E0E7F44 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		32BD75FE04B3CDF992A510FD /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		78AE8C6BEB2A40A6D824CCEE /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BAF25A90929912BA8CB8FBBF /* RackoonCore in Frameworks */,
+				7D04DA3F288E45B9FA45A7A9 /* RackoonSSHEmbedded in Frameworks */,
+				076002896E07B962AE44C01A /* RackoonDemo in Frameworks */,
+				F5F9ACD1985968BE116911B3 /* SwiftTerm in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1F102E3D417D501151200524 /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				4337FECCA4ABC17EFB6A79F0 /* themes.json */,
+			);
+			name = Shared;
+			sourceTree = "<group>";
+		};
+		328EC33DF3954DC9B83FA285 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				8BCD5BC4CDFDF0918087C782 /* RackoonIOS.app */,
+				D43E6F042E6A901F12BCDD03 /* RackoonIOSTests.xctest */,
+				EDA1D044165F30AACBAACA49 /* RackoonIOSUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		E50290A24C49A459B43487C5 = {
+			isa = PBXGroup;
+			children = (
+				80BEB3E0E20DFE942A9E0748 /* Signing.xcconfig */,
+				69F8D45498D7E20DA99BB780 /* RackoonIOS */,
+				68DE481A39400A49757EB7B7 /* RackoonIOSTests */,
+				406942D57D6289AF40C271F7 /* RackoonIOSUITests */,
+				1F102E3D417D501151200524 /* Shared */,
+				328EC33DF3954DC9B83FA285 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		A3B4849843D6C59FC0EE3DC5 /* RackoonIOSUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = EC201DB08680D65047D00BF0 /* Build configuration list for PBXNativeTarget "RackoonIOSUITests" */;
+			buildPhases = (
+				61569D999AE77B406C009E39 /* Sources */,
+				0E4890DCBC8382691E0E7F44 /* Frameworks */,
+				4E1B40FFA5B08A146186F8C4 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				807A2257FCCD5B7FD3539C2D /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				406942D57D6289AF40C271F7 /* RackoonIOSUITests */,
+			);
+			name = RackoonIOSUITests;
+			productName = RackoonIOSUITests;
+			productReference = EDA1D044165F30AACBAACA49 /* RackoonIOSUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		C13732C8E715C9BEE4FA51C9 /* RackoonIOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 5333CCA39857637925FB3D0C /* Build configuration list for PBXNativeTarget "RackoonIOS" */;
+			buildPhases = (
+				971ED9D05B25DB6C4D7680D4 /* Sources */,
+				78AE8C6BEB2A40A6D824CCEE /* Frameworks */,
+				364863F9F2E558B0F50473FC /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				69F8D45498D7E20DA99BB780 /* RackoonIOS */,
+			);
+			name = RackoonIOS;
+			packageProductDependencies = (
+				8AFF3563EFB15534FEE6B6D6 /* RackoonCore */,
+				ED2153C783A64DD4430B33A1 /* RackoonSSHEmbedded */,
+				6FC4104E2400FFE754EA1CEC /* RackoonDemo */,
+				235C005E9B3067049B7B6721 /* SwiftTerm */,
+			);
+			productName = RackoonIOS;
+			productReference = 8BCD5BC4CDFDF0918087C782 /* RackoonIOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		EB441FB4F42650CB3146523A /* RackoonIOSTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 1F2CD76FA2212F8C9CE927F4 /* Build configuration list for PBXNativeTarget "RackoonIOSTests" */;
+			buildPhases = (
+				87578F7D47DE44A504256C73 /* Sources */,
+				32BD75FE04B3CDF992A510FD /* Frameworks */,
+				1544DFBBD36E4A0D68754A27 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				87F75CA355C5294767588B49 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				68DE481A39400A49757EB7B7 /* RackoonIOSTests */,
+			);
+			name = RackoonIOSTests;
+			productName = RackoonIOSTests;
+			productReference = D43E6F042E6A901F12BCDD03 /* RackoonIOSTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		98F54143AB4E86B28C3AFEE0 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2700;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					A3B4849843D6C59FC0EE3DC5 = {
+						CreatedOnToolsVersion = 27.1;
+						TestTargetID = C13732C8E715C9BEE4FA51C9;
+					};
+					C13732C8E715C9BEE4FA51C9 = {
+						CreatedOnToolsVersion = 27.1;
+					};
+					EB441FB4F42650CB3146523A = {
+						CreatedOnToolsVersion = 27.1;
+						TestTargetID = C13732C8E715C9BEE4FA51C9;
+					};
+				};
+			};
+			buildConfigurationList = 60AA9EB27EE681A82A9AEC1A /* Build configuration list for PBXProject "RackoonIOS" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = E50290A24C49A459B43487C5;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				4FF15B936B8851E2CAA578B9 /* XCLocalSwiftPackageReference "../.." */,
+				9857A4AD557E8705802C5A23 /* XCRemoteSwiftPackageReference "SwiftTerm" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 328EC33DF3954DC9B83FA285 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				C13732C8E715C9BEE4FA51C9 /* RackoonIOS */,
+				EB441FB4F42650CB3146523A /* RackoonIOSTests */,
+				A3B4849843D6C59FC0EE3DC5 /* RackoonIOSUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		1544DFBBD36E4A0D68754A27 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		364863F9F2E558B0F50473FC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6695618281BBF56101D30F9E /* themes.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		4E1B40FFA5B08A146186F8C4 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		61569D999AE77B406C009E39 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		87578F7D47DE44A504256C73 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		971ED9D05B25DB6C4D7680D4 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		807A2257FCCD5B7FD3539C2D /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C13732C8E715C9BEE4FA51C9 /* RackoonIOS */;
+			targetProxy = F313AE656F0E52DC4F16F650 /* PBXContainerItemProxy */;
+		};
+		87F75CA355C5294767588B49 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C13732C8E715C9BEE4FA51C9 /* RackoonIOS */;
+			targetProxy = D799BAE6088A90139B415FCC /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		0F3D67935A4F199E058A017A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bgallagher.rackoon.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RackoonIOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RackoonIOS";
+			};
+			name = Debug;
+		};
+		20B70E15FDC36C625E57F658 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bgallagher.rackoon.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/RackoonIOS.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/RackoonIOS";
+			};
+			name = Release;
+		};
+		2768A6D2725C3630052338E5 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 80BEB3E0E20DFE942A9E0748 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(RACKOON_BUNDLE_ID).uitests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = RackoonIOS;
+			};
+			name = Release;
+		};
+		5A8C91857F674E16E2724F47 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 80BEB3E0E20DFE942A9E0748 /* Signing.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Rackoon;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Face ID unlocks a sudo password you chose to remember on this device.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Rackoon connects to your servers over SSH, including servers on your local network.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(RACKOON_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		811CB99F7A296F7846C18A7F /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 6.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		C83CFB19A90830D1A4CF9225 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 80BEB3E0E20DFE942A9E0748 /* Signing.xcconfig */;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(RACKOON_BUNDLE_ID).uitests";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = RackoonIOS;
+			};
+			name = Debug;
+		};
+		D08DD63EED508AD30D0CB0B4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		E9B2E96ABC5F6856F2BE79CF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 80BEB3E0E20DFE942A9E0748 /* Signing.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Rackoon;
+				INFOPLIST_KEY_NSFaceIDUsageDescription = "Face ID unlocks a sudo password you chose to remember on this device.";
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "Rackoon connects to your servers over SSH, including servers on your local network.";
+				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "$(RACKOON_BUNDLE_ID)";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1F2CD76FA2212F8C9CE927F4 /* Build configuration list for PBXNativeTarget "RackoonIOSTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				0F3D67935A4F199E058A017A /* Debug */,
+				20B70E15FDC36C625E57F658 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		5333CCA39857637925FB3D0C /* Build configuration list for PBXNativeTarget "RackoonIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E9B2E96ABC5F6856F2BE79CF /* Debug */,
+				5A8C91857F674E16E2724F47 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		60AA9EB27EE681A82A9AEC1A /* Build configuration list for PBXProject "RackoonIOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D08DD63EED508AD30D0CB0B4 /* Debug */,
+				811CB99F7A296F7846C18A7F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		EC201DB08680D65047D00BF0 /* Build configuration list for PBXNativeTarget "RackoonIOSUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C83CFB19A90830D1A4CF9225 /* Debug */,
+				2768A6D2725C3630052338E5 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		4FF15B936B8851E2CAA578B9 /* XCLocalSwiftPackageReference "../.." */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../..;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		9857A4AD557E8705802C5A23 /* XCRemoteSwiftPackageReference "SwiftTerm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/migueldeicaza/SwiftTerm.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.99.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		235C005E9B3067049B7B6721 /* SwiftTerm */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 9857A4AD557E8705802C5A23 /* XCRemoteSwiftPackageReference "SwiftTerm" */;
+			productName = SwiftTerm;
+		};
+		6FC4104E2400FFE754EA1CEC /* RackoonDemo */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RackoonDemo;
+		};
+		8AFF3563EFB15534FEE6B6D6 /* RackoonCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RackoonCore;
+		};
+		ED2153C783A64DD4430B33A1 /* RackoonSSHEmbedded */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RackoonSSHEmbedded;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 98F54143AB4E86B28C3AFEE0 /* Project object */;
+}

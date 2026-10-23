@@ -223,6 +223,7 @@ final class FileTransferTests: XCTestCase {
     }
 
     func testFolderRoundTripAndMerge() async throws {
+        try requireShell()
         let remote = try dir("remote"), local = try dir("local")
         let folder = try dir("local/proj dir")
         try Data("a".utf8).write(to: folder.appendingPathComponent("a.txt"))
@@ -288,6 +289,7 @@ final class FileTransferTests: XCTestCase {
     }
 
     func testUploadRefusesAFolderInTheWayAndCleansUp() async throws {
+        try requireShell()
         let remote = try dir("remote"), local = try dir("local")
         _ = try dir("remote/f.txt")
         let source = local.appendingPathComponent("f.txt")
@@ -300,6 +302,7 @@ final class FileTransferTests: XCTestCase {
     }
 
     func testAShortStreamNeverReplacesTheRealFileOrFolder() throws {
+        try requireShell()
         let remote = try dir("remote")
         try Data("ORIGINAL".utf8).write(to: remote.appendingPathComponent("f.txt"))
         func run(_ command: String) throws -> Int32 {

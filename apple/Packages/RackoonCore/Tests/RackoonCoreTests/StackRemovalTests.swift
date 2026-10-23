@@ -95,6 +95,7 @@ final class StackRemovalTests: XCTestCase {
     }
 
     func testFolderIsDeletedOnlyAfterDownSucceedsAndOnlyWithItsComposeFile() throws {
+        try requireShell()
         // Resolved, because the guard compares real paths and /var is a symlink to /private/var on a Mac.
         let root = realTemporaryDirectory().appendingPathComponent("rk-del-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
@@ -124,6 +125,7 @@ final class StackRemovalTests: XCTestCase {
     }
 
     func testASymlinkCannotRedirectTheDelete() throws {
+        try requireShell()
         let root = realTemporaryDirectory().appendingPathComponent("rk-del-\(UUID().uuidString)")
         defer { try? FileManager.default.removeItem(at: root) }
         let fm = FileManager.default
