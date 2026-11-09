@@ -60,6 +60,7 @@ class Monitor:
         self.entries: dict[str, Entry] = {}
         self.running = False
         self.nas_for: Callable[[str], UnraidSnapshot | None] | None = None
+        self.heat_for: Callable[[str], float | None] | None = None
 
     # --- lifecycle
 
@@ -201,7 +202,8 @@ class Monitor:
         o = entry.state.overview
         if o is None or not is_unraid(o.os):
             return entry.state.attention
-        return unraid_view.merge(entry.state.attention, True, self.nas_for(server_id) if self.nas_for else None)
+        return unraid_view.merge(entry.state.attention, True, self.nas_for(server_id) if self.nas_for else None,
+                                 self.heat_for(server_id) if self.heat_for else None)
 
     def state_json(self, server_id: str) -> dict[str, Any] | None:
         entry = self.entries.get(server_id)

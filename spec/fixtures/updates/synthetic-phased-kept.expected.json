@@ -1,0 +1,64 @@
+{
+  "held" : [
+    "docker-ce"
+  ],
+  "packages" : [
+    {
+      "architecture" : "amd64",
+      "isSecurity" : true,
+      "name" : "openssl",
+      "newVersion" : "3.0.13-0ubuntu3.5",
+      "oldVersion" : "3.0.13-0ubuntu3.4",
+      "suite" : "noble-updates,noble-security"
+    }
+  ],
+  "phased" : [
+    "python3-distupgrade",
+    "ubuntu-release-upgrader-core",
+    "libnss-systemd"
+  ],
+  "rebootRequired" : false,
+  "refreshedAt" : 1762646400,
+  "waiting" : [
+    {
+      "architecture" : "all",
+      "isSecurity" : false,
+      "name" : "python3-distupgrade",
+      "newVersion" : "1:24.04.26",
+      "oldVersion" : "1:24.04.25",
+      "suite" : "noble-updates"
+    },
+    {
+      "architecture" : "all",
+      "isSecurity" : false,
+      "name" : "ubuntu-release-upgrader-core",
+      "newVersion" : "1:24.04.26",
+      "oldVersion" : "1:24.04.25",
+      "suite" : "noble-updates"
+    },
+    {
+      "architecture" : "amd64",
+      "isSecurity" : true,
+      "name" : "ubuntu-pro-client",
+      "newVersion" : "36~24.04",
+      "oldVersion" : "35.1ubuntu0~24.04",
+      "suite" : "noble-updates,noble-security"
+    },
+    {
+      "architecture" : "amd64",
+      "isSecurity" : false,
+      "name" : "libnss-systemd",
+      "newVersion" : "255.4-1ubuntu8.6",
+      "oldVersion" : "255.4-1ubuntu8.5",
+      "suite" : "noble-updates"
+    },
+    {
+      "architecture" : "amd64",
+      "isSecurity" : false,
+      "name" : "docker-ce",
+      "newVersion" : "5:28.0.1-1~ubuntu.24.04~noble",
+      "oldVersion" : "5:28.0.0-1~ubuntu.24.04~noble",
+      "suite" : "noble"
+    }
+  ]
+}

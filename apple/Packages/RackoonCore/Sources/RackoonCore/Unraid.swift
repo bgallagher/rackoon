@@ -421,7 +421,9 @@ public enum UnraidParser {
 
 /// What needs attention on an Unraid server, in the same shape as the Overview's attention strip. Pure.
 public enum UnraidAttention {
-    public static func evaluate(_ s: UnraidSnapshot) -> [AttentionItem] {
+    /// `sustainedCPU` is the CPU temperature only when it has STAYED hot (`CPUHeatTracker`); one reading alone never
+    /// raises a CPU item, because modern CPUs jump to 90-100 °C for a moment whenever a core boosts.
+    public static func evaluate(_ s: UnraidSnapshot, sustainedCPU: Double? = nil) -> [AttentionItem] {
         var items: [AttentionItem] = []
         func add(_ id: String, _ severity: AttentionItem.Severity, _ message: String) {
             items.append(AttentionItem(id: id, severity: severity, message: message, fix: ""))
@@ -455,7 +457,9 @@ public enum UnraidAttention {
         if let last = s.lastParityCheck, last.errors > 0 {
             add("parity_errors", .warning, "The last \(last.label.lowercased()) found \(last.errors) error(s).")
         }
-        if let cpu = s.cpuTemperature, cpu >= 90 { add("cpu_hot", .warning, "The CPU is at \(Int(cpu)) °C.") }
+        if let cpu = sustainedCPU {
+            add("cpu_hot", .warning, "The CPU has stayed at \(Int(cpu)) °C or hotter for over \(Int(CPUHeatTracker.sustain / 60)) minutes.")
+        }
         return items
     }
 }
@@ -469,10 +473,10 @@ public actor UnraidSession {
     echo '##disks'; grep -E '^\[|^(name|device|id|size|transport|rotational|spundown|status|temp|numErrors|type|fsType|fsStatus|fsMountpoint|fsSize|fsFree|fsUsed|devices|fsProfile)=' /var/local/emhttp/disks.ini 2>/dev/null; \#
     echo '##shares'; grep -E '^\[|^(name|comment|useCache|cachePool|free)=' /var/local/emhttp/shares.ini 2>/dev/null; \#
     echo '##zpool'; zpool list -H -o name,size,alloc,free,health 2>/dev/null; \#
-    echo '##temps'; for h in /sys/class/hwmon/hwmon*; do n=$(cat "$h/name" 2>/dev/null); for t in "$h"/temp*_input; do [ -r "$t" ] && echo "$n|$(cat "${t%_input}_label" 2>/dev/null)|$(cat "$t" 2>/dev/null)"; done; done; \#
     echo '##fans'; for h in /sys/class/hwmon/hwmon*; do n=$(cat "$h/name" 2>/dev/null); for f in "$h"/fan*_input; do [ -r "$f" ] && echo "$n|$(cat "${f%_input}_label" 2>/dev/null)|$(cat "$f" 2>/dev/null)"; done; done; \#
     echo '##cpu'; grep -m1 '^model name' /proc/cpuinfo | cut -d: -f2- | sed 's/^ *//'; \#
-    echo '##parity'; tail -n 10 /boot/config/parity-checks.log 2>/dev/null; true
+    echo '##parity'; tail -n 10 /boot/config/parity-checks.log 2>/dev/null; \#
+    echo '##temps'; sleep 1; for h in /sys/class/hwmon/hwmon*; do n=; read -r n 2>/dev/null < "$h/name"; for t in "$h"/temp*_input; do [ -r "$t" ] || continue; l=; read -r l 2>/dev/null < "${t%_input}_label"; v=; read -r v 2>/dev/null < "$t"; echo "$n|$l|$v"; done; done; true
     """#
 
     private let transport: SSHTransport
@@ -589,8 +593,44 @@ extension UnraidSnapshot.Pool {
 extension UnraidAttention {
     /// The Overview's attention items for a server of this kind. On Unraid, `df`'s disk-full items are dropped (every ZFS
     /// dataset reads about 1%, and array disks are judged from emhttp's own numbers instead) and the NAS items added.
-    public static func merge(_ base: [AttentionItem], kind: ServerKind, snapshot: UnraidSnapshot?) -> [AttentionItem] {
+    public static func merge(_ base: [AttentionItem], kind: ServerKind, snapshot: UnraidSnapshot?, sustainedCPU: Double? = nil) -> [AttentionItem] {
         guard kind == .unraid else { return base }
-        return base.filter { !$0.id.hasPrefix("disk_high:") } + (snapshot.map(evaluate) ?? [])
+        return base.filter { !$0.id.hasPrefix("disk_high:") } + (snapshot.map { evaluate($0, sustainedCPU: sustainedCPU) } ?? [])
+    }
+}
+
+/// Whether a CPU has STAYED hot, from successive readings. A single reading says little: Intel and AMD CPUs boost a
+/// core for a moment and the package temperature jumps to 90-100 °C, then falls back within a second, so alerting on
+/// one reading flooded users with heat warnings the machine never had. Hot means every reading at or above `hot` for
+/// at least `sustain`; once hot, it stays hot until a reading drops below `cool` (so a CPU hovering at the limit does
+/// not flap). Pure: the times are passed in.
+public struct CPUHeatTracker: Sendable, Equatable {
+    public static let hot = 90.0
+    public static let cool = 85.0
+    public static let sustain: TimeInterval = 3 * 60
+
+    public private(set) var hotSince: Date?
+    public private(set) var lastAt: Date?
+    /// The lowest reading since it became hot: what the CPU has stayed at or above.
+    public private(set) var lowest: Double?
+
+    public init() {}
+
+    public mutating func record(_ celsius: Double?, at time: Date) {
+        guard let c = celsius else { self = CPUHeatTracker(); return }
+        let wasSustained = sustained != nil
+        if c >= Self.hot || (wasSustained && c >= Self.cool) {
+            hotSince = hotSince ?? time
+            lowest = min(lowest ?? c, c)
+            lastAt = time
+        } else {
+            self = CPUHeatTracker()
+        }
+    }
+
+    /// The temperature the CPU has stayed at or above, once it has been hot for `sustain`; nil otherwise.
+    public var sustained: Double? {
+        guard let since = hotSince, let last = lastAt, last.timeIntervalSince(since) >= Self.sustain else { return nil }
+        return lowest
     }
 }

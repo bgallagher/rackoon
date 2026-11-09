@@ -149,10 +149,16 @@ class NASStore:
     def __init__(self, clock: Callable[[], float] = time.time) -> None:
         self.clock = clock
         self.reads: dict[str, Cached] = {}
+        # Per server: the CPU temperature over successive reads, so only heat that lasts raises "CPU running hot".
+        self.heat: dict[str, unraid_view.CPUHeatTracker] = {}
 
     def snapshot(self, server_id: str) -> unraid.UnraidSnapshot | None:
         c = self.reads.get(server_id)
         return c.value if c is not None else None
+
+    def sustained_cpu(self, server_id: str) -> float | None:
+        h = self.heat.get(server_id)
+        return h.sustained if h is not None else None
 
     async def read(self, server_id: str, transport: Transport, force: bool = False) -> Cached:
         c = self.reads.get(server_id)
@@ -163,6 +169,8 @@ class NASStore:
             if r.exit_code != 0:  # the script ends in `true`: ssh itself failed
                 raise SSHError(r.stderr.strip() or f"ssh exited {r.exit_code}")
             c = Cached(unraid.parse(r.stdout), self.clock())
+            self.heat.setdefault(server_id, unraid_view.CPUHeatTracker()).record(
+                unraid_view.cpu_temperature(c.value), c.at)
         except unraid.NotUnraid:
             c = Cached(None, self.clock(), "This server does not look like Unraid (no /etc/unraid-version).")
         except (SSHError, TrustError, ValueError) as e:

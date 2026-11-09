@@ -90,7 +90,10 @@ def test_several_pools_unmountable_missing_and_degraded_zfs() -> None:
     assert by["disk_unmountable:disk3"].severity is Severity.CRITICAL
     assert by["zfs_health:vms"].severity is Severity.WARNING
     assert by["disk_full:fast"].severity is Severity.WARNING
-    assert by["cpu_hot"].message == "The CPU is at 91 °C.", "Tdie, not Tctl"
+    assert "cpu_hot" not in by, "one hot reading alone is never an alert"
+    assert v.cpu_temperature(s) == 91.5, "Tdie, not Tctl"
+    hot = {i.id: i for i in v.evaluate(s, 91.5)}["cpu_hot"]
+    assert hot.message == "The CPU has stayed at 91 °C or hotter for over 3 minutes."
     assert "disk_hot:fast" not in by
     assert [n for n, _ in v.board_sensors(s)] == ["SYSTIN"]
 
@@ -149,3 +152,33 @@ def test_merge_replaces_df_items_on_unraid_only() -> None:
     faulted = dataclasses.replace(fixture("unraid-7.3-zfs"),
                                   zfs_pools=[dataclasses.replace(fixture("unraid-7.3-zfs").zfs_pools[0], health="FAULTED")])
     assert next(i for i in v.evaluate(faulted) if i.id == "zfs_health:cache").severity is Severity.CRITICAL
+
+
+def test_cpu_heat_must_last_before_it_counts() -> None:
+    h = v.CPUHeatTracker()
+    h.record(95, 0)
+    assert h.sustained is None, "one spike"
+    h.record(62, 15)
+    assert h.hot_since is None
+    for i in range(13):
+        h.record(90 if i == 6 else 93, 60 + i * 15)
+    assert h.sustained == 90
+    h.record(87, 400)
+    assert h.sustained == 87, "stays hot down to 85 °C"
+    h.record(80, 415)
+    assert h.sustained is None
+    sweep = v.CPUHeatTracker()
+    sweep.record(92, 0)
+    sweep.record(91, 300)
+    assert sweep.sustained == 91
+    sweep.record(None, 600)
+    assert sweep.sustained is None
+
+
+def test_cpu_heat_is_never_called_a_disk_problem() -> None:
+    from rackoon.core import alerts
+    assert alerts.storage_title("cpu_hot") == "CPU running hot"
+    assert alerts.storage_title("disk_hot:cache2") == "Disk running hot"
+    assert alerts.storage_title("zfs_health:vms") == "Pool needs attention"
+    assert alerts.storage_title("disk_status:disk2") == "Disk needs attention"
+    assert alerts.storage_title("parity_errors") == "Array needs attention"

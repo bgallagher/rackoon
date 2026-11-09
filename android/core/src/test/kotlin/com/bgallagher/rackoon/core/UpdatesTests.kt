@@ -36,11 +36,25 @@ class UpdatesParserTests {
 
     @Test fun securityPendingFixtureCounts() {
         val s = UpdatesParser.parse(Spec.out("updates", "synthetic-security-pending"))
-        assertEquals(6, s.packages.size)
+        assertEquals(4, s.packages.size, "the two held packages wait: apt will not install them")
+        assertEquals(listOf("linux-image-generic", "docker-ce"), s.waiting.map { it.name })
         assertEquals(3, s.securityCount, "openssl, libssl3t64 and the infra-security client")
         assertEquals(listOf("linux-image-generic", "docker-ce"), s.held)
         assertTrue(s.rebootRequired)
         assertEquals("3.0.13-0ubuntu3.4", s.packages.first().oldVersion)
+    }
+
+    @Test fun phasedAndKeptBackUpdatesWaitInsteadOfCounting() {
+        val s = UpdatesParser.parse(Spec.out("updates", "synthetic-phased-kept"))
+        assertEquals(listOf("openssl"), s.packages.map { it.name })
+        assertEquals(listOf("python3-distupgrade", "ubuntu-release-upgrader-core", "ubuntu-pro-client", "libnss-systemd", "docker-ce"),
+            s.waiting.map { it.name })
+        assertEquals(listOf("python3-distupgrade", "ubuntu-release-upgrader-core", "libnss-systemd"), s.phased)
+        val reasons = s.waiting.associate { it.name to s.waitingReason(it) }
+        assertEquals(UpdatesSnapshot.WaitingReason.PHASED, reasons["python3-distupgrade"])
+        assertEquals(UpdatesSnapshot.WaitingReason.KEPT_BACK, reasons["ubuntu-pro-client"])
+        assertEquals(UpdatesSnapshot.WaitingReason.HELD, reasons["docker-ce"], "held wins over kept back")
+        assertEquals(1, s.securityCount)
     }
 
     @Test fun missingAptSectionIsMalformed() {

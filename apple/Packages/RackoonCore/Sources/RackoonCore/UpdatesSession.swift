@@ -18,12 +18,13 @@ public struct UpdatesState: Sendable, Equatable {
     public init() {}
 }
 
-/// Reads one server's pending apt updates. Read-only: it reports what apt already knows from its cache
-/// and never refreshes it or installs anything (that needs root and goes through `ActionPolicy`).
+/// Reads one server's pending apt updates. Read-only: it reports what apt already knows from its cache (and what a
+/// simulated upgrade would leave out) and never refreshes it or installs anything (that needs root and goes through `ActionPolicy`).
 public actor UpdatesSession {
     public static let command = """
     echo '##apt'; if command -v apt-get >/dev/null 2>&1; then echo ok; else echo missing; fi; \
     echo '##upgradable'; apt list --upgradable 2>/dev/null; \
+    echo '##deferred'; LC_ALL=C apt-get -s upgrade --with-new-pkgs 2>/dev/null | awk '/^[^ ]/{s=""} /^(The following upgrades have been deferred due to phasing|Not upgrading yet due to phasing):/{s="phased ";next} /^(The following packages have been kept back|Not upgrading):/{s="kept ";next} s!=""{for(i=1;i<=NF;i++) print s $i}'; \
     echo '##held'; apt-mark showhold 2>/dev/null; \
     echo '##refreshed'; stat -c %Y /var/lib/apt/periodic/update-success-stamp 2>/dev/null || stat -c %Y /var/lib/apt/lists 2>/dev/null; \
     echo '##reboot'; if [ -f /var/run/reboot-required ]; then echo yes; else echo no; fi

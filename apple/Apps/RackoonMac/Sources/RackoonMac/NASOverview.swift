@@ -11,7 +11,13 @@ final class NASModel {
     private(set) var error: String?
     private(set) var updatedAt: Date?
     private(set) var loading = false
+    /// The CPU temperature over successive readings (the Overview's 15 s poll and the 5-minute background check), so
+    /// only heat that lasts raises "CPU running hot"; a boost spike in one reading does not.
+    private(set) var heat = CPUHeatTracker()
     @ObservationIgnored private let session: UnraidSession
+
+    /// The temperature the CPU has stayed at or above for minutes, or nil.
+    var sustainedCPU: Double? { heat.sustained }
 
     init(server: Server) { session = UnraidSession(transport: makeTransport(for: server)) }
     init(transport: SSHTransport) { session = UnraidSession(transport: transport) }
@@ -20,6 +26,9 @@ final class NASModel {
         guard !loading else { return }
         loading = true
         let result = await session.refresh()
+        if result.error == nil, let fresh = result.snapshot, result.updatedAt != updatedAt {
+            heat.record(fresh.cpuTemperature, at: result.updatedAt ?? Date())
+        }
         snapshot = result.snapshot
         error = result.error
         updatedAt = result.updatedAt

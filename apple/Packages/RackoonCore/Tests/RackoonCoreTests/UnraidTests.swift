@@ -201,6 +201,37 @@ final class UnraidEdgeCaseTests: XCTestCase {
 
     // MARK: alerts
 
+    /// Boost spikes (one reading at 95 °C between normal ones) must never alert; only heat that lasts does.
+    func testCPUHeatMustLastBeforeItCounts() {
+        let t0 = Date(timeIntervalSince1970: 1_800_000_000)
+        var h = CPUHeatTracker()
+        h.record(95, at: t0)
+        XCTAssertNil(h.sustained, "one spike")
+        h.record(62, at: t0.addingTimeInterval(15))
+        XCTAssertNil(h.hotSince, "a cool reading starts over")
+        for i in 0...12 { h.record(i == 6 ? 90 : 93, at: t0.addingTimeInterval(Double(60 + i * 15))) }
+        XCTAssertEqual(h.sustained, 90, "every reading at 90 or above for three minutes; reports the lowest")
+        h.record(87, at: t0.addingTimeInterval(400))
+        XCTAssertEqual(h.sustained, 87, "once hot it stays hot down to 85 °C, so it does not flap")
+        h.record(80, at: t0.addingTimeInterval(415))
+        XCTAssertNil(h.sustained)
+        // Background checks are five minutes apart: two hot readings in a row are enough.
+        var sweep = CPUHeatTracker()
+        sweep.record(92, at: t0)
+        sweep.record(91, at: t0.addingTimeInterval(300))
+        XCTAssertEqual(sweep.sustained, 91)
+        sweep.record(nil, at: t0.addingTimeInterval(600))
+        XCTAssertNil(sweep.sustained, "no reading, no claim")
+    }
+
+    func testCPUHeatIsNeverCalledADiskProblem() throws {
+        let titles = AlertRules.storage(try fixture("synthetic-pools-unmountable"), sustainedCPU: 92)
+        XCTAssertEqual(titles.first { $0.key == "cpu_hot" }?.title, "CPU running hot")
+        XCTAssertEqual(titles.first { $0.key == "zfs_health:vms" }?.title, "Pool needs attention")
+        XCTAssertEqual(titles.first { $0.key == "disk_status:disk2" }?.title, "Disk needs attention")
+        XCTAssertEqual(AlertRules.storageTitle("disk_hot:cache2"), "Disk running hot")
+    }
+
     func testUnmountableMissingInvalidAndDegradedZFS() throws {
         let items = UnraidAttention.evaluate(try fixture("synthetic-pools-unmountable"))
         let byID = Dictionary(uniqueKeysWithValues: items.map { ($0.id, $0) })
@@ -210,7 +241,11 @@ final class UnraidEdgeCaseTests: XCTestCase {
         XCTAssertEqual(byID["disk_unmountable:disk3"]?.severity, .critical)
         XCTAssertEqual(byID["zfs_health:vms"]?.severity, .warning, "DEGRADED still works")
         XCTAssertEqual(byID["disk_full:fast"]?.severity, .warning, "pools are judged like array disks (92%)")
-        XCTAssertEqual(byID["cpu_hot"]?.message, "The CPU is at 91 °C.", "Tdie, not Tctl's offset 101 °C")
+        XCTAssertNil(byID["cpu_hot"], "one hot reading alone is never an alert")
+        let s = try fixture("synthetic-pools-unmountable")
+        XCTAssertEqual(s.cpuTemperature, 91.5, "Tdie, not Tctl's offset 101 °C")
+        let hot = UnraidAttention.evaluate(s, sustainedCPU: 91.5).first { $0.id == "cpu_hot" }
+        XCTAssertEqual(hot?.message, "The CPU has stayed at 91 °C or hotter for over 3 minutes.")
         XCTAssertNil(byID["disk_hot:fast"], "44 °C is fine for an NVMe drive")
         XCTAssertTrue(items.allSatisfy { $0.fix.isEmpty }, "no screen link: the fix is on this page")
     }

@@ -177,6 +177,8 @@ def register(app: FastAPI, rackoon: Rackoon, authenticated: Callable[[Request], 
             "status": "ready" if s else "notInstalled" if e.not_installed else "failed" if e.error else "loading",
             "error": e.error, "updatedAt": e.updated_at, "readOnly": read_only,
             "packages": [to_json(p) for p in apt.sorted_packages(s.packages)] if s else [],
+            # Upgradable but not installed by apt yet (held, phased rollout, kept back), with why.
+            "waiting": [{**to_json(p), "reason": s.waiting_reason(p)} for p in s.waiting] if s else [],
             "held": s.held if s else [], "refreshedAt": s.refreshed_at if s else None,
             "rebootRequired": s.reboot_required if s else False,
             "securityCount": s.security_count if s else 0,

@@ -154,6 +154,12 @@ public enum DockerAccess {
         let m = message.lowercased()
         return m.contains("permission denied") && (m.contains("docker") || m.contains("/var/run/docker.sock"))
     }
+
+    /// The server has no docker command at all (the Docker poll's error). Such servers are left off the Dashboard's
+    /// Docker page unless the user asks to see them.
+    public static func isNotInstalled(_ message: String?) -> Bool {
+        message != nil && message == DockerParseError.notInstalled.errorDescription
+    }
 }
 
 public enum DockerParseError: Error, Equatable, LocalizedError {

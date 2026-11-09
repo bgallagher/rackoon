@@ -204,7 +204,9 @@ def placement(share: Share) -> str:
         share.use_cache, "array")
 
 
-def evaluate(s: UnraidSnapshot) -> list[AttentionItem]:
+def evaluate(s: UnraidSnapshot, sustained_cpu: float | None = None) -> list[AttentionItem]:
+    """`sustained_cpu` is the CPU temperature only once it has STAYED hot (`CPUHeatTracker`): one reading alone never
+    raises a CPU item, because modern CPUs jump to 90-100 °C for a moment whenever a core boosts."""
     items: list[AttentionItem] = []
 
     def add(id: str, sev: Severity, message: str) -> None:
@@ -244,13 +246,42 @@ def evaluate(s: UnraidSnapshot) -> list[AttentionItem]:
     last = last_parity_check(s)
     if last is not None and last.errors > 0:
         add("parity_errors", Severity.WARNING, f"The last {describe(last.action).lower()} found {last.errors} error(s).")
-    cpu = cpu_temperature(s)
-    if cpu is not None and cpu >= 90:
-        add("cpu_hot", Severity.WARNING, f"The CPU is at {int(cpu)} °C.")
+    if sustained_cpu is not None:
+        add("cpu_hot", Severity.WARNING,
+            f"The CPU has stayed at {int(sustained_cpu)} °C or hotter for over {int(CPUHeatTracker.SUSTAIN // 60)} minutes.")
     return items
 
 
-def merge(base: list[AttentionItem], unraid: bool, snapshot: UnraidSnapshot | None) -> list[AttentionItem]:
+def merge(base: list[AttentionItem], unraid: bool, snapshot: UnraidSnapshot | None,
+          sustained_cpu: float | None = None) -> list[AttentionItem]:
     if not unraid:
         return base
-    return [i for i in base if not i.id.startswith("disk_high:")] + (evaluate(snapshot) if snapshot else [])
+    return [i for i in base if not i.id.startswith("disk_high:")] + (
+        evaluate(snapshot, sustained_cpu) if snapshot else [])
+
+
+class CPUHeatTracker:
+    """Whether a CPU has STAYED hot, from successive readings (Swift `CPUHeatTracker`). Hot means every reading at or
+    above HOT for at least SUSTAIN seconds; once hot it stays hot until a reading drops below COOL."""
+    HOT = 90.0
+    COOL = 85.0
+    SUSTAIN = 180.0
+
+    def __init__(self) -> None:
+        self.hot_since: float | None = None
+        self.last_at: float | None = None
+        self.lowest: float | None = None
+
+    def record(self, celsius: float | None, at: float) -> None:
+        if celsius is not None and (celsius >= self.HOT or (self.sustained is not None and celsius >= self.COOL)):
+            self.hot_since = at if self.hot_since is None else self.hot_since
+            self.lowest = celsius if self.lowest is None else min(self.lowest, celsius)
+            self.last_at = at
+        else:
+            self.hot_since = self.last_at = self.lowest = None
+
+    @property
+    def sustained(self) -> float | None:
+        if self.hot_since is None or self.last_at is None or self.last_at - self.hot_since < self.SUSTAIN:
+            return None
+        return self.lowest

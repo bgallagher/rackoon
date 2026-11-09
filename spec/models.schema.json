@@ -353,6 +353,8 @@
       "type": "object",
       "required": [
         "packages",
+        "waiting",
+        "phased",
         "held",
         "rebootRequired"
       ],
@@ -390,6 +392,50 @@
                 "description": "true when any suite ends in -security"
               }
             }
+          },
+          "description": "Upgrades apt would install now: the upgradable list minus held, phased and kept-back packages"
+        },
+        "waiting": {
+          "type": "array",
+          "description": "Upgradable packages apt is not installing yet: held (apt-mark hold), deferred by Ubuntu's phased rollout, or kept back because they need a removal (Rackoon never removes packages). Same item shape as packages.",
+          "items": {
+            "type": "object",
+            "required": [
+              "name",
+              "suite",
+              "newVersion",
+              "architecture",
+              "isSecurity"
+            ],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "suite": {
+                "type": "string",
+                "description": "apt's suite list, e.g. noble-updates,noble-security"
+              },
+              "newVersion": {
+                "type": "string"
+              },
+              "oldVersion": {
+                "type": "string"
+              },
+              "architecture": {
+                "type": "string"
+              },
+              "isSecurity": {
+                "type": "boolean",
+                "description": "true when any suite ends in -security"
+              }
+            }
+          }
+        },
+        "phased": {
+          "type": "array",
+          "description": "Names apt defers for its phased rollout (from the ##deferred section)",
+          "items": {
+            "type": "string"
           }
         },
         "held": {

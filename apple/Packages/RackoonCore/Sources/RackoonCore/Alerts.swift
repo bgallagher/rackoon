@@ -312,12 +312,20 @@ public enum AlertRules {
     }
 
     /// An Unraid server's array and disks (`UnraidAttention`).
-    public static func storage(_ snapshot: UnraidSnapshot) -> [AlertSignal] {
-        UnraidAttention.evaluate(snapshot).map {
-            AlertSignal(key: $0.id, category: .storage, severity: $0.severity,
-                        title: $0.id.hasPrefix("array") || $0.id.hasPrefix("parity") ? "Array needs attention" : "Disk needs attention",
+    public static func storage(_ snapshot: UnraidSnapshot, sustainedCPU: Double? = nil) -> [AlertSignal] {
+        UnraidAttention.evaluate(snapshot, sustainedCPU: sustainedCPU).map {
+            AlertSignal(key: $0.id, category: .storage, severity: $0.severity, title: storageTitle($0.id),
                         detail: $0.message, fix: AlertFix("overview"))
         }
+    }
+
+    /// The headline for an Unraid item: what it is about, so a CPU temperature is never called a disk problem.
+    static func storageTitle(_ id: String) -> String {
+        if id == "cpu_hot" { return "CPU running hot" }
+        if id.hasPrefix("disk_hot:") { return "Disk running hot" }
+        if id.hasPrefix("zfs_health:") { return "Pool needs attention" }
+        if id.hasPrefix("array") || id.hasPrefix("parity") { return "Array needs attention" }
+        return "Disk needs attention"
     }
 
     /// Days before expiry at which a certificate warns, and becomes critical.

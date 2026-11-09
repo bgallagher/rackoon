@@ -4,7 +4,8 @@ import Foundation
 public enum AptAction: Sendable, Equatable {
     /// `apt-get update`: refreshes the package lists, installs nothing.
     case refresh
-    /// `apt-get upgrade`: every available upgrade, no new packages, no removals, held packages stay.
+    /// `apt-get upgrade --with-new-pkgs`: every available upgrade, including new packages it needs (a new kernel's), no
+    /// removals; held packages stay, and Ubuntu's phased updates wait until apt offers them.
     case upgradeAll
     /// Upgrade only these packages (used for "install security updates").
     case upgrade(packages: [String])
@@ -20,7 +21,7 @@ public enum AptAction: Sendable, Equatable {
     public var command: String? {
         switch self {
         case .refresh: return Self.prefix + "update"
-        case .upgradeAll: return Self.prefix + "upgrade " + Self.options
+        case .upgradeAll: return Self.prefix + "upgrade --with-new-pkgs " + Self.options
         case .upgrade(let packages):
             var seen = Set<String>()
             let unique = packages.filter { seen.insert($0).inserted }

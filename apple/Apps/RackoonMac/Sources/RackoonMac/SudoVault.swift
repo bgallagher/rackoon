@@ -84,6 +84,22 @@ final class SudoVault {
         }
     }
 
+    /// Several saved passwords after ONE Touch ID / Apple Watch / login password approval, keyed by server id. Same
+    /// rules per server as `unlock`.
+    func unlockMany(_ servers: [Server], reason: String) async -> [String: Result<String, SudoSecretError>] {
+        guard let store else { return Dictionary(uniqueKeysWithValues: servers.map { ($0.id, .failure(.notRemembered)) }) }
+        var out: [String: Result<String, SudoSecretError>] = [:]
+        var scopes: [SudoSecretScope] = []
+        for server in servers {
+            guard store.isRemembered(serverID: server.id) else { out[server.id] = .failure(.notRemembered); continue }
+            guard let resolved = await OpenSSHTransport.resolve(server) else { out[server.id] = .failure(.scopeChanged); continue }
+            scopes.append(SudoSecretScope(server: server, resolved: resolved))
+        }
+        for (id, result) in await store.secrets(for: scopes, reason: reason) { out[id] = result }
+        for server in servers { refresh(server) }
+        return out
+    }
+
     func forget(_ serverID: String) {
         store?.forget(serverID: serverID)
         remembered.remove(serverID)
