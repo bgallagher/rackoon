@@ -49,7 +49,7 @@ public struct DemoProfile: Sendable {
         hostname: "homelab", prettyName: "Ubuntu 24.04.2 LTS", versionID: "24.04", codename: "noble", vendor: "Intel Corporation",
         product: "NUC13ANHi5", kernel: "6.8.0-52-generic", cores: 8, memTotalKB: 16_384_000, memUsedFraction: 0.39,
         diskTotal: 500_107_862_016, diskUsedFraction: 0.41, uptimeDays: 27.4, ip: "203.0.113.24", tailscaleIP: "100.100.40.7",
-        updates: 5, security: 2, rebootRequired: true, stacks: DemoData.homelabStacks, machineID: "8c2f4e61b0a94d37a1c5d2e9f7b3a608",
+        updates: 4, security: 2, rebootRequired: true, stacks: DemoData.homelabStacks, machineID: "8c2f4e61b0a94d37a1c5d2e9f7b3a608",
         standalone: DemoData.homelabStandalone)
 
     public static let nuc = DemoProfile(

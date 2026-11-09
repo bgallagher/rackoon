@@ -19,7 +19,7 @@ final class DemoDataTests: XCTestCase {
         let overview = try OverviewParser.parse(result.stdout)
         XCTAssertEqual(overview.hostname, "homelab")
         XCTAssertTrue(overview.rebootRequired)
-        XCTAssertEqual(overview.pendingUpdates, 5)
+        XCTAssertEqual(overview.pendingUpdates, 4, "matches the Updates screen: the held docker-ce does not count")
         XCTAssertEqual(overview.securityUpdates, 2)
         XCTAssertEqual(overview.tailscaleIP, "100.100.40.7")
         XCTAssertFalse(overview.unhealthyContainers.isEmpty)
@@ -65,8 +65,9 @@ final class DemoDataTests: XCTestCase {
     func testUpdatesParse() async throws {
         let result = try await DemoUpdatesTransport().run(UpdatesSession.command, timeout: 5)
         let snapshot = try UpdatesParser.parse(result.stdout)
-        XCTAssertEqual(snapshot.packages.count, 5)
+        XCTAssertEqual(snapshot.packages.count, 4, "the held docker-ce waits instead of counting")
         XCTAssertEqual(snapshot.packages.filter(\.isSecurity).count, 2)
+        XCTAssertEqual(snapshot.waiting.map(\.name), ["docker-ce"])
         XCTAssertTrue(snapshot.rebootRequired)
     }
 
