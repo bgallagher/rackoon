@@ -1,0 +1,23 @@
+##apt
+ok
+##upgradable
+Listing...
+openssl/noble-updates,noble-security 3.0.13-0ubuntu3.5 amd64 [upgradable from: 3.0.13-0ubuntu3.4]
+python3-distupgrade/noble-updates 1:24.04.26 all [upgradable from: 1:24.04.25]
+ubuntu-release-upgrader-core/noble-updates 1:24.04.26 all [upgradable from: 1:24.04.25]
+ubuntu-pro-client/noble-updates,noble-security 36~24.04 amd64 [upgradable from: 35.1ubuntu0~24.04]
+libnss-systemd/noble-updates 255.4-1ubuntu8.6 amd64 [upgradable from: 255.4-1ubuntu8.5]
+docker-ce/noble 5:28.0.1-1~ubuntu.24.04~noble amd64 [upgradable from: 5:28.0.0-1~ubuntu.24.04~noble]
+##deferred
+phased python3-distupgrade
+phased ubuntu-release-upgrader-core
+phased libnss-systemd:amd64
+kept ubuntu-pro-client
+kept docker-ce
+phased python3-distupgrade
+##held
+docker-ce
+##refreshed
+1762646400
+##reboot
+no

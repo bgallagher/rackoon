@@ -6,6 +6,11 @@ import XCTest
 import RackoonCore
 @testable import RackoonSSHSystem
 
+private func failure(_ r: Result<String, SudoSecretError>?) -> SudoSecretError? {
+    if case .failure(let e)? = r { return e }
+    return nil
+}
+
 final class SudoSecretStoreTests: XCTestCase {
     private var dir: URL!
     private let server = Server(id: "940AE65F-4805-4CAA-ACB9-F6AB965FCC14", name: "lab", host: "192.168.6.8", user: "lab",
@@ -31,6 +36,29 @@ final class SudoSecretStoreTests: XCTestCase {
         XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: file.path)[.posixPermissions] as? Int, 0o600)
         XCTAssertEqual(try FileManager.default.attributesOfItem(atPath: dir.path)[.posixPermissions] as? Int, 0o700)
         XCTAssertEqual(try dir.resourceValues(forKeys: [.isExcludedFromBackupKey]).isExcludedFromBackup, true)
+    }
+
+    func testSeveralOpenTogetherWithEachServersOwnRules() async throws {
+        let s = store()
+        try s.remember("pw-lab", scope: scope)
+        let other = Server(id: "11111111-2222-3333-4444-555555555555", name: "other", host: "10.0.0.2", user: "ops")
+        let otherScope = SudoSecretScope(server: other, resolved: SSHResolved(user: "ops", hostname: "10.0.0.2", port: 22))
+        try s.remember("pw-other", scope: otherScope)
+        let missing = Server(id: "99999999-2222-3333-4444-555555555555", name: "none", host: "10.0.0.3")
+        var moved = otherScope
+        moved.destination = "ops@10.0.0.99"
+        let got = await s.secrets(for: [scope, moved, SudoSecretScope(server: missing, resolved: resolved)], reason: "test")
+        XCTAssertEqual(try got[server.id]?.get(), "pw-lab")
+        XCTAssertEqual(failure(got[other.id]), .scopeChanged)
+        XCTAssertEqual(failure(got[missing.id]), .notRemembered)
+        XCTAssertFalse(s.isRemembered(serverID: other.id), "a changed server is forgotten, as with one at a time")
+    }
+
+    func testARefusedApprovalOpensNoneAndKeepsThemAll() async throws {
+        try store().remember("pw", scope: scope)
+        let got = await store(refuse: true).secrets(for: [scope], reason: "test")
+        XCTAssertEqual(failure(got[server.id]), .cancelled)
+        XCTAssertTrue(store().isRemembered(serverID: server.id))
     }
 
     func testAChangedConnectionForgetsInsteadOfOpening() async throws {

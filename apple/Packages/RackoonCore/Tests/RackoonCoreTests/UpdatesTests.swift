@@ -47,11 +47,26 @@ final class UpdatesParserTests: XCTestCase {
 
     func testSecurityPendingFixtureCounts() throws {
         let snapshot = try UpdatesParser.parse(String(contentsOf: specDir.appendingPathComponent("fixtures/updates/synthetic-security-pending.out.txt"), encoding: .utf8))
-        XCTAssertEqual(snapshot.packages.count, 6)
+        XCTAssertEqual(snapshot.packages.count, 4, "the two held packages wait: apt will not install them")
+        XCTAssertEqual(snapshot.waiting.map(\.name), ["linux-image-generic", "docker-ce"])
         XCTAssertEqual(snapshot.securityCount, 3, "openssl, libssl3t64 and the infra-security client")
         XCTAssertEqual(snapshot.held, ["linux-image-generic", "docker-ce"])
         XCTAssertTrue(snapshot.rebootRequired)
         XCTAssertEqual(snapshot.packages.first?.oldVersion, "3.0.13-0ubuntu3.4")
+    }
+
+    /// Ubuntu's phased updates and kept-back packages stay in `apt list --upgradable` however often apt runs, so
+    /// they must not count as pending (the Updates screen said "N updates" forever).
+    func testPhasedAndKeptBackUpdatesWaitInsteadOfCounting() throws {
+        let snapshot = try UpdatesParser.parse(String(contentsOf: specDir.appendingPathComponent("fixtures/updates/synthetic-phased-kept.out.txt"), encoding: .utf8))
+        XCTAssertEqual(snapshot.packages.map(\.name), ["openssl"])
+        XCTAssertEqual(snapshot.waiting.map(\.name), ["python3-distupgrade", "ubuntu-release-upgrader-core", "ubuntu-pro-client", "libnss-systemd", "docker-ce"])
+        XCTAssertEqual(snapshot.phased, ["python3-distupgrade", "ubuntu-release-upgrader-core", "libnss-systemd"], "unique, :arch dropped")
+        let reasons = Dictionary(uniqueKeysWithValues: snapshot.waiting.map { ($0.name, snapshot.waitingReason($0)) })
+        XCTAssertEqual(reasons["python3-distupgrade"], .phased)
+        XCTAssertEqual(reasons["ubuntu-pro-client"], .keptBack)
+        XCTAssertEqual(reasons["docker-ce"], .held, "held wins over kept back")
+        XCTAssertEqual(snapshot.securityCount, 1, "a kept-back security update is not offered as installable")
     }
 
     func testMissingAptSectionIsMalformed() {

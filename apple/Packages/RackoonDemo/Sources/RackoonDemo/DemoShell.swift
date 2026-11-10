@@ -78,7 +78,7 @@ public enum DemoShell {
           Memory usage: 39%                IPv4 address for eno1: 203.0.113.24
           Swap usage:   0%                 IPv4 address for tailscale0: 100.100.40.7
 
-        5 updates can be applied immediately.
+        4 updates can be applied immediately.
         2 of these updates are standard security updates.
 
         *** System restart required ***

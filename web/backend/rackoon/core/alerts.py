@@ -296,10 +296,22 @@ def containers(reading: DockerStatesReading) -> list[Signal]:
     return out
 
 
-def storage(snapshot: UnraidSnapshot) -> list[Signal]:
-    return [Signal(i.id, Category.STORAGE, i.severity,
-                   "Array needs attention" if i.id.startswith(("array", "parity")) else "Disk needs attention",
-                   i.message, Fix("overview")) for i in unraid_view.evaluate(snapshot)]
+def storage(snapshot: UnraidSnapshot, sustained_cpu: float | None = None) -> list[Signal]:
+    return [Signal(i.id, Category.STORAGE, i.severity, storage_title(i.id), i.message, Fix("overview"))
+            for i in unraid_view.evaluate(snapshot, sustained_cpu)]
+
+
+def storage_title(id: str) -> str:
+    """The headline for an Unraid item: what it is about, so a CPU temperature is never called a disk problem."""
+    if id == "cpu_hot":
+        return "CPU running hot"
+    if id.startswith("disk_hot:"):
+        return "Disk running hot"
+    if id.startswith("zfs_health:"):
+        return "Pool needs attention"
+    if id.startswith(("array", "parity")):
+        return "Array needs attention"
+    return "Disk needs attention"
 
 
 @dataclass(frozen=True)

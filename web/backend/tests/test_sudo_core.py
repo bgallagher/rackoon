@@ -278,3 +278,19 @@ def test_sudo_refusals_of_the_reboot_are_explained() -> None:
                                                                                          "sh: 1: systemctl: not found")
     assert c("", 255).message == "The reboot command failed (exit 255)."
     assert reboot.sudo_outcome_of(0, "##rebooting\n", "") is None
+
+
+def test_phased_and_kept_back_updates_wait_instead_of_counting() -> None:
+    # Ubuntu's phased updates and kept-back packages stay in `apt list --upgradable` however often apt runs.
+    from rackoon.core import updates
+    from tests.support import out
+    s = updates.parse(out("updates", "synthetic-phased-kept"))
+    assert [p.name for p in s.packages] == ["openssl"]
+    assert [p.name for p in s.waiting] == ["python3-distupgrade", "ubuntu-release-upgrader-core", "ubuntu-pro-client",
+                                          "libnss-systemd", "docker-ce"]
+    assert s.phased == ["python3-distupgrade", "ubuntu-release-upgrader-core", "libnss-systemd"]
+    reasons = {p.name: s.waiting_reason(p) for p in s.waiting}
+    assert reasons["python3-distupgrade"] == "phased"
+    assert reasons["ubuntu-pro-client"] == "kept_back"
+    assert reasons["docker-ce"] == "held"
+    assert s.security_count == 1

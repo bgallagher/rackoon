@@ -6,6 +6,31 @@ public struct ElevationWindow: Sendable {
     public struct Unlock: Sendable, Equatable {
         public let password: String
         public let until: Date
+        /// Kept until the app quits (or the user locks it) rather than for a fixed time.
+        public var lastsUntilQuit: Bool { until == .distantFuture }
+    }
+
+    /// How long an unlock lasts, as offered to the user. The raw value is minutes; 0 means until the app quits.
+    public enum Lasting: Int, Sendable, CaseIterable, Identifiable {
+        case fifteenMinutes = 15
+        case oneHour = 60
+        case eightHours = 480
+        case untilQuit = 0
+
+        public static let standard = Lasting.fifteenMinutes
+        public var id: Int { rawValue }
+
+        /// Seconds, or nil for until the app quits.
+        public var seconds: TimeInterval? { self == .untilQuit ? nil : TimeInterval(rawValue * 60) }
+
+        public var title: String {
+            switch self {
+            case .fifteenMinutes: "15 minutes"
+            case .oneHour: "1 hour"
+            case .eightHours: "8 hours"
+            case .untilQuit: "Until Rackoon quits"
+            }
+        }
     }
 
     /// Like sudo's own default grace period.
@@ -18,9 +43,16 @@ public struct ElevationWindow: Sendable {
 
     public init(length: TimeInterval = ElevationWindow.defaultLength) { self.length = length }
 
-    /// Unlocks `serverID` from `now` for `length`. Replaces an earlier unlock and clears the last lock reason.
-    public mutating func unlock(_ serverID: String, password: String, now: Date) {
-        unlocks[serverID] = Unlock(password: password, until: now.addingTimeInterval(length))
+    /// Unlocks `serverID` from `now` for `length`, or for `lasting` when given. Replaces an earlier unlock and clears the
+    /// last lock reason.
+    public mutating func unlock(_ serverID: String, password: String, now: Date, lasting: Lasting? = nil) {
+        let until: Date
+        switch lasting {
+        case nil: until = now.addingTimeInterval(length)
+        case .untilQuit?: until = .distantFuture
+        case let other?: until = now.addingTimeInterval(other.seconds ?? length)
+        }
+        unlocks[serverID] = Unlock(password: password, until: until)
         lockReasons[serverID] = nil
         generations[serverID, default: 0] += 1
     }

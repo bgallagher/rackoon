@@ -565,6 +565,9 @@ private struct DockerAttachment: ViewModifier {
         content
             .onAppear { sync() }
             .onChange(of: rows.filter(\.isOnline).map(\.id)) { _, _ in sync() }
+            // Unlocking or locking Docker through sudo gives the server a new model (`DockerWorkspace` keys them by
+            // `DockerElevation.key`): attach that one.
+            .onChange(of: rows.filter(\.isOnline).map { DockerElevation.shared.key($0.server) }) { _, _ in sync() }
             .onDisappear {
                 for model in attached.values { model.detach() }
                 attached = [:]
@@ -590,9 +593,18 @@ private struct DockerPage: View {
     let workspace: DockerWorkspace
     let openServer: (Server, Screen) -> Void
     let openStack: (Server, String) -> Void
+    /// Servers known to have no Docker are left out unless this is on.
+    @AppStorage("dashboardDockerShowAll") private var showWithoutDocker = false
+    @State private var unlocking = false
+    @State private var unlockNote: String?
+    private let elevation = DockerElevation.shared
 
     var body: some View {
         let sections = rows.map { row in (row: row, model: row.isOnline ? workspace.model(for: row.server) : nil) }
+        let withoutDocker = sections.filter { Self.hasNoDocker($0.row, $0.model) }
+        let shown = showWithoutDocker ? sections : sections.filter { !Self.hasNoDocker($0.row, $0.model) }
+        let locked = sections.filter { s in s.model?.state.error.map(DockerAccess.isPermissionProblem) == true && !elevation.isUnlocked(s.row.server) }
+        let unlocked = sections.filter { elevation.isUnlocked($0.row.server) }
         let totals = sections.compactMap { s in s.model?.state.snapshot.map { DockerTotals.of($0, host: s.row.state.overview) } }
         let cores = sections.compactMap { s in s.model?.state.snapshot != nil ? s.row.state.overview?.cores : nil }.reduce(0, +)
         let cpuSum = sections.compactMap { s in s.model?.state.snapshot?.containers.compactMap(\.cpuPercent).reduce(0, +) }.reduce(0, +)
@@ -611,13 +623,73 @@ private struct DockerPage: View {
                          detail: "Disks holding \(DockerTotals.dataRoot)",
                          fraction: dockerDiskFraction(totals))
             }
-            ForEach(sections, id: \.row.id) { section in
+            if !locked.isEmpty || !unlocked.isEmpty {
+                sudoBanner(locked: locked.map(\.row.server), unlocked: unlocked.map(\.row.server))
+            }
+            ForEach(shown, id: \.row.id) { section in
                 DockerServerSection(row: section.row, model: section.model,
                                     openDocker: { openServer(section.row.server, .docker) },
                                     openStack: { openStack(section.row.server, $0) })
             }
+            if !withoutDocker.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "shippingbox").foregroundStyle(Theme.textMuted)
+                    Text("\(withoutDocker.count) server\(withoutDocker.count == 1 ? "" : "s") without Docker: \(withoutDocker.map(\.row.server.name).joined(separator: ", "))")
+                        .font(.system(size: 12)).foregroundStyle(Theme.textMuted).lineLimit(2)
+                    Spacer()
+                    Button(showWithoutDocker ? "Hide" : "Show") { showWithoutDocker.toggle() }
+                        .buttonStyle(.bordered).controlSize(.small).handCursor()
+                }
+                .padding(.top, 6)
+            }
         }
         .modifier(DockerAttachment(rows: rows, workspace: workspace))
+    }
+
+    /// The server answered and has no docker command (from its Docker poll, or the background alert check's reading).
+    static func hasNoDocker(_ row: FleetRow, _ model: DockerModel?) -> Bool {
+        if model?.state.snapshot != nil { return false }
+        if DockerAccess.isNotInstalled(model?.state.error) { return true }
+        return AlertMonitor.shared.containerReading(for: row.server.id)?.problem == .notInstalled
+    }
+
+    /// One place to unlock Docker on every server that needs sudo: saved passwords open with ONE Touch ID / Apple Watch /
+    /// login password approval; servers without a saved password keep their own Unlock button below.
+    private func sudoBanner(locked: [Server], unlocked: [Server]) -> some View {
+        let saved = locked.filter { SudoVault.shared.isRemembered($0) }
+        let message = locked.isEmpty
+            ? "Docker is running through sudo on \(unlocked.count) server\(unlocked.count == 1 ? "" : "s")."
+            : "Docker needs sudo on \(locked.count) server\(locked.count == 1 ? "" : "s"): \(locked.map(\.name).joined(separator: ", "))."
+        let detail = unlockNote ?? (saved.isEmpty && !locked.isEmpty
+            ? "Unlock each one below; tick \"Remember on this Mac\" in the password sheet and next time one approval unlocks them all."
+            : "Nothing on the server is changed. Passwords stay in Rackoon's memory only, for the time chosen here.")
+        let action: AttentionAction? = !saved.isEmpty
+            ? AttentionAction(title: unlocking ? "Unlocking…" : "Unlock \(saved.count == locked.count ? "All" : "\(saved.count) Saved")…",
+                              help: "Use the sudo passwords saved on this Mac, after one Touch ID, Apple Watch or login password approval",
+                              enabled: !unlocking, run: { unlockAll(locked) })
+            : (!unlocked.isEmpty ? AttentionAction(title: "Lock All", help: "Stop using sudo for Docker on every server now",
+                                                   run: { elevation.lockAll(unlocked); unlockNote = nil }) : nil)
+        return HStack(spacing: 12) {
+            NoticeRow(icon: locked.isEmpty ? "lock.open.fill" : "lock.fill", tint: locked.isEmpty ? Theme.accent : Theme.warn,
+                      message: message, detail: detail, action: action)
+            UnlockLastingMenu()
+        }
+        .noticeSurface(locked.isEmpty ? .info : .warn)
+    }
+
+    private func unlockAll(_ servers: [Server]) {
+        unlocking = true
+        unlockNote = nil
+        Task {
+            defer { unlocking = false }
+            let failed = await elevation.unlockAll(servers)
+            let problems = failed.filter { $0.problem != nil }
+            if !problems.isEmpty {
+                unlockNote = problems.map { "\($0.server.name): \($0.problem!)" }.joined(separator: " ")
+            } else if !failed.isEmpty {
+                unlockNote = "No saved password for \(failed.map(\.server.name).joined(separator: ", ")): unlock \(failed.count == 1 ? "it" : "them") below."
+            }
+        }
     }
 
     private func unhealthyText(_ n: Int) -> String { n > 0 ? "\(n) unhealthy" : "None unhealthy" }
@@ -677,11 +749,11 @@ private struct DockerServerSection: View {
                     }
                 }
             }
+        } else if let error = model?.state.error, DockerAccess.isPermissionProblem(error) {
+            // Unlock right here (the saved password or the password sheet); no need to open the Docker screen.
+            DockerAccessNotice(server: row.server, error: error, compact: true)
         } else if let error = model?.state.error {
-            Text(DockerAccess.isPermissionProblem(error)
-                 ? "Docker needs sudo on this server. Open its Docker screen to unlock it."
-                 : error)
-                .font(.system(size: 12)).foregroundStyle(Theme.textMuted).lineLimit(3)
+            Text(error).font(.system(size: 12)).foregroundStyle(Theme.textMuted).lineLimit(3)
         } else {
             HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Reading containers…") }
                 .font(.system(size: 12)).foregroundStyle(Theme.textMuted)
@@ -813,6 +885,9 @@ private struct ServicesAttachment: ViewModifier {
         content
             .onAppear { sync() }
             .onChange(of: rows.filter(\.isOnline).map(\.id)) { _, _ in sync() }
+            // Unlocking or locking Docker through sudo gives the server a new model (`DockerWorkspace` keys them by
+            // `DockerElevation.key`): attach that one.
+            .onChange(of: rows.filter(\.isOnline).map { DockerElevation.shared.key($0.server) }) { _, _ in sync() }
             .onDisappear {
                 for model in attached.values { model.detach() }
                 attached = [:]

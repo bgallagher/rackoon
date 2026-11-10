@@ -42,7 +42,7 @@ struct UpdatesScreen: View {
                     }
                     summary(snapshot)
                     packageList
-                    if !snapshot.held.isEmpty { held(snapshot.held) }
+                    if !snapshot.waiting.isEmpty { waiting(snapshot) }
                 } else if state.error == nil {
                     HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Reading updates…") }
                         .foregroundStyle(Theme.textMuted)
@@ -88,7 +88,7 @@ struct UpdatesScreen: View {
                 .handCursor()
                 .disabled(busy)
             Button("Install All") { model.request(.upgradeAll) }
-                .help(safety.readOnly ? "Read-only mode is on" : "Install every available update")
+                .help(safety.readOnly ? "Read-only mode is on" : "Install every available update (apt-get upgrade --with-new-pkgs: new dependencies such as a new kernel too, never removals)")
                 .handCursor()
                 .disabled(busy || model.packages.isEmpty)
             Button("Install Security Updates") { model.request(.upgrade(packages: model.securityNames)) }
@@ -126,7 +126,7 @@ struct UpdatesScreen: View {
         HStack(spacing: 14) {
             SummaryTile(title: "Available", value: "\(s.packages.count)", tint: nil)
             SummaryTile(title: "Security", value: "\(s.securityCount)", tint: s.securityCount > 0 ? Theme.warn : Theme.ok)
-            SummaryTile(title: "Held back", value: "\(s.held.count)", tint: nil)
+            SummaryTile(title: "Waiting", value: "\(s.waiting.count)", tint: nil)
             SummaryTile(title: "Lists refreshed", value: s.refreshedAt.map {
                 Date(timeIntervalSince1970: TimeInterval($0)).formatted(.relative(presentation: .named))
             } ?? "unknown", tint: nil, small: true)
@@ -168,13 +168,32 @@ struct UpdatesScreen: View {
         }
     }
 
-    private func held(_ names: [String]) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("Held back").fontWeight(.semibold)
-            Text("These packages are pinned with apt-mark hold, so updates skip them: \(names.joined(separator: ", ")).")
-                .font(.system(size: 13)).foregroundStyle(Theme.textSecondary)
+    /// Upgradable, but apt will not install them now (held, phased rollout, kept back). Listed apart so the count above
+    /// reaches zero once everything apt will install is installed; each says why it waits.
+    private func waiting(_ s: UpdatesSnapshot) -> some View {
+        let groups: [UpdatesSnapshot.WaitingReason] = [.phased, .keptBack, .held]
+        return VStack(alignment: .leading, spacing: 0) {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Waiting (\(s.waiting.count))").fontWeight(.semibold)
+                Text("apt lists these as upgradable but will not install them yet, so they are not counted above.")
+                    .font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+            }
+            .padding(14)
+            ForEach(groups, id: \.label) { reason in
+                let pkgs = s.waiting.filter { s.waitingReason($0) == reason }
+                if !pkgs.isEmpty {
+                    Divider().overlay(Theme.border)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(reason.label).font(.system(size: 13, weight: .medium))
+                        Text(reason.explanation).font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    .padding(.horizontal, 14).padding(.top, 10).padding(.bottom, 2)
+                    ForEach(pkgs) { pkg in PackageRow(pkg: pkg).opacity(0.75) }
+                }
+            }
         }
-        .padding(14).frame(maxWidth: .infinity, alignment: .leading).card()
+        .card()
     }
 }
 

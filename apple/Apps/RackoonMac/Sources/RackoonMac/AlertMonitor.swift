@@ -105,7 +105,7 @@ final class AlertMonitor {
             }
             if let o = row.state.overview, ServerKind.detect(o.os) == .unraid {
                 let nas = NASStore.shared.model(for: row.server)
-                if let snapshot = nas.snapshot, let at = nas.updatedAt, isNew(id, .storage, at) { apply(.storage, AlertRules.storage(snapshot)) }
+                if let snapshot = nas.snapshot, let at = nas.updatedAt, isNew(id, .storage, at) { apply(.storage, AlertRules.storage(snapshot, sustainedCPU: nas.sustainedCPU)) }
             }
             if let (checks, at) = certificates[id], isNew(id, .certificates, at) {
                 apply(.certificates, AlertRules.certificates(checks, now: now))

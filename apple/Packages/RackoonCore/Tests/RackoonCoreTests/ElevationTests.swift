@@ -38,9 +38,29 @@ final class ElevationWindowTests: XCTestCase {
         XCTAssertEqual(w.generation("a"), 2, "views keyed by it rebuild their connections")
         XCTAssertEqual(w.generation("b"), 0)
     }
+
+    func testTheChosenLengthOverridesTheDefault() {
+        var w = ElevationWindow(length: 900)
+        w.unlock("a", password: "pw", now: t0, lasting: .oneHour)
+        XCTAssertNotNil(w.active("a", at: t0.addingTimeInterval(3599)))
+        XCTAssertNil(w.active("a", at: t0.addingTimeInterval(3600)))
+        w.unlock("b", password: "pw", now: t0, lasting: .untilQuit)
+        XCTAssertEqual(w.active("b", at: t0.addingTimeInterval(365 * 86_400))?.lastsUntilQuit, true, "no end until the app quits")
+        w.lock("b")
+        XCTAssertNil(w.active("b", at: t0), "Lock still ends it at once")
+        XCTAssertEqual(ElevationWindow.Lasting.standard, .fifteenMinutes, "the default stays like sudo's own")
+        XCTAssertEqual(ElevationWindow.Lasting(rawValue: 0), .untilQuit)
+        XCTAssertNil(ElevationWindow.Lasting.untilQuit.seconds)
+    }
 }
 
 final class DockerAccessTests: XCTestCase {
+    func testNotInstalledIsRecognisedOnlyFromItsOwnError() {
+        XCTAssertTrue(DockerAccess.isNotInstalled(DockerParseError.notInstalled.errorDescription))
+        XCTAssertFalse(DockerAccess.isNotInstalled(nil))
+        XCTAssertFalse(DockerAccess.isNotInstalled("permission denied while trying to connect to the Docker daemon socket"))
+    }
+
     func testRecognisesDockerSocketRefusals() throws {
         // Captured on Ubuntu 26.04 (minilab) and the older daemon wording in the spec fixture.
         XCTAssertTrue(DockerAccess.isPermissionProblem("permission denied while trying to connect to the docker API at unix:///var/run/docker.sock"))

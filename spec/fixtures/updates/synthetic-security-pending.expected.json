@@ -30,19 +30,26 @@
     },
     {
       "architecture" : "amd64",
-      "isSecurity" : false,
-      "name" : "linux-image-generic",
-      "newVersion" : "6.8.0-52.53",
-      "oldVersion" : "6.8.0-51.52",
-      "suite" : "noble-updates"
-    },
-    {
-      "architecture" : "amd64",
       "isSecurity" : true,
       "name" : "ubuntu-pro-client",
       "newVersion" : "33.3~24.04",
       "oldVersion" : "33.2~24.04",
       "suite" : "noble-infra-security"
+    }
+  ],
+  "phased" : [
+
+  ],
+  "rebootRequired" : true,
+  "refreshedAt" : 1735689600,
+  "waiting" : [
+    {
+      "architecture" : "amd64",
+      "isSecurity" : false,
+      "name" : "linux-image-generic",
+      "newVersion" : "6.8.0-52.53",
+      "oldVersion" : "6.8.0-51.52",
+      "suite" : "noble-updates"
     },
     {
       "architecture" : "arm64",
@@ -52,7 +59,5 @@
       "oldVersion" : "5:27.4.0-1~ubuntu.24.04~noble",
       "suite" : "noble"
     }
-  ],
-  "rebootRequired" : true,
-  "refreshedAt" : 1735689600
+  ]
 }

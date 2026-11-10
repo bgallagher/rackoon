@@ -24,6 +24,19 @@ public protocol SudoSealer: Sendable {
     /// Prompts (Touch ID, Apple Watch or login password). Throws `SudoSecretError.cancelled` if the user says no or the
     /// approval fails (the record is kept), `.unreadable` only if the record itself can't be opened.
     func open(_ sealed: SealedSecret, authenticating aad: Data, reason: String) async throws -> Data
+    /// Opens several records after one approval where possible. A refused approval fails every item with `.cancelled`.
+    func openAll(_ items: [(sealed: SealedSecret, aad: Data)], reason: String) async -> [Result<Data, Error>]
+}
+
+extension SudoSealer {
+    public func openAll(_ items: [(sealed: SealedSecret, aad: Data)], reason: String) async -> [Result<Data, Error>] {
+        var out: [Result<Data, Error>] = []
+        for item in items {
+            do { out.append(.success(try await open(item.sealed, authenticating: item.aad, reason: reason))) }
+            catch { out.append(.failure(error)) }
+        }
+        return out
+    }
 }
 
 enum SealCrypto {
@@ -84,6 +97,27 @@ public struct SecureEnclaveSealer: SudoSealer {
             }
             return try Self.unwrap(sealed, aad: aad, context: again)
         }
+    }
+
+    /// One approval for every record: each is its own Secure Enclave key, and every key is used with the same approved
+    /// context. A key that still wants its own approval falls back to `open`, which asks for that one alone.
+    public func openAll(_ items: [(sealed: SealedSecret, aad: Data)], reason: String) async -> [Result<Data, Error>] {
+        guard !items.isEmpty else { return [] }
+        let context: LAContext
+        do { context = try await Self.approve(reason: reason) }
+        catch { return items.map { _ in .failure(SudoSecretError.cancelled) } }
+        var out: [Result<Data, Error>] = []
+        for item in items {
+            do {
+                out.append(.success(try Self.unwrap(item.sealed, aad: item.aad, context: context)))
+            } catch where Self.needsApproval(error) {
+                do { out.append(.success(try await open(item.sealed, authenticating: item.aad, reason: reason))) }
+                catch { out.append(.failure(error)) }
+            } catch {
+                out.append(.failure(error))
+            }
+        }
+        return out
     }
 
     /// macOS's own owner-approval prompt (`.deviceOwnerAuthentication`): Touch ID, the paired Apple Watch (double-click
@@ -210,7 +244,8 @@ public final class SudoSecretFileStore: SudoSecretStore, @unchecked Sendable {
         }
     }
 
-    public func secret(for scope: SudoSecretScope, reason: String) async throws -> String {
+    /// The saved record for `scope`, checked against the server as it is now (see `secret`).
+    private func record(matching scope: SudoSecretScope) throws -> Record {
         guard let record = lock.withLock({ read(scope.serverID) }) else { throw SudoSecretError.notRemembered }
         guard record.scope == scope else {
             var sameSaved = record.scope
@@ -220,19 +255,42 @@ public final class SudoSecretFileStore: SudoSecretStore, @unchecked Sendable {
             forget(serverID: scope.serverID)
             throw SudoSecretError.scopeChanged
         }
+        return record
+    }
+
+    /// What an opened (or failed) seal means: the text, or why not. Forgets records that can no longer be read.
+    private func outcome(_ opened: Result<Data, Error>, serverID: String) -> Result<String, SudoSecretError> {
+        switch opened {
+        case .success(let data):
+            guard let text = String(data: data, encoding: .utf8) else { forget(serverID: serverID); return .failure(.unreadable) }
+            return .success(text)
+        case .failure(SudoSecretError.cancelled):
+            return .failure(.cancelled)
+        case .failure:
+            forget(serverID: serverID)
+            return .failure(.unreadable)
+        }
+    }
+
+    public func secret(for scope: SudoSecretScope, reason: String) async throws -> String {
+        let record = try record(matching: scope)
         let opened: Result<Data, Error>
         do { opened = .success(try await sealer.open(record.sealed, authenticating: scope.authenticatedData, reason: reason)) }
         catch { opened = .failure(error) }
-        switch opened {
-        case .success(let data):
-            guard let text = String(data: data, encoding: .utf8) else { forget(serverID: scope.serverID); throw SudoSecretError.unreadable }
-            return text
-        case .failure(SudoSecretError.cancelled):
-            throw SudoSecretError.cancelled
-        case .failure:
-            forget(serverID: scope.serverID)
-            throw SudoSecretError.unreadable
+        return try outcome(opened, serverID: scope.serverID).get()
+    }
+
+    public func secrets(for scopes: [SudoSecretScope], reason: String) async -> [String: Result<String, SudoSecretError>] {
+        var out: [String: Result<String, SudoSecretError>] = [:]
+        var pending: [(scope: SudoSecretScope, record: Record)] = []
+        for scope in scopes {
+            do { pending.append((scope, try record(matching: scope))) }
+            catch let error as SudoSecretError { out[scope.serverID] = .failure(error) }
+            catch { out[scope.serverID] = .failure(.unreadable) }
         }
+        let opened = await sealer.openAll(pending.map { ($0.record.sealed, $0.scope.authenticatedData) }, reason: reason)
+        for (item, result) in zip(pending, opened) { out[item.scope.serverID] = outcome(result, serverID: item.scope.serverID) }
+        return out
     }
 
     public func forget(serverID: String) {

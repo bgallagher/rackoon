@@ -24,8 +24,8 @@ public actor ServerSession {
     echo "ip=$(ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i ~ /^src$/){print $(i+1); exit}}')"; \
     T=$(timeout 3 tailscale ip -4 2>/dev/null | head -1); [ -n "$T" ] || T=$(ip -4 -o addr show dev tailscale0 2>/dev/null | awk '{print $4}' | cut -d/ -f1 | head -1); echo "tailscale_ip=$T"; \
     echo '##reboot'; if [ -f /var/run/reboot-required ]; then echo yes; else echo no; fi; \
-    U=$(apt list --upgradable 2>/dev/null); echo '##updates'; echo "$U" | grep -c -E '^[^/ ]+/'; \
-    echo '##security'; echo "$U" | grep -c -E '^[^/ ]+/[^ ]*-security'; \
+    U=$(LC_ALL=C apt-get -s upgrade --with-new-pkgs 2>/dev/null | grep -E '^Inst [^ ]+ \\['); echo '##updates'; echo "$U" | grep -c '^Inst'; \
+    echo '##security'; echo "$U" | grep -c -E -- '-security[], ]'; \
     echo '##unhealthy'; docker ps --filter health=unhealthy --format '{{.Names}}' 2>/dev/null || true
     """
 

@@ -5,7 +5,7 @@ sealed class AptAction {
     /** `apt-get update`: refreshes the package lists, installs nothing. */
     object Refresh : AptAction()
 
-    /** `apt-get upgrade`: every available upgrade, no new packages, no removals, held packages stay. */
+    /** `apt-get upgrade --with-new-pkgs`: every available upgrade, plus new packages it needs, no removals; held packages stay. */
     object UpgradeAll : AptAction()
 
     /** Upgrade only these packages (used for "install security updates"). */

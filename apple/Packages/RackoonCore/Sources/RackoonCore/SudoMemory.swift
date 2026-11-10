@@ -90,6 +90,21 @@ public protocol SudoSecretStore: Sendable {
     /// The saved password, after the user approves. `scope` is the server as it is NOW: a mismatch forgets the record
     /// and throws `.scopeChanged`. `reason` completes "Rackoon is trying to …".
     func secret(for scope: SudoSecretScope, reason: String) async throws -> String
+    /// Several saved passwords after ONE approval where the store can do that (the same rules as `secret`, per server),
+    /// keyed by server id. The default asks once per server.
+    func secrets(for scopes: [SudoSecretScope], reason: String) async -> [String: Result<String, SudoSecretError>]
     func forget(serverID: String)
     func forgetAll()
+}
+
+extension SudoSecretStore {
+    public func secrets(for scopes: [SudoSecretScope], reason: String) async -> [String: Result<String, SudoSecretError>] {
+        var out: [String: Result<String, SudoSecretError>] = [:]
+        for scope in scopes {
+            do { out[scope.serverID] = .success(try await secret(for: scope, reason: reason)) }
+            catch let error as SudoSecretError { out[scope.serverID] = .failure(error) }
+            catch { out[scope.serverID] = .failure(.unreadable) }
+        }
+        return out
+    }
 }

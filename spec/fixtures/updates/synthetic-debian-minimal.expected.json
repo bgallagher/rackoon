@@ -27,5 +27,11 @@
       "suite" : "stable"
     }
   ],
-  "rebootRequired" : false
+  "phased" : [
+
+  ],
+  "rebootRequired" : false,
+  "waiting" : [
+
+  ]
 }

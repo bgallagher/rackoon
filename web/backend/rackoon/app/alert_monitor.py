@@ -306,7 +306,8 @@ class AlertMonitor:
             if o is not None and is_unraid(o.os):
                 nas = await self.rackoon.nas.read(server.id, base)
                 if nas.value is not None:
-                    await self.record(server, Source.STORAGE, alerts.storage(nas.value))
+                    await self.record(server, Source.STORAGE, alerts.storage(
+                        nas.value, self.rackoon.nas.sustained_cpu(server.id)))
             if self.clock() - self.last_certs.get(server.id, 0) >= CERTS_EVERY:
                 self.last_certs[server.id] = self.clock()
                 await self.check_certificates(server)

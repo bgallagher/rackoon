@@ -188,6 +188,7 @@ class Rackoon:
         self.services = system_api.ServicesStore(self.store.root / "services", clock)
         self.nas = system_api.NASStore(clock)
         self.monitor.nas_for = self.nas.snapshot
+        self.monitor.heat_for = self.nas.sustained_cpu
         self.alerts = AlertMonitor(self, clock)
         self.terminals = TerminalManager(self.connections.open_shell, lambda: self.preferences.read_only,
                                          self.preferences.touch, lambda: self.preferences.highlight_output)
