@@ -40,11 +40,17 @@ RUN python -m pip uninstall -y pip setuptools wheel >/dev/null 2>&1 || true; \
     && mkdir -p /data && chown rackoon:rackoon /data && chmod 700 /data
 COPY --from=deps /app/.venv /app/.venv
 COPY --from=ui /ui/dist /app/static
-COPY spec/commands.json spec/command-library.json /app/spec/
+COPY spec/commands.json spec/command-library.json spec/security-checks.json /app/spec/
 COPY apple/Apps/RackoonMac/Resources/themes.json /app/spec/themes.json
-# Demo mode answers the Services screen with two of the spec's sanitized captures.
+# Demo mode answers the Services and Security screens with the spec's sanitized/synthetic captures, and the
+# vulnerability lookup with spec/osv's made-up records (so a demo sends nothing). tests/test_image_spec.py checks
+# that these lines copy everything the app and its demo read.
 COPY spec/fixtures/services/synthetic-root-failed.out.txt spec/fixtures/services/ubuntu-user-units-and-processes.out.txt \
      /app/spec/fixtures/services/
+COPY spec/fixtures/security/synthetic-ubuntu-hardened.out.txt spec/fixtures/security/synthetic-ubuntu-default.out.txt \
+     /app/spec/fixtures/security/
+COPY spec/fixtures/security_packages/synthetic-ubuntu-noble.out.txt /app/spec/fixtures/security_packages/
+COPY spec/osv/vulns/ /app/spec/osv/vulns/
 ENV PATH="/app/.venv/bin:$PATH" PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
     RACKOON_DATA=/data RACKOON_STATIC=/app/static RACKOON_SPEC=/app/spec RACKOON_HOST=0.0.0.0 RACKOON_PORT=8080 \
     RACKOON_VERSION=${VERSION}
