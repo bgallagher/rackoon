@@ -49,6 +49,16 @@ def test_the_dockerfile_copies_into_the_image_spec_folder() -> None:
     assert "" in dests and "themes.json" in dests, dests
 
 
+def test_the_build_context_lets_in_everything_copied_to_the_spec_folder() -> None:
+    """web/Dockerfile.dockerignore is an allow-list (`*`, then `!path`): a copied file it does not let in makes the
+    image build fail with "not found"."""
+    allowed = {line[1:].strip().rstrip("/") for line in (REPO / "web" / "Dockerfile.dockerignore").read_text().splitlines()
+               if line.startswith("!")}
+    for source, _ in image_spec_copies():
+        rel = source.relative_to(REPO)
+        assert any(str(p) in allowed for p in (rel, *rel.parents)), f"{rel} is copied but not let in by the dockerignore"
+
+
 def test_demo_mode_works_with_only_what_the_image_copies(tmp_path: Path) -> None:
     spec = tmp_path / "spec"
     build_image_spec(spec)
