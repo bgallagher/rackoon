@@ -27,6 +27,28 @@ final class AlertsTests: XCTestCase {
         XCTAssertEqual(book.active().first { $0.key == "disk_high:/" }?.firstSeen, t0)
     }
 
+    func testSecurityFindingsAreListedAndCountedButNeverNotify() throws {
+        let text = try String(contentsOf: specDir.appendingPathComponent("fixtures/security/synthetic-debian-exposed.out.txt"), encoding: .utf8)
+        let findings = SecurityRules.evaluate(SecurityParser.parse(text), context: .init(pendingSecurityUpdates: 2, rebootRequired: true))
+        let signals = AlertRules.security(findings)
+        XCTAssertEqual(signals.first { $0.key == "ssh.root_login" }?.severity, .critical)
+        XCTAssertEqual(signals.first { $0.key == "ssh.root_login" }?.title, "Root login with a password")
+        XCTAssertEqual(signals.first { $0.key == "ssh.root_login" }?.fix, AlertFix("security", target: "ssh.root_login"))
+        XCTAssertEqual(signals.first { $0.key == "exposure.sensitive_port:3306" }?.severity, .warning)
+        XCTAssertNil(signals.first { $0.key == "docker.container:portainer" }, "info findings stay on the Security screen")
+        XCTAssertNil(signals.first { $0.key == "updates.security_pending" }, "the Overview already alerts about updates")
+        XCTAssertNil(signals.first { $0.key == "updates.reboot" })
+        XCTAssertTrue(signals.allSatisfy { $0.category == .security })
+
+        var book = AlertBook()
+        XCTAssertTrue(book.apply(server: "a", serverName: "lab", source: .security, signals: [], at: t0).isEmpty)
+        let raised = book.apply(server: "a", serverName: "lab", source: .security, signals: signals, at: later(60))
+        XCTAssertTrue(raised.isEmpty, "never a notification, even after the first reading")
+        XCTAssertEqual(book.unseenCount(server: "a"), signals.count, "but counted in the badge")
+        XCTAssertFalse(AlertSource.security.notifies)
+        XCTAssertTrue(AlertSource.overview.notifies)
+    }
+
     func testGettingWorseNotifiesAndClearsTheSeenMark() {
         var book = AlertBook()
         book.apply(server: "a", serverName: "lab", source: .overview, signals: [disk(90)], at: t0)

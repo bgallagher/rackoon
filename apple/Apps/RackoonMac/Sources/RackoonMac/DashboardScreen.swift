@@ -4,7 +4,8 @@ import RackoonCore
 import SwiftUI
 
 /// Every server at once, as a carousel of pages: Health (uptime and resource history), Servers (one tile each),
-/// Docker (every stack, grouped by server), Services (what runs outside Docker), Alerts (every server's) and Bookmarks. Reads what the polls already have: the
+/// Docker (every stack, grouped by server), Services (what runs outside Docker), Security (what each server's hardening
+/// checks found), Alerts (every server's) and Bookmarks. Reads what the polls already have: the
 /// selected server's live poll, the others' once-a-minute poll (`FleetMonitor`), and, while the Docker or Bookmarks page
 /// is showing, each answering server's Docker poll.
 struct DashboardScreen: View {
@@ -16,7 +17,7 @@ struct DashboardScreen: View {
     let openStack: (Server, String) -> Void
 
     enum Page: String, CaseIterable, Identifiable {
-        case health, servers, docker, services, alerts, bookmarks
+        case health, servers, docker, services, security, alerts, bookmarks
         var id: String { rawValue }
         var title: String {
             switch self {
@@ -24,6 +25,7 @@ struct DashboardScreen: View {
             case .servers: "Servers"
             case .docker: "Docker"
             case .services: "Services"
+            case .security: "Security"
             case .alerts: "Alerts"
             case .bookmarks: "Bookmarks"
             }
@@ -34,6 +36,7 @@ struct DashboardScreen: View {
             case .servers: "server.rack"
             case .docker: "shippingbox"
             case .services: "gearshape.2"
+            case .security: "shield"
             case .alerts: "bell"
             case .bookmarks: "bookmark"
             }
@@ -147,6 +150,7 @@ struct DashboardScreen: View {
                 case .servers: ServersPage(rows: rows, openServer: openServer)
                 case .docker: DockerPage(rows: rows, workspace: workspace, openServer: openServer, openStack: openStack)
                 case .services: ServicesPage(rows: rows, openServer: openServer)
+                case .security: SecurityPage(rows: rows, openServer: openServer)
                 case .alerts: AlertsPage(rows: rows, open: openAlert)
                 case .bookmarks: BookmarksPage(rows: rows, workspace: workspace)
                 }
@@ -987,6 +991,102 @@ private struct ServicesServerSection: View {
     }
 }
 
+// MARK: - Security
+
+/// What each answering server's Security checks found, worst first: only what needs the user (critical and warning) is
+/// listed, with the disclaimer, since a clean result never means "secure". Reads each server when the page shows, unless
+/// its reading is under five minutes old (`SecurityModel.load`); nothing polls while it is hidden.
+private struct SecurityPage: View {
+    let rows: [FleetRow]
+    let openServer: (Server, Screen) -> Void
+    private let store = SecurityStore.shared
+
+    var body: some View {
+        let sections = rows.map { row -> (row: FleetRow, model: SecurityModel?, findings: [SecurityFinding]) in
+            let model = row.isOnline ? store.model(for: row.server) : store.existingModel(for: row.server)
+            let findings = model?.findings(SecurityModel.context(row.state.overview)) ?? []
+            return (row, model, findings)
+        }
+        let all = sections.flatMap(\.findings)
+        let checked = sections.filter { $0.model?.snapshot != nil }.count
+        let exposed = sections.reduce(0) { sum, s in
+            guard let snap = s.model?.snapshot else { return sum }
+            return sum + SecurityExposure.ports(snap, ufwOn: SecurityRules.ufwOn(snap))
+                .filter(\.isExposed).count
+        }
+        VStack(alignment: .leading, spacing: 14) {
+            TileGrid(count: 4) {
+                let critical = all.filter { $0.severity == .critical }.count
+                Headline(title: "Critical", value: "\(critical)", detail: critical > 0 ? "fix these first" : "None found",
+                         detailTint: critical > 0 ? Theme.danger : Theme.textMuted)
+                let warnings = all.filter { $0.severity == .warning }.count
+                Headline(title: "Warnings", value: "\(warnings)", detail: warnings > 0 ? "worth a look" : "None found",
+                         detailTint: warnings > 0 ? Theme.warn : Theme.textMuted)
+                Headline(title: "Ports open to other networks", value: "\(exposed)", detail: "every interface or a public address")
+                Headline(title: "Servers checked", value: "\(checked) / \(rows.count)",
+                         detail: "\(all.filter { $0.severity == .unknown }.count) checks could not run")
+            }
+            Text(SecurityScreen.disclaimer).font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+                .fixedSize(horizontal: false, vertical: true)
+            ForEach(sections, id: \.row.id) { section in
+                SecurityServerSection(row: section.row, model: section.model, findings: section.findings,
+                                      open: { openServer(section.row.server, .security) })
+            }
+        }
+        .onAppear { load() }
+        .onChange(of: rows.filter(\.isOnline).map(\.id)) { _, _ in load() }
+    }
+
+    private func load() {
+        for row in rows where row.isOnline { store.model(for: row.server).load() }
+    }
+}
+
+private struct SecurityServerSection: View {
+    let row: FleetRow
+    let model: SecurityModel?
+    let findings: [SecurityFinding]
+    let open: () -> Void
+
+    var body: some View {
+        let toFix = findings.filter { $0.severity == .critical || $0.severity == .warning }.sorted { $0.severity < $1.severity }
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 10) {
+                StatusDot(status: lightStatus(row), glow: row.isOnline)
+                Text(row.server.name).font(.system(size: 15, weight: .semibold))
+                if model?.snapshot != nil {
+                    Text(toFix.isEmpty ? "Nothing obvious to fix" : "\(toFix.count) thing\(toFix.count == 1 ? "" : "s") to fix")
+                        .font(.system(size: 12, weight: .medium)).foregroundStyle(toFix.isEmpty ? Theme.textMuted : Theme.warn)
+                    if let at = model?.checkedAt {
+                        Text("checked \(at.formatted(.relative(presentation: .named)))").font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+                    }
+                }
+                Spacer()
+                Button("Open Security", action: open).buttonStyle(.bordered).controlSize(.small).handCursor()
+            }
+            if !row.isOnline {
+                Text(offlineNote(row)).font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+            } else if model?.snapshot != nil {
+                ForEach(toFix) { f in
+                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        Image(systemName: f.severity == .critical ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
+                            .foregroundStyle(f.severity == .critical ? Theme.danger : Theme.warn)
+                            .accessibilityLabel(f.severity == .critical ? "Critical" : "Warning")
+                        Text(SecurityChecks.check(f.check)?.title ?? f.check).font(.system(size: 13, weight: .medium))
+                        Text(f.summary).font(.system(size: 12)).foregroundStyle(Theme.textSecondary).lineLimit(2)
+                    }
+                }
+            } else if let error = model?.error {
+                Text(error).font(.system(size: 12)).foregroundStyle(Theme.textMuted).lineLimit(3)
+            } else {
+                HStack(spacing: 8) { ProgressView().controlSize(.small); Text("Checking…") }
+                    .font(.system(size: 12)).foregroundStyle(Theme.textMuted)
+            }
+        }
+        .padding(.top, 6)
+    }
+}
+
 // MARK: - Alerts
 
 /// Every server's alerts in one list, worst first.
@@ -1032,7 +1132,7 @@ private struct AlertsHeaderBar: View {
     let clearable: Bool
 
     var body: some View {
-        AlertsHeader(title: "Every server", subtitle: "Connection, disks, updates, containers, services, storage and certificates",
+        AlertsHeader(title: "Every server", subtitle: "Connection, disks, updates, containers, services, storage, certificates and security",
                      server: nil, tab: $tab, counts: counts, clearable: clearable)
     }
 }

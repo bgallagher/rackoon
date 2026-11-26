@@ -27,6 +27,7 @@ class SharedScenarioTests {
 
     private val subjects = setOf(
         "shell_quote", "template_fill", "action_policy", "compose_command", "stream_output", "server_input", "docker_ids",
+        "security_checks", "debian_version", "vulnerability_report",
     )
 
     private fun doneFeatures(): Set<String> =
@@ -147,5 +148,27 @@ class SharedScenarioTests {
             val ok = if (c.str("kind") == "container_id") DockerSession.isContainerID(value) else ComposeAction.isServiceName(value)
             assertEquals(c["ok"]!!.jsonPrimitive.boolean, ok, name)
         }
+    }
+
+    @Test fun securityChecks() {
+        for ((name, c) in cases("security_checks")) {
+            val ctx = c["context"]!!.jsonObject
+            val context = SecurityContext(
+                ctx["pendingSecurityUpdates"]?.takeIf { it != JsonNull }?.jsonPrimitive?.intOrNull,
+                ctx["rebootRequired"]?.takeIf { it != JsonNull }?.jsonPrimitive?.booleanOrNull,
+            )
+            val snapshot = SecurityParser.parse(Spec.out("security", c.str("fixture")))
+            val got = LinkedHashMap<String, String>()
+            for (f in SecurityRules.evaluate(snapshot, context)) got.putIfAbsent(f.id, f.severity.raw)
+            for ((id, severity) in c["expect"]!!.jsonObject) assertEquals(severity.jsonPrimitive.content, got[id], "$name: $id")
+            for (id in c["absent"]?.jsonArray ?: emptyList()) assertTrue(id.jsonPrimitive.content !in got, "$name: ${id.jsonPrimitive.content}")
+        }
+    }
+
+    @Test fun debianVersion() = VulnerabilityScenarios.debianVersion(cases("debian_version"))
+
+    @Test fun vulnerabilityReport() = kotlinx.coroutines.test.runTest {
+        val found = cases("vulnerability_report")
+        if (found.isNotEmpty()) VulnerabilityScenarios.report(Spec.parse("scenarios/vulnerability-report.json").jsonObject, found)
     }
 }

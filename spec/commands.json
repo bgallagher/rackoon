@@ -106,6 +106,26 @@
       ]
     },
     {
+      "id": "security",
+      "description": "Read-only hardening facts for the Security screen, as the ssh user (no root): sshd settings (`sshd -T` when it can run, else the config files in sshd's first-value-wins order, naming any it cannot read), whether Tailscale SSH is on, which firewall and brute-force services are active, listening TCP/UDP sockets, Docker-published ports and risky container settings (only when Docker lets the user in), unattended-upgrades, extra UID 0 accounts, accounts with an empty password (only as root: /etc/shadow, run from Check Deeper with sudo), ASLR and clock sync. Each check that cannot be read is reported as unknown, never as a pass. Ends with true.",
+      "script": "PATH=\"$PATH:/usr/local/sbin:/usr/sbin:/sbin\"; echo '##uid'; id -u; echo '##os'; (. /etc/os-release 2>/dev/null; echo \"id=$ID\"; echo \"like=$ID_LIKE\"; echo \"version=$VERSION_ID\"); echo '##sshd'; if command -v sshd >/dev/null 2>&1; then echo installed=yes; else echo installed=no; fi; echo \"active=$(systemctl is-active ssh.service sshd.service ssh.socket 2>/dev/null | grep -cx active)\"; echo '##sshd_effective'; sshd -T 2>/dev/null | grep -Ei '^(port|permitrootlogin|passwordauthentication|kbdinteractiveauthentication|permitemptypasswords|maxauthtries|x11forwarding) '; echo '##sshd_files'; for f in /etc/ssh/sshd_config /etc/ssh/sshd_config.d/*.conf; do [ -e \"$f\" ] || continue; if [ -r \"$f\" ]; then echo \"#file $f\"; grep -Ei '^[[:space:]]*(include|match|port|permitrootlogin|passwordauthentication|kbdinteractiveauthentication|challengeresponseauthentication|permitemptypasswords|maxauthtries|x11forwarding)([[:space:]]|=)' \"$f\"; else echo \"#unreadable $f\"; fi; done; echo '##tailscale_ssh'; timeout 3 tailscale debug prefs 2>/dev/null | grep -o '\"RunSSH\": *[a-z]*'; echo '##firewall'; grep -E '^ENABLED=' /etc/ufw/ufw.conf 2>/dev/null; for u in ufw firewalld nftables; do echo \"$u=$(systemctl is-active $u 2>/dev/null)\"; done; echo '##guards'; for u in fail2ban crowdsec sshguard; do echo \"$u=$(systemctl is-active $u 2>/dev/null)\"; done; echo '##listen'; ss -H -tuln 2>/dev/null; echo '##docker'; if command -v docker >/dev/null 2>&1; then echo installed=yes; docker ps --format '{{.Names}}\t{{.Ports}}' 2>&1 | head -200; else echo installed=no; fi; echo '##docker_inspect'; docker ps -q 2>/dev/null | head -100 | xargs -r docker inspect --format '{{.Name}}|{{.HostConfig.Privileged}}|{{.HostConfig.NetworkMode}}|{{.HostConfig.PidMode}}|{{range .Mounts}}{{.Source}};{{end}}' 2>/dev/null; echo '##unattended'; echo \"package=$(dpkg-query -W -f='${Status}' unattended-upgrades 2>/dev/null)\"; apt-config dump APT::Periodic::Unattended-Upgrade 2>/dev/null; echo '##uid0'; awk -F: '$3==0{print $1}' /etc/passwd 2>/dev/null; echo '##shadow_empty'; if [ \"$(id -u)\" = 0 ]; then echo checked; awk -F: '$2==\"\"{print $1}' /etc/shadow 2>/dev/null; fi; echo '##aslr'; cat /proc/sys/kernel/randomize_va_space 2>/dev/null; echo '##ntp'; timedatectl show -p NTPSynchronized --value 2>/dev/null; true",
+      "timeoutSeconds": 20,
+      "distros": [
+        "debian",
+        "ubuntu"
+      ]
+    },
+    {
+      "id": "security_packages",
+      "description": "Read-only list of installed Debian packages for the opt-in vulnerability lookup (docs/security-plan.md, stage S3): the release from /etc/os-release, then one line per installed package: binary name (with :arch for foreign architectures), its version, its source package and the source version (tab-separated). Advisories are keyed by source package. Only these names and versions are ever sent to OSV.dev, and only when the user turned the lookup on; the server sends nothing. Ends with true.",
+      "script": "echo '##os'; (. /etc/os-release 2>/dev/null; echo \"id=$ID\"; echo \"like=$ID_LIKE\"; echo \"version=$VERSION_ID\"; echo \"codename=$VERSION_CODENAME\"); echo '##packages'; dpkg-query -W -f='${db:Status-Abbrev}\\t${binary:Package}\\t${Version}\\t${source:Package}\\t${source:Version}\\n' 2>/dev/null | awk -F'\\t' '$1 ~ /^ii/ { print $2 \"\\t\" $3 \"\\t\" $4 \"\\t\" $5 }'; true",
+      "timeoutSeconds": 20,
+      "distros": [
+        "debian",
+        "ubuntu"
+      ]
+    },
+    {
       "id": "compose_pull",
       "kind": "action",
       "description": "docker compose pull for one stack: downloads newer images, changes no containers. {project} must match ^[a-z0-9][a-z0-9_-]*$. {dir} is the project's working directory, and {files} is `-f <path>` once per compose file, in label order (compose merges them in that order). All paths are absolute, from the project's labels, single-quoted for the shell (' becomes '\\'').",

@@ -104,18 +104,20 @@ class DemoTransport:
             raise AuthFailed(f"Permission denied for user backup on host {p.hostname}.demo")
         self.system.check_up()
         answer_ = self.system.run(command, input)
+        as_root = False
         if answer_ is None and command.startswith(ELEVATED):
             # Docker through sudo: the password must be the demo's; then the inner command runs as before.
             if self.system.needs_password and input != DEMO_PASSWORD + "\n":
                 return CommandResult("", "Sorry, try again.\nsudo: 1 incorrect password attempt\n", 1)
             command, input = shlex.split(command[len(ELEVATED):])[0], None
+            as_root = True
             answer_ = self.system.run(command, input)
         if answer_ is not None:
             await asyncio.sleep(0.15)
             return answer_
         if command == overview.command():
             return CommandResult(self._overview(), "", 0)
-        extra = self.extras.run(command)
+        extra = self.extras.run(command, as_root)
         if extra is not None:
             await asyncio.sleep(0.1)
             return extra

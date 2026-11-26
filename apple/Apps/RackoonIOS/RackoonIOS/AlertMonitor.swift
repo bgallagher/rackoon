@@ -32,6 +32,7 @@ final class AlertMonitor {
         var rows: @MainActor () -> [AlertRow]
         /// The server's services model (made if needed), or nil when it can't be read yet.
         var services: @MainActor (Server) -> ServicesModel?
+        var security: @MainActor (Server) -> SecurityModel? = { _ in nil }
         var isWatched: @MainActor (DiscoveredService, String) -> Bool
         /// The transport Docker is read with (through sudo while unlocked), or nil.
         var dockerTransport: @MainActor (Server) -> SSHTransport?
@@ -52,6 +53,8 @@ final class AlertMonitor {
     static let tick: Duration = .seconds(15)
     static let sweepInterval: TimeInterval = 5 * 60
     static let certificateInterval: TimeInterval = 6 * 3600
+    /// Hardening settings rarely change; the Security screen reads again whenever it opens.
+    static let securityInterval: TimeInterval = 3600
 
     /// `file` nil keeps the book in memory only (demo mode, tests).
     init(file: URL?, dependencies: Dependencies) {
@@ -122,6 +125,9 @@ final class AlertMonitor {
             if let (reading, at) = containerReadings[id], isNew(id, .containers, at) {
                 apply(.containers, AlertRules.containers(reading))
             }
+            if row.isOnline, let security = deps.security(row.server), let at = security.checkedAt, isNew(id, .security, at) {
+                apply(.security, AlertRules.security(security.findings(SecurityModel.context(row.state.overview))))
+            }
             if let (checks, at) = certificates[id], isNew(id, .certificates, at) {
                 apply(.certificates, AlertRules.certificates(checks, now: now))
             }
@@ -148,6 +154,10 @@ final class AlertMonitor {
             evaluate(deps.rows())
         }
         await deps.services(server)?.refresh()
+        if let security = deps.security(server), !security.deep,
+           certificatesToo || deps.now().timeIntervalSince(security.checkedAt ?? .distantPast) >= Self.securityInterval {
+            await security.refresh()
+        }
         guard let transport = deps.dockerTransport(server),
               let reading = await DockerStatesSession(transport: transport).read() else { return }
         containerReadings[server.id] = (reading, deps.now())

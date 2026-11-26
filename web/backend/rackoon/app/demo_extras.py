@@ -11,12 +11,16 @@ import time
 from collections.abc import AsyncIterable, AsyncIterator
 from dataclasses import dataclass, field
 
-from rackoon.core import docker_states, remote_files, services, shell, spec
+from rackoon.core import docker_states, remote_files, security, services, shell, spec, vulnerabilities
 from rackoon.ssh import CommandResult, SSHError
 
 from .demo_docker import DemoDocker
 
 SERVICE_FIXTURE = {"homelab": "synthetic-root-failed", "garage-nuc": "ubuntu-user-units-and-processes"}
+# The Security page in demo mode: spec fixtures (made-up servers), and the made-up package list whose advisories live in
+# spec/osv (ids in 2099), so the demo never sends a package list anywhere.
+SECURITY_FIXTURE = {"homelab": "synthetic-ubuntu-hardened", "garage-nuc": "synthetic-ubuntu-default"}
+PACKAGES_FIXTURE = "synthetic-ubuntu-noble"
 
 
 @dataclass
@@ -73,10 +77,21 @@ class DemoExtras:
         self.files = DemoFiles(user)
         fixture = SERVICE_FIXTURE.get(hostname)
         self.services = (spec.spec_dir() / "fixtures" / "services" / f"{fixture}.out.txt").read_text() if fixture else ""
+        sec = SECURITY_FIXTURE.get(hostname)
+        self.security = (spec.spec_dir() / "fixtures" / "security" / f"{sec}.out.txt").read_text() if sec else ""
+        self.packages = (spec.spec_dir() / "fixtures" / "security_packages" / f"{PACKAGES_FIXTURE}.out.txt").read_text()
 
-    def run(self, command: str) -> CommandResult | None:
+    def run(self, command: str, as_root: bool = False) -> CommandResult | None:
         if command == services.command():
             return CommandResult(self.services, "", 0) if self.services else None
+        if command == security.command() and self.security and as_root:
+            # Check Deeper in demo mode: the same reading as root, with /etc/shadow read (no empty passwords).
+            root = re.sub(r"##uid\n\d+", "##uid\n0", self.security, count=1)
+            return CommandResult(root.replace("##shadow_empty\n", "##shadow_empty\nchecked\n", 1), "", 0)
+        if command == security.command():
+            return CommandResult(self.security, "", 0) if self.security else None
+        if command == vulnerabilities.command():
+            return CommandResult(self.packages, "", 0)
         if command == docker_states.command():
             lines = []
             for b in self.docker.boxes:

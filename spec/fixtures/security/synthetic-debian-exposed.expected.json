@@ -1,0 +1,153 @@
+{
+  "aslr" : 0,
+  "docker" : {
+    "containers" : [
+      {
+        "dockerSocket" : false,
+        "hostNetwork" : false,
+        "hostPID" : false,
+        "hostRoot" : true,
+        "name" : "agent",
+        "privileged" : false
+      },
+      {
+        "dockerSocket" : false,
+        "hostNetwork" : true,
+        "hostPID" : true,
+        "hostRoot" : false,
+        "name" : "cache",
+        "privileged" : true
+      },
+      {
+        "dockerSocket" : false,
+        "hostNetwork" : false,
+        "hostPID" : false,
+        "hostRoot" : false,
+        "name" : "mariadb",
+        "privileged" : false
+      },
+      {
+        "dockerSocket" : true,
+        "hostNetwork" : false,
+        "hostPID" : false,
+        "hostRoot" : false,
+        "name" : "portainer",
+        "privileged" : false
+      }
+    ],
+    "installed" : true,
+    "published" : [
+      {
+        "address" : "192.168.1.20",
+        "container" : "portainer",
+        "port" : "9000",
+        "proto" : "tcp",
+        "scope" : "lan"
+      },
+      {
+        "address" : "0.0.0.0",
+        "container" : "mariadb",
+        "port" : "3306",
+        "proto" : "tcp",
+        "scope" : "all"
+      },
+      {
+        "address" : "::",
+        "container" : "mariadb",
+        "port" : "3306",
+        "proto" : "tcp",
+        "scope" : "all"
+      },
+      {
+        "address" : "0.0.0.0",
+        "container" : "cache",
+        "port" : "6379",
+        "proto" : "tcp",
+        "scope" : "all"
+      }
+    ]
+  },
+  "emptyPasswordAccounts" : [
+    "backup"
+  ],
+  "firewall" : {
+    "services" : {
+      "firewalld" : "inactive",
+      "nftables" : "active",
+      "ufw" : "inactive"
+    }
+  },
+  "guards" : {
+    "crowdsec" : "inactive",
+    "fail2ban" : "inactive",
+    "sshguard" : "inactive"
+  },
+  "listeners" : [
+    {
+      "address" : "0.0.0.0",
+      "port" : 2222,
+      "proto" : "tcp",
+      "scope" : "all"
+    },
+    {
+      "address" : "*",
+      "port" : 2375,
+      "proto" : "tcp",
+      "scope" : "all"
+    },
+    {
+      "address" : "0.0.0.0",
+      "port" : 3306,
+      "proto" : "tcp",
+      "scope" : "all"
+    },
+    {
+      "address" : "::",
+      "port" : 3306,
+      "proto" : "tcp",
+      "scope" : "all"
+    },
+    {
+      "address" : "0.0.0.0",
+      "port" : 6379,
+      "proto" : "tcp",
+      "scope" : "all"
+    },
+    {
+      "address" : "192.168.1.20",
+      "port" : 9000,
+      "proto" : "tcp",
+      "scope" : "lan"
+    }
+  ],
+  "os" : {
+    "id" : "debian",
+    "like" : "",
+    "version" : "12"
+  },
+  "rootAccounts" : [
+    "root",
+    "toor"
+  ],
+  "sshd" : {
+    "active" : true,
+    "installed" : true,
+    "origin" : {},
+    "settings" : {
+      "kbdinteractiveauthentication" : "no",
+      "maxauthtries" : "10",
+      "passwordauthentication" : "yes",
+      "permitemptypasswords" : "no",
+      "permitrootlogin" : "yes",
+      "port" : "2222",
+      "x11forwarding" : "yes"
+    },
+    "source" : "effective",
+    "uncertain" : [],
+    "unreadable" : []
+  },
+  "uid" : 0,
+  "unattended" : {
+    "installed" : false
+  }
+}

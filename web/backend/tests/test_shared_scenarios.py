@@ -10,14 +10,14 @@ from typing import Any
 
 import pytest
 
-from rackoon.core import docker, shell, stream
+from rackoon.core import docker, security, shell, stream, vulnerabilities
 from rackoon.core.models import server_input_problem
 from rackoon.core.policy import ActionPolicy, Confirmation, Intent, NotConfirmed, ReadOnly, Risk
 
 from .support import PLATFORM, SPEC, done_features, load, run_everything
 
 SUBJECTS = {"shell_quote", "template_fill", "action_policy", "compose_command", "stream_output", "server_input",
-            "docker_ids"}
+            "docker_ids", "security_checks", "debian_version", "vulnerability_report"}
 
 
 @dataclass
@@ -134,3 +134,70 @@ def test_docker_ids() -> None:
     for name, c in cases("docker_ids"):
         ok = docker.is_container_id(c["value"]) if c["kind"] == "container_id" else docker.is_service_name(c["value"])
         assert ok == c["ok"], name
+
+
+def test_security_checks() -> None:
+    for name, c in cases("security_checks"):
+        text = (SPEC / "fixtures" / "security" / f"{c['fixture']}.out.txt").read_text(encoding="utf-8")
+        ctx = c["context"]
+        context = security.SecurityContext(ctx.get("pendingSecurityUpdates"), ctx.get("rebootRequired"))
+        got: dict[str, str] = {}
+        for f in security.evaluate(security.parse(text), context):
+            got.setdefault(f.id, f.severity.value)
+        for finding, severity in c["expect"].items():
+            assert got.get(finding) == severity, f"{name}: {finding}"
+        for finding in c.get("absent", []):
+            assert finding not in got, f"{name}: {finding} should not appear"
+
+
+def run_debian_version(found: list[tuple[str, dict[str, Any]]]) -> None:
+    for name, c in found:
+        assert vulnerabilities.compare_versions(c["a"], c["b"]) == c["expect"], name
+        assert vulnerabilities.compare_versions(c["b"], c["a"]) == -c["expect"], f"{name} (reversed)"
+
+
+class ReplayOSV:
+    """Replays spec/osv: querybatch answers with the named file, /v1/vulns/<id> with spec/osv/vulns/<id>.json."""
+
+    def __init__(self, batch: str | None) -> None:
+        self.batch = batch
+        self.posts: list[bytes] = []
+        self.gets: list[str] = []
+
+    async def post(self, url: str, body: bytes) -> bytes:
+        self.posts.append(body)
+        if self.batch is None:
+            raise vulnerabilities.OSVError("no batch")
+        return (SPEC / "osv" / self.batch).read_bytes()
+
+    async def get(self, url: str) -> bytes:
+        self.gets.append(url)
+        return (SPEC / "osv" / "vulns" / f"{url.rsplit('/', 1)[-1]}.json").read_bytes()
+
+
+def run_vulnerability_report(doc: dict[str, Any], found: list[tuple[str, dict[str, Any]]]) -> None:
+    import asyncio
+
+    for e in doc["ecosystems"]:
+        assert vulnerabilities.ecosystem(e["os"]["id"], e["os"]["version"]) == e["expect"], e["os"]
+    for name, c in found:
+        inv = vulnerabilities.parse_inventory((SPEC / "fixtures" / "security_packages" / f"{c['inventory']}.out.txt")
+                                              .read_text(encoding="utf-8"))
+        qs = vulnerabilities.queries(inv)
+        assert [{"name": q.name, "ecosystem": q.ecosystem, "version": q.version} for q in qs] == c["expectQueries"], name
+        client = ReplayOSV(c["batch"])
+        pending = [vulnerabilities.PendingPackage(p["name"], p["newVersion"]) for p in c["pending"]]
+        findings = asyncio.run(vulnerabilities.lookup(inv, pending, client, vulnerabilities.OSVCache()))
+        assert sorted(u.rsplit("/", 1)[-1] for u in client.gets) == c["expectRecords"], name
+        got = [{k: vulnerabilities.finding_json(f)[k] for k in ("id", "package", "installed", "fixed", "status",
+                                                                 "severity", "binaries")} for f in findings]
+        assert got == c["expect"], name
+
+
+def test_debian_version() -> None:
+    run_debian_version(cases("debian_version"))
+
+
+def test_vulnerability_report() -> None:
+    found = cases("vulnerability_report")
+    run_vulnerability_report(load("scenarios/vulnerability-report.json"), found)

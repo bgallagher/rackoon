@@ -47,6 +47,7 @@ final class SharedScenarioTests: XCTestCase {
 
     private static let subjects: Set<String> = [
         "shell_quote", "template_fill", "action_policy", "compose_command", "stream_output", "server_input", "docker_ids",
+        "security_checks", "debian_version", "vulnerability_report",
     ]
 
     func testEveryApplicableScenarioHasARunner() throws {
@@ -141,6 +142,36 @@ final class SharedScenarioTests: XCTestCase {
             let value = c["value"] as! String
             let ok = c["kind"] as! String == "container_id" ? DockerSession.isContainerID(value) : ComposeAction.isServiceName(value)
             XCTAssertEqual(ok, c["ok"] as! Bool, name)
+        }
+    }
+
+    func testSecurityChecks() throws {
+        for (name, c) in try cases("security_checks") {
+            let fixture = c["fixture"] as! String
+            let text = try String(contentsOf: specDir.appendingPathComponent("fixtures/security/\(fixture).out.txt"), encoding: .utf8)
+            let ctx = c["context"] as! [String: Any]
+            let context = SecurityContext(pendingSecurityUpdates: ctx["pendingSecurityUpdates"] as? Int,
+                                          rebootRequired: ctx["rebootRequired"] as? Bool)
+            let findings = SecurityRules.evaluate(SecurityParser.parse(text), context: context)
+            let got = Dictionary(findings.map { ($0.id, $0.severity.rawValue) }, uniquingKeysWith: { a, _ in a })
+            for (id, severity) in c["expect"] as! [String: String] {
+                XCTAssertEqual(got[id], severity, "\(name): \(id)")
+            }
+            for id in c["absent"] as? [String] ?? [] {
+                XCTAssertNil(got[id], "\(name): \(id) should not appear")
+            }
+        }
+    }
+
+    func testDebianVersion() throws {
+        VulnerabilityScenarios.debianVersion(try cases("debian_version"))
+    }
+
+    func testVulnerabilityReport() async throws {
+        let found = try Self.scenarios().filter { $0.subject == "vulnerability_report" }
+        for s in found {
+            let doc = try Self.json(specDir.appendingPathComponent("scenarios/\(s.file)"))
+            try await VulnerabilityScenarios.report(doc, cases: s.cases.map { ("\(s.file): \($0["name"] as! String)", $0) })
         }
     }
 }

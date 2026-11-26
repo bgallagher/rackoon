@@ -20,6 +20,8 @@ export function usePoll<T>(load: () => Promise<T>, interval: number, deps: unkno
   data: T | undefined;
   error: string | undefined;
   reload: () => Promise<void>;
+  /** Replaces the data with an answer the page got another way (a POST that returns the same shape). */
+  setData: (value: T) => void;
 } {
   const [data, setData] = useState<T>();
   const [error, setError] = useState<string>();
@@ -46,7 +48,7 @@ export function usePoll<T>(load: () => Promise<T>, interval: number, deps: unkno
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
-  return { data, error, reload };
+  return { data, error, reload, setData };
 }
 
 /** Seconds since the epoch, ticking once a second (uptime and the server clock count up between polls). */

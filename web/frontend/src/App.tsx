@@ -16,6 +16,7 @@ const DockerScreen = lazy(() => import("./screens/Docker").then((m) => ({ defaul
 const StackScreen = lazy(() => import("./screens/Docker").then((m) => ({ default: m.StackScreen })));
 const UpdatesScreen = lazy(() => import("./screens/Updates").then((m) => ({ default: m.UpdatesScreen })));
 const CommandsScreen = lazy(() => import("./screens/Commands").then((m) => ({ default: m.CommandsScreen })));
+const SecurityScreen = lazy(() => import("./screens/Security").then((m) => ({ default: m.SecurityScreen })));
 const ServicesScreen = lazy(() => import("./screens/Services").then((m) => ({ default: m.ServicesScreen })));
 const FilesScreen = lazy(() => import("./screens/Files").then((m) => ({ default: m.FilesScreen })));
 const AddContainerScreen = lazy(() => import("./screens/AddContainer").then((m) => ({ default: m.AddContainerScreen })));
@@ -90,7 +91,7 @@ function Shell(props: { auth: AuthState; onSignedOut: () => void }) {
     },
   }), [props, servers, fleet, safety, appearance, reloadServers, reloadFleet, setAppearance, go]);
 
-  // Routes: /dashboard[/<page>], /servers/<id>[/terminal|/docker[/add|/stack/<id>]|/bookmarks|/updates|/services[/<q>]|/commands[/<id>]|/files|/alerts], /settings/<tab>[/<sub>]; "/" opens the last server or the dashboard.
+  // Routes: /dashboard[/<page>], /servers/<id>[/terminal|/docker[/add|/stack/<id>]|/bookmarks|/updates|/services[/<q>]|/security|/commands[/<id>]|/files|/alerts], /settings/<tab>[/<sub>]; "/" opens the last server or the dashboard.
   const parts = route.split("/").filter(Boolean);
   useEffect(() => {
     if (!servers || parts.length > 0) return;
@@ -124,6 +125,8 @@ function Shell(props: { auth: AuthState; onSignedOut: () => void }) {
       screen = lazyScreen(<CommandsScreen key={server.id} server={server} select={parts[3]} />);
     } else if (parts[2] === "services") {
       screen = lazyScreen(<ServicesScreen key={server.id} server={server} focus={parts[3] ? decodeURIComponent(parts[3]) : undefined} />);
+    } else if (parts[2] === "security") {
+      screen = lazyScreen(<SecurityScreen key={server.id} server={server} />);
     } else if (parts[2] === "files") {
       screen = lazyScreen(<FilesScreen key={server.id} server={server} />);
     } else if (parts[2] === "alerts") {

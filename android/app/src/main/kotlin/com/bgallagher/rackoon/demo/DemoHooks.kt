@@ -15,4 +15,7 @@ interface DemoHooks {
 
     /** A fake connection to one of them (no network, nothing is ever sent anywhere). */
     fun connection(endpoint: SshEndpoint): ServerConnection
+
+    /** Made-up OSV.dev answers for the vulnerability lookup (nothing is sent). */
+    fun osvClient(): com.bgallagher.rackoon.core.OSVClient
 }

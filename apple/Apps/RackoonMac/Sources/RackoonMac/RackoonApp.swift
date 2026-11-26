@@ -321,7 +321,9 @@ struct TerminalCommands: Commands {
 
 struct ContentView: View {
     @State private var model = AppModel()
-    @State private var selection: Screen = .overview
+    /// `-startScreen security` (any Screen raw value) opens on that screen, for screenshots; otherwise the Overview.
+    @State private var selection: Screen = UserDefaults.standard.string(forKey: "startScreen").flatMap(Screen.init(rawValue:))
+        .flatMap { $0.isAvailable ? $0 : nil } ?? .overview
     @State private var terminals = TerminalStore()
     @State private var dockerWorkspace = DockerWorkspace()
     @State private var showingAdd = false
@@ -370,6 +372,7 @@ struct ContentView: View {
                         ServicesStore.shared.forget(serverID: server.id)
                         ServiceVisibilityStore.shared.forget(serverID: server.id)
                         AlertMonitor.shared.forget(serverID: server.id)
+                        VulnerabilityLookupSettings.shared.forget(serverID: server.id)
                         model.remove(server)
                     },
                     onReorder: { model.reorder($0) },
@@ -575,6 +578,10 @@ struct ContentView: View {
                     }).id(DockerElevation.shared.key(server))
                 case .alerts:
                     AlertsScreen(server: server, open: openAlert)
+                case .security:
+                    SecurityScreen(server: server, overview: model.state.overview,
+                                   openScreen: { screen in if screen.isAvailable { selection = screen } })
+                        .id(server.connectionKey)
                 case .services:
                     ServicesScreen(server: server, theme: appearance.resolvedTheme,
                                    webHost: model.state.overview?.tailscaleIP ?? model.state.overview?.ipAddress,

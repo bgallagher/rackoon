@@ -1,7 +1,23 @@
 # Security screen: plan
 
-Status: proposal, nothing built. The sidebar already has a Security entry (`Screen.security`) that shows an empty
-page. This plan says what goes on it, in what order to build it, and what it deliberately does not do.
+Status (2026-11-26): every stage is built. S0 in all three cores (Swift `Security.swift`, Kotlin `Security.kt`, Python
+`core/security.py`); S1/S2 on the Mac, iOS, Android and web; S3 (the opt-in OSV lookup: spec command
+`security_packages`, `Vulnerabilities.swift` / `Vulnerabilities.kt` / `core/vulnerabilities.py`, scenarios
+`debian-version.json` and `vulnerability-report.json`, made-up OSV answers in `spec/osv`) on all four; S4 (Security
+alerts, listed and never notified, and a Dashboard page) and Check Deeper with sudo on the Mac, iOS and web. Android has
+no Alerts, Dashboard or sudo password flow yet, so `security.alerts` is planned there, and its screen is compiled only by
+CI (no Android SDK on the dev Mac) and not yet tried on a device. This plan says what goes on the screen, in what order
+to build it, and what it deliberately does not do.
+
+Differences from the first draft, found while building:
+- Password logins are a warning, never critical: "listens on every interface" is true of almost every home server
+  behind a router, so it cannot tell an internet-facing sshd from one on a LAN.
+- The passwordless-sudo check (`sudo -n -l`) is left out for now: when sudo wants a password it logs a failed attempt,
+  and intrusion detection on the server (Wazuh, for one) would report Rackoon's every check as an attack.
+- When sshd's settings come from the files and a drop-in cannot be read (Ubuntu's `50-cloud-init.conf` is often mode
+  600), every keyword that file could set first is `unknown`, never a guess from sshd's default.
+- nftables being active is `info`, not a pass: Debian's default `nftables.conf` accepts everything, and the ruleset
+  needs root to read.
 
 ## What it is for
 
@@ -120,9 +136,16 @@ security advisories is unreliable).
 - **S4** Critical findings into Alerts (new category Security, off by default) and a Security page on the Dashboard.
 - **S5** iOS, web and Android screens.
 
-## Open questions for the user
+## Decisions (2026-11-26)
 
-1. OSV lookups send package lists to Google's OSV service. Acceptable as opt-in, or should CVE matching wait for an
-   offline approach (downloading Ubuntu/Debian OVAL data to the Mac, which is large)?
-2. Should deeper checks use the Docker sudo unlock automatically while it is active, or ask separately?
-3. Should Security findings ever raise notifications, or stay on the Security screen and Alerts list only?
+1. CVE lookup: OSV.dev, opt-in, per server or for all servers, with what is sent said next to the switch (package names,
+   the release's ecosystem and versions; never host names or addresses). Answers are cached for a day in memory. Demo mode
+   answers from made-up advisories (ids in 2099) and its switch is never saved, so trying it there can never turn the
+   lookup on for real servers.
+2. Deeper checks ask each time: Check Deeper with sudo… runs the same read-only `security` command as root, through the
+   Docker unlock while one is active, else with a password (saved one via Touch ID on the Mac, or the sheet) used for that
+   one reading and then dropped. Running as root also reads /etc/shadow (`accounts.empty_password`). Only Check Now
+   replaces a deeper reading, so its findings and alerts do not vanish when a plain reading cannot see them.
+3. Security findings (critical and warning) go to the Alerts list and badge under a Security category and never raise a
+   notification (`AlertSource.notifies`). The security-update count and reboot flag stay with the Overview's own alerts.
+   The alert sweep reads Security hourly; the screen reads on open when the last reading is over 5 minutes old.

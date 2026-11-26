@@ -115,6 +115,26 @@ test("search finds a failed service and opens it", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Services" })).toBeVisible();
 });
 
+test("security: findings, Check Deeper with sudo, the opt-in vulnerability lookup and the dashboard page", async ({ page }) => {
+  await page.goto("/#/servers/demo-nuc/security");
+  await expect(page.getByRole("heading", { name: "Security", exact: true })).toBeVisible();
+  await expect(page.getByText("No firewall is running.")).toBeVisible();
+  await expect(page.getByText("not \"secure\"").first()).toBeVisible();
+  await page.goto(`${LAB}/security`);
+  await page.getByRole("button", { name: "Check Deeper with sudo…" }).click();
+  const sheet = page.getByRole("dialog", { name: /sudo password/ });
+  await sheet.getByLabel("sudo password").fill("demo");
+  await sheet.getByRole("button", { name: "Continue…" }).click();
+  await expect(sheet).toBeHidden();
+  await expect(page.getByText(/with sudo/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "Check Deeper with sudo…" })).toBeHidden();
+  await page.getByRole("button", { name: "Turn On for This Server" }).click();
+  await expect(page.getByText("UBUNTU-CVE-2099-0003")).toBeVisible();
+  await expect(page.getByText("No fix released yet", { exact: false })).toBeVisible();
+  await page.goto("/#/dashboard/security");
+  await expect(page.getByRole("link", { name: "Open Security" }).first()).toBeVisible();
+});
+
 test("alerts list what needs you", async ({ page }) => {
   await page.goto(LAB);
   await page.goto(`${LAB}/alerts`);

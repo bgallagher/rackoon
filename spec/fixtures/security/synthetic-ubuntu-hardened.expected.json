@@ -1,0 +1,143 @@
+{
+  "aslr" : 2,
+  "docker" : {
+    "containers" : [
+      {
+        "dockerSocket" : false,
+        "hostNetwork" : false,
+        "hostPID" : false,
+        "hostRoot" : false,
+        "name" : "paperless",
+        "privileged" : false
+      },
+      {
+        "dockerSocket" : false,
+        "hostNetwork" : false,
+        "hostPID" : false,
+        "hostRoot" : false,
+        "name" : "paperless-db",
+        "privileged" : false
+      }
+    ],
+    "installed" : true,
+    "published" : [
+      {
+        "address" : "100.100.40.7",
+        "container" : "paperless",
+        "port" : "8080",
+        "proto" : "tcp",
+        "scope" : "tailscale"
+      },
+      {
+        "address" : "127.0.0.1",
+        "container" : "paperless-db",
+        "port" : "5432",
+        "proto" : "tcp",
+        "scope" : "loopback"
+      }
+    ]
+  },
+  "firewall" : {
+    "services" : {
+      "firewalld" : "inactive",
+      "nftables" : "inactive",
+      "ufw" : "active"
+    },
+    "ufwEnabled" : true
+  },
+  "guards" : {
+    "crowdsec" : "inactive",
+    "fail2ban" : "active",
+    "sshguard" : "inactive"
+  },
+  "listeners" : [
+    {
+      "address" : "0.0.0.0",
+      "port" : 22,
+      "proto" : "tcp",
+      "scope" : "all"
+    },
+    {
+      "address" : "::",
+      "port" : 22,
+      "proto" : "tcp",
+      "scope" : "all"
+    },
+    {
+      "address" : "127.0.0.53",
+      "port" : 53,
+      "proto" : "udp",
+      "scope" : "loopback"
+    },
+    {
+      "address" : "127.0.0.54",
+      "port" : 53,
+      "proto" : "udp",
+      "scope" : "loopback"
+    },
+    {
+      "address" : "127.0.0.1",
+      "port" : 5432,
+      "proto" : "tcp",
+      "scope" : "loopback"
+    },
+    {
+      "address" : "100.100.40.7",
+      "port" : 8080,
+      "proto" : "tcp",
+      "scope" : "tailscale"
+    },
+    {
+      "address" : "fd7a:115c:a1e0::1",
+      "port" : 8080,
+      "proto" : "tcp",
+      "scope" : "tailscale"
+    },
+    {
+      "address" : "100.100.40.7",
+      "port" : 41641,
+      "proto" : "udp",
+      "scope" : "tailscale"
+    }
+  ],
+  "ntpSynchronized" : true,
+  "os" : {
+    "id" : "ubuntu",
+    "like" : "debian",
+    "version" : "24.04"
+  },
+  "rootAccounts" : [
+    "root"
+  ],
+  "sshd" : {
+    "active" : true,
+    "installed" : true,
+    "origin" : {
+      "kbdinteractiveauthentication" : "\/etc\/ssh\/sshd_config",
+      "maxauthtries" : "\/etc\/ssh\/sshd_config.d\/10-hardening.conf",
+      "passwordauthentication" : "\/etc\/ssh\/sshd_config.d\/10-hardening.conf",
+      "permitrootlogin" : "\/etc\/ssh\/sshd_config.d\/10-hardening.conf",
+      "x11forwarding" : "\/etc\/ssh\/sshd_config.d\/10-hardening.conf"
+    },
+    "settings" : {
+      "kbdinteractiveauthentication" : "no",
+      "maxauthtries" : "3",
+      "passwordauthentication" : "no",
+      "permitrootlogin" : "no",
+      "x11forwarding" : "no"
+    },
+    "source" : "files",
+    "uncertain" : [
+
+    ],
+    "unreadable" : [
+
+    ]
+  },
+  "tailscaleSSH" : true,
+  "uid" : 1000,
+  "unattended" : {
+    "enabled" : true,
+    "installed" : true
+  }
+}

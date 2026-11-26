@@ -1,0 +1,47 @@
+##uid
+1000
+##os
+id=ubuntu
+like=debian
+version=24.04
+##sshd
+installed=yes
+active=1
+##sshd_effective
+##sshd_files
+#file /etc/ssh/sshd_config
+Include /etc/ssh/sshd_config.d/*.conf
+#PermitRootLogin prohibit-password
+KbdInteractiveAuthentication no
+X11Forwarding yes
+#unreadable /etc/ssh/sshd_config.d/50-cloud-init.conf
+#file /etc/ssh/sshd_config.d/60-local.conf
+PermitRootLogin no
+##tailscale_ssh
+##firewall
+ENABLED=no
+ufw=inactive
+firewalld=inactive
+nftables=inactive
+##guards
+fail2ban=inactive
+crowdsec=inactive
+sshguard=inactive
+##listen
+udp   UNCONN 0      0       127.0.0.53%lo:53         0.0.0.0:*
+tcp   LISTEN 0      4096         0.0.0.0:22          0.0.0.0:*
+tcp   LISTEN 0      4096            [::]:22             [::]:*
+tcp   LISTEN 0      511          0.0.0.0:80          0.0.0.0:*
+##docker
+installed=yes
+permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Get "http://%2Fvar%2Frun%2Fdocker.sock/v1.47/containers/json": dial unix /var/run/docker.sock: connect: permission denied
+##docker_inspect
+##unattended
+package=install ok installed
+##uid0
+root
+##shadow_empty
+##aslr
+2
+##ntp
+no

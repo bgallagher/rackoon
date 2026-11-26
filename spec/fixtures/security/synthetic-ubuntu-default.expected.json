@@ -1,0 +1,91 @@
+{
+  "aslr" : 2,
+  "docker" : {
+    "containers" : [
+
+    ],
+    "installed" : true,
+    "problem" : "permission denied while trying to connect to the Docker daemon socket at unix:\/\/\/var\/run\/docker.sock: Get \"http:\/\/%2Fvar%2Frun%2Fdocker.sock\/v1.47\/containers\/json\": dial unix \/var\/run\/docker.sock: connect: permission denied",
+    "published" : [
+
+    ]
+  },
+  "firewall" : {
+    "services" : {
+      "firewalld" : "inactive",
+      "nftables" : "inactive",
+      "ufw" : "inactive"
+    },
+    "ufwEnabled" : false
+  },
+  "guards" : {
+    "crowdsec" : "inactive",
+    "fail2ban" : "inactive",
+    "sshguard" : "inactive"
+  },
+  "listeners" : [
+    {
+      "address" : "0.0.0.0",
+      "port" : 22,
+      "proto" : "tcp",
+      "scope" : "all"
+    },
+    {
+      "address" : "::",
+      "port" : 22,
+      "proto" : "tcp",
+      "scope" : "all"
+    },
+    {
+      "address" : "127.0.0.53",
+      "port" : 53,
+      "proto" : "udp",
+      "scope" : "loopback"
+    },
+    {
+      "address" : "0.0.0.0",
+      "port" : 80,
+      "proto" : "tcp",
+      "scope" : "all"
+    }
+  ],
+  "ntpSynchronized" : false,
+  "os" : {
+    "id" : "ubuntu",
+    "like" : "debian",
+    "version" : "24.04"
+  },
+  "rootAccounts" : [
+    "root"
+  ],
+  "sshd" : {
+    "active" : true,
+    "installed" : true,
+    "origin" : {
+      "kbdinteractiveauthentication" : "\/etc\/ssh\/sshd_config",
+      "permitrootlogin" : "\/etc\/ssh\/sshd_config.d\/60-local.conf",
+      "x11forwarding" : "\/etc\/ssh\/sshd_config"
+    },
+    "settings" : {
+      "kbdinteractiveauthentication" : "no",
+      "permitrootlogin" : "no",
+      "x11forwarding" : "yes"
+    },
+    "source" : "files",
+    "uncertain" : [
+      "kbdinteractiveauthentication",
+      "maxauthtries",
+      "passwordauthentication",
+      "permitemptypasswords",
+      "permitrootlogin",
+      "x11forwarding"
+    ],
+    "unreadable" : [
+      "\/etc\/ssh\/sshd_config.d\/50-cloud-init.conf"
+    ]
+  },
+  "uid" : 1000,
+  "unattended" : {
+    "installed" : true
+  }
+}

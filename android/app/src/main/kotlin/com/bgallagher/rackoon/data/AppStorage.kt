@@ -67,6 +67,16 @@ class Prefs(context: Context, name: String = "rackoon") {
         get() = prefs.getString("theme_id", "automatic") ?: "automatic"
         set(value) = prefs.edit().putString("theme_id", value).apply()
 
+    /** The opt-in vulnerability lookup (docs/security-plan.md, S3): on for every server. Off by default. */
+    var osvLookupAll: Boolean
+        get() = prefs.getBoolean("osv_lookup_all", false)
+        set(value) = prefs.edit().putBoolean("osv_lookup_all", value).apply()
+
+    /** Servers the vulnerability lookup is on for. */
+    var osvLookupServers: Set<String>
+        get() = prefs.getStringSet("osv_lookup_servers", emptySet())?.toSet() ?: emptySet()
+        set(value) = prefs.edit().putStringSet("osv_lookup_servers", value).apply()
+
     var firstRunDone: Boolean
         get() = prefs.getBoolean("first_run_done", false)
         set(value) = prefs.edit().putBoolean("first_run_done", value).apply()
@@ -94,4 +104,8 @@ class AppContainer(context: Context, private val demo: DemoHooks? = null) {
 
     val terminals = TerminalManager(appContext, ::connection)
     val favicons = FaviconStore(File(dir, "favicons"))
+
+    /** OSV.dev for the vulnerability lookup; demo mode answers from made-up advisories and sends nothing. */
+    val osv: com.bgallagher.rackoon.core.OSVClient = demo?.osvClient() ?: HttpOSVClient()
+    val osvCache = com.bgallagher.rackoon.core.OSVCache()
 }

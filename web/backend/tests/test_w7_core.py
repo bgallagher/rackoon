@@ -336,3 +336,24 @@ def test_service_visibility() -> None:
     assert v.overrides == {f"*|{s.id}": False}, "everywhere drops each server's own choice"
     v.set(True, s.id, "b")
     assert v.forget("b") and not v.forget("b")
+
+
+def test_security_findings_are_listed_and_counted_but_never_notify() -> None:
+    from rackoon.core import security
+
+    from .support import out
+
+    findings = security.evaluate(security.parse(out("security", "synthetic-debian-exposed")),
+                                 security.SecurityContext(2, True))
+    signals = {s.key: s for s in alerts.security_findings(findings)}
+    assert signals["ssh.root_login"].severity == Severity.CRITICAL
+    assert signals["ssh.root_login"].title == "Root login with a password"
+    assert signals["ssh.root_login"].fix == alerts.Fix("security", "ssh.root_login")
+    assert signals["exposure.sensitive_port:3306"].severity == Severity.WARNING
+    assert "docker.container:portainer" not in signals  # info stays on the Security screen
+    assert "updates.security_pending" not in signals and "updates.reboot" not in signals
+    book = AlertBook()
+    assert book.apply("a", "lab", alerts.Source.SECURITY, [], T0) == []
+    assert book.apply("a", "lab", alerts.Source.SECURITY, list(signals.values()), later(60)) == []
+    assert book.unseen_count("a") == len(signals)
+    assert not alerts.Source.SECURITY.notifies and alerts.Source.OVERVIEW.notifies

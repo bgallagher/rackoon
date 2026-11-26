@@ -118,6 +118,23 @@ final class ServicesFlowTests: DemoFlow {
     }
 }
 
+final class SecurityFlowTests: DemoFlow {
+    func testTheVerdictThenTheOptInVulnerabilityLookup() {
+        openHomelab()
+        openPlace("openSecurity")
+        waitFor(element("securityVerdict"), 20)
+        let turnOn = element("lookupThisServer")
+        var scrolls = 0
+        while !(turnOn.exists && turnOn.isHittable) && scrolls < 8 { app.swipeUp(); scrolls += 1 }
+        turnOn.tap()
+        // Demo mode answers from made-up advisories (ids in 2099); nothing is sent to OSV.dev.
+        let group = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Fix waiting in the updates'")).firstMatch
+        var tries = 0
+        while !group.exists && tries < 8 { app.swipeUp(); tries += 1 }
+        XCTAssertTrue(group.waitForExistence(timeout: 20), "the lookup found the demo's waiting fix")
+    }
+}
+
 final class CommandsFlowTests: DemoFlow {
     func testALibraryCommandRunsAndATypedOneAsksFirst() {
         openHomelab()
