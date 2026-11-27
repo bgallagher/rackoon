@@ -674,6 +674,62 @@
    }
   },
   {
+   "name": "off the Mac a resolved address is used without an alias too: a Mac user name becomes explicit",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "m",
+      "name": "box",
+      "host": "box.lan",
+      "identityFile": "~/.ssh/id_ed25519",
+      "resolved": {
+       "host": "box.lan",
+       "user": "andy",
+       "port": 22
+      }
+     }
+    ]
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "m",
+      "kind": "new"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "m",
+      "name": "box",
+      "host": "box.lan",
+      "user": "andy",
+      "port": 22
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
    "name": "the Mac keeps the alias, the key file and the resolved address",
    "platform": "mac",
    "source": "encrypted",

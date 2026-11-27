@@ -30,11 +30,14 @@ document whose `version` is greater than 1 is refused ("made by a newer Rackoon"
 }
 ```
 
-- `servers`: in the exporter's saved order. An empty `user` reads as no user. `host`, `user` and `port` are what that device connects with. `sshConfigAlias`
-  and `identityFile` only mean something on a Mac. `resolved` is what a Mac's `ssh -G` said the alias connects to, so a
-  device without that ~/.ssh/config still gets a real address.
-- `hostKeys`: trusted keys by the address they are pinned for (`host` lower-case, `port`), `type` as ssh names it, `key`
-  base64 of the wire-format key (as in known_hosts). A host may have several (a Mac's known_hosts often does).
+- `servers`: in the exporter's saved order. An empty `user` reads as no user. `host`, `user` and `port` are what that
+  device connects with. `sshConfigAlias` and `identityFile` only mean something on a Mac. `resolved` is what the Mac's
+  `ssh -G` says the server connects to (host name, user and port after ~/.ssh/config), so a device without that config,
+  or without the Mac's user name as its default, still gets the real address and user.
+- `hostKeys`: trusted keys by the address they are pinned for (`host`, compared ignoring case, and `port`), `type` as
+  ssh names it, `key` base64 of the wire-format key (as in known_hosts). A host may have several (a Mac's known_hosts
+  often does). `host` is a plain host name or IP address: letters, digits, `.`, `-`, `_` and `:` only, so it can never
+  be a known_hosts pattern (`*`, `?`, `!`) or list (`,`); a document with any other `host` is refused.
 - `signIn`: per server, `method` is `tailscale` (SSH `none`), `key`, `password` or `system` (a Mac's own ssh setup:
   agent, ~/.ssh/config, default keys). `keyName` is for display. Never a secret.
 - `preferences`: catalog ids from `config-transfer.json` whose `part` is `preferences`, each with its catalog `type`. A
@@ -104,9 +107,8 @@ another.
 
 `scenarios/config-merge.json` holds the cases. Every core plans an import the same way:
 
-1. **Fit the incoming servers to this platform.** Off the Mac, a server with an `sshConfigAlias` and a `resolved` entry
-   takes `resolved`'s host, user and port, and `sshConfigAlias` and `identityFile` are dropped (`identityFile` is
-   dropped on every platform but the Mac).
+1. **Fit the incoming servers to this platform.** Off the Mac, a server with a `resolved` entry takes the host, user
+   and port it names (each one it names), and `sshConfigAlias`, `identityFile` and `resolved` are dropped.
 2. **Match** each incoming server to a local one: same id; else the same address (host compared ignoring case, port
    missing = 22, user missing = empty). Each local server matches at most one incoming server, the first.
 3. Each server is then **new** (no match), **identical** (name, host, user, port, alias and key file all equal, with

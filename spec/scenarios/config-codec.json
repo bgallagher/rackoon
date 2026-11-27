@@ -1045,6 +1045,93 @@
    "error": "damaged"
   },
   {
+   "name": "read: a host key for a known_hosts wildcard",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "*",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAA"
+     }
+    ]
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: a host key for a known_hosts list",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "a.lan,b.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAA"
+     }
+    ]
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: a host key for a negated pattern",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "!a.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAA"
+     }
+    ]
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: a host key for an IPv6 address",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "fd7a:115c:a1e0::1",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAA"
+     }
+    ]
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [
+     {
+      "host": "fd7a:115c:a1e0::1",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAA"
+     }
+    ],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
    "name": "read: a host key type with spaces",
    "fn": "readDocument",
    "source": "plain",

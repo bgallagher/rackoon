@@ -75,7 +75,7 @@
       "type": "object",
       "required": ["host", "port", "type", "key"],
       "properties": {
-        "host": {"type": "string", "minLength": 1},
+        "host": {"type": "string", "pattern": "^[A-Za-z0-9._:-]+$"},
         "port": {"type": "integer", "minimum": 1, "maximum": 65535},
         "type": {"type": "string", "pattern": "^[a-z0-9@.-]+$"},
         "key": {"type": "string", "description": "base64 of the wire-format public key"}

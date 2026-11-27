@@ -281,6 +281,8 @@ object ConfigTransfer {
     }
 
     private val keyType = Regex("[a-z0-9@.-]+")
+    /** A plain name or address: never a known_hosts pattern (* ? !) or list (,), which a Mac writes into ~/.ssh/known_hosts. */
+    private val keyHost = Regex("[A-Za-z0-9._:-]+")
     private val customIconId = Regex("[0-9a-f]{16,64}")
 
     private fun readHostKey(raw: JsonElement, index: Int): ConfigHostKey {
@@ -290,7 +292,7 @@ object ConfigTransfer {
         val host = o["host"].str()
         val type = o["type"].str()
         val key = o["key"].str()
-        if (host.isNullOrEmpty() || host.any { it.isWhitespace() } || port == null || type == null || !keyType.matches(type) ||
+        if (host.isNullOrEmpty() || !keyHost.matches(host) || port == null || type == null || !keyType.matches(type) ||
             key == null || !isBase64(key)
         ) throw ConfigTransferException.damaged("$place is incomplete")
         return ConfigHostKey(host, port, type, key)
@@ -635,7 +637,7 @@ object ConfigTransfer {
         if (platform == "mac") return server
         var s = server
         val r = s.resolved
-        if (s.sshConfigAlias != null && r != null) s = s.copy(host = r.host, user = r.user ?: s.user, port = r.port ?: s.port)
+        if (r != null) s = s.copy(host = r.host, user = r.user ?: s.user, port = r.port ?: s.port)
         return s.copy(sshConfigAlias = null, identityFile = null, resolved = null)
     }
 

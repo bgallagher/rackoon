@@ -248,11 +248,19 @@ extension ConfigTransfer {
         !s.isEmpty && s.unicodeScalars.allSatisfy { ("a"..."z").contains($0) || ("0"..."9").contains($0) || "@.-".unicodeScalars.contains($0) }
     }
 
+    /// A plain name or address: never a known_hosts pattern (`*` `?` `!`) or list (`,`), which the Mac writes into
+    /// ~/.ssh/known_hosts.
+    static func isKeyHost(_ s: String) -> Bool {
+        !s.isEmpty && s.unicodeScalars.allSatisfy {
+            ("a"..."z").contains($0) || ("A"..."Z").contains($0) || ("0"..."9").contains($0) || "._:-".unicodeScalars.contains($0)
+        }
+    }
+
     private static func readHostKey(_ raw: JSONValue, index: Int) throws -> ConfigHostKey {
         let place = "host key \(index + 1)"
         guard let o = raw.object else { throw ConfigTransferError.damaged("\(place) is not an object") }
         let port = try port(o["port"], place)
-        guard let host = o["host"]?.string, !host.isEmpty, !host.contains(where: \.isWhitespace), let port,
+        guard let host = o["host"]?.string, isKeyHost(host), let port,
               let type = o["type"]?.string, isKeyType(type), let key = o["key"]?.string, isBase64(key) else {
             throw ConfigTransferError.damaged("\(place) is incomplete")
         }
@@ -677,7 +685,7 @@ extension ConfigTransfer {
     public static func fit(_ server: ConfigServer, platform: String) -> ConfigServer {
         guard platform != "mac" else { return server }
         var s = server
-        if s.sshConfigAlias != nil, let r = s.resolved {
+        if let r = s.resolved {
             s.host = r.host
             s.user = r.user ?? s.user
             s.port = r.port ?? s.port

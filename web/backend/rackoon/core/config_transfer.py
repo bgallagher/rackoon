@@ -245,6 +245,8 @@ def _read_server(raw: Any, index: int) -> ConfigServer:
 
 
 HOST_KEY_TYPE = re.compile(r"[a-z0-9@.-]+")
+# A plain name or address: never a known_hosts pattern (* ? !) or list (,), which a Mac writes into ~/.ssh/known_hosts.
+HOST_KEY_HOST = re.compile(r"[A-Za-z0-9._:-]+")
 
 
 def _read_host_key(raw: Any, index: int) -> ConfigHostKey:
@@ -253,7 +255,7 @@ def _read_host_key(raw: Any, index: int) -> ConfigHostKey:
         raise _damaged(f"{where} is not an object")
     host, ktype, key = _str(raw, "host"), _str(raw, "type"), _str(raw, "key")
     port = _port(raw.get("port"), where)
-    if not host or any(c.isspace() for c in host) or port is None or not ktype or not HOST_KEY_TYPE.fullmatch(ktype) \
+    if not host or not HOST_KEY_HOST.fullmatch(host) or port is None or not ktype or not HOST_KEY_TYPE.fullmatch(ktype) \
             or not key or not _is_base64(key):
         raise _damaged(f"{where} is incomplete")
     return ConfigHostKey(host, port, ktype, key)
@@ -690,7 +692,7 @@ def fit_server(server: ConfigServer, platform: str) -> ConfigServer:
     if platform == "mac":
         return server
     s = server
-    if s.ssh_config_alias is not None and s.resolved is not None:
+    if s.resolved is not None:
         r = s.resolved
         s = replace(s, host=r.host, user=r.user if r.user is not None else s.user,
                     port=r.port if r.port is not None else s.port)
