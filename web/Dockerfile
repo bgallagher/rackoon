@@ -40,7 +40,7 @@ RUN python -m pip uninstall -y pip setuptools wheel >/dev/null 2>&1 || true; \
     && mkdir -p /data && chown rackoon:rackoon /data && chmod 700 /data
 COPY --from=deps /app/.venv /app/.venv
 COPY --from=ui /ui/dist /app/static
-COPY spec/commands.json spec/command-library.json spec/security-checks.json /app/spec/
+COPY spec/commands.json spec/command-library.json spec/security-checks.json spec/config-transfer.json /app/spec/
 COPY apple/Apps/RackoonMac/Resources/themes.json /app/spec/themes.json
 # Demo mode answers the Services and Security screens with the spec's sanitized/synthetic captures, and the
 # vulnerability lookup with spec/osv's made-up records (so a demo sends nothing). tests/test_image_spec.py checks

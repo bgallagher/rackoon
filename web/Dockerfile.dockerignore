@@ -16,6 +16,7 @@
 !spec/fixtures/services/synthetic-root-failed.out.txt
 !spec/fixtures/services/ubuntu-user-units-and-processes.out.txt
 !spec/security-checks.json
+!spec/config-transfer.json
 !spec/fixtures/security/synthetic-ubuntu-hardened.out.txt
 !spec/fixtures/security/synthetic-ubuntu-default.out.txt
 !spec/fixtures/security_packages/synthetic-ubuntu-noble.out.txt

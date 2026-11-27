@@ -27,7 +27,7 @@ class SharedScenarioTests {
 
     private val subjects = setOf(
         "shell_quote", "template_fill", "action_policy", "compose_command", "stream_output", "server_input", "docker_ids",
-        "security_checks", "debian_version", "vulnerability_report",
+        "security_checks", "debian_version", "vulnerability_report", "config_codec", "config_merge",
     )
 
     private fun doneFeatures(): Set<String> =
@@ -171,4 +171,8 @@ class SharedScenarioTests {
         val found = cases("vulnerability_report")
         if (found.isNotEmpty()) VulnerabilityScenarios.report(Spec.parse("scenarios/vulnerability-report.json").jsonObject, found)
     }
+
+    @Test fun configCodec() = ConfigScenarios.codec(cases("config_codec"))
+
+    @Test fun configMerge() = ConfigScenarios.merge(cases("config_merge"))
 }

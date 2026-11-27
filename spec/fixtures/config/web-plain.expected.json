@@ -1,0 +1,52 @@
+{
+  "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "exportedAt": "2026-11-27T12:15:00Z",
+    "source": {
+      "platform": "web",
+      "app": "web-0.1.0"
+    },
+    "servers": [
+      {
+        "id": "0c1d2e3f405162738495a6b7c8d9e0f1",
+        "name": "homelab",
+        "host": "100.64.0.10",
+        "user": "andy"
+      }
+    ],
+    "hostKeys": [
+      {
+        "host": "100.64.0.10",
+        "port": 22,
+        "type": "ssh-ed25519",
+        "key": "AAAAC3NzaC1lZDI1NTE5AAAAIDyWws01Wl8TS8ApXztJZoBmUSX1b2OXbnjm4bzz1RdS"
+      }
+    ],
+    "signIn": {
+      "0c1d2e3f405162738495a6b7c8d9e0f1": {
+        "method": "key",
+        "keyName": "rackoon-web"
+      }
+    },
+    "preferences": {
+      "theme": "automatic",
+      "readOnly": true,
+      "autoReadOnly": "idle15",
+      "highlightOutput": true,
+      "vulnerabilityLookupAll": false
+    },
+    "serverSettings": {
+      "0c1d2e3f405162738495a6b7c8d9e0f1": {
+        "services": {
+          "cockpit.service": false
+        }
+      },
+      "*": {
+        "services": {
+          "snapd.service": false
+        }
+      }
+    }
+  }
+}

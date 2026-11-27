@@ -1,0 +1,102 @@
+{
+  "format": "rackoon-config",
+  "version": 1,
+  "exportedAt": "2026-11-27T12:00:00Z",
+  "source": {
+    "platform": "mac",
+    "app": "0.1.0"
+  },
+  "servers": [
+    {
+      "id": "6F1C0D5E-2B7A-4C1D-9E8F-0A1B2C3D4E5F",
+      "name": "homelab",
+      "host": "homelab",
+      "sshConfigAlias": "homelab",
+      "identityFile": "~/.ssh/id_ed25519",
+      "resolved": {
+        "host": "100.64.0.10",
+        "user": "andy",
+        "port": 22
+      }
+    },
+    {
+      "id": "A0B1C2D3-E4F5-4061-8293-A4B5C6D7E8F9",
+      "name": "Backup NAS",
+      "host": "nas.lan",
+      "user": "root",
+      "port": 2222
+    }
+  ],
+  "hostKeys": [
+    {
+      "host": "100.64.0.10",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIDyWws01Wl8TS8ApXztJZoBmUSX1b2OXbnjm4bzz1RdS"
+    },
+    {
+      "host": "100.64.0.10",
+      "port": 22,
+      "type": "ecdsa-sha2-nistp256",
+      "key": "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBAVFaXFwnRk25BZy1zbmF3hjiWHC22ghYHbel1UZ+aQNXWHIh6TifpXzN4WxzJlcGKgVYPdI4y0nv/8azhyGK4U="
+    },
+    {
+      "host": "100.64.0.10",
+      "port": 22,
+      "type": "ssh-rsa",
+      "key": "AAAAB3NzaC1yc2EAAAADAQABAAABAQBo+Jtrn/JY3n0t3Pp/XAPrYpkUM3mq9svDVibtOLCpJQywusDjOiMhobOCzc7P/VrlUtzRkbpHYHaKsUnWiWaS7lDlz1Nf5WlJTuzVR7rV5hm6zvV84kSof3oftwSMkSEYtS6ObVuziwWwluHGHwIJ2w8OEMRurZmYyOnhmBDZzHfTr2DrzjWVlIecGSroZuMFUV9nfX9JQTz6EOVA3fCc84oQwayp0qH62ZpG4ZPvpQ2Xj8f+dFoOE0Sd8+9/M/HmaNFTeKtS/JJwkt5Iszn7Dh9FYl14Xu9mNRcQ+aQ0OqmrtXNxZ9iLVGmD9oidanbLxdJBrdVKd3omGkDn4fVn"
+    },
+    {
+      "host": "nas.lan",
+      "port": 2222,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIHl4CGY160wfrAqUjGPuUd7dumdvc/PDNuEJ1EUz3H5X"
+    }
+  ],
+  "signIn": {
+    "6F1C0D5E-2B7A-4C1D-9E8F-0A1B2C3D4E5F": {
+      "method": "key",
+      "keyName": "id_ed25519"
+    },
+    "A0B1C2D3-E4F5-4061-8293-A4B5C6D7E8F9": {
+      "method": "system"
+    }
+  },
+  "preferences": {
+    "theme": "automatic",
+    "highlightOutput": true,
+    "readOnly": false,
+    "dockerUnlockMinutes": 60,
+    "alertNotifications": true,
+    "servicesShowHidden": false,
+    "dashboardDockerShowAll": true,
+    "vulnerabilityLookupAll": false
+  },
+  "serverSettings": {
+    "6F1C0D5E-2B7A-4C1D-9E8F-0A1B2C3D4E5F": {
+      "icons": {
+        "immich": "immich",
+        "immich|immich-machine-learning": "",
+        "paperless": "custom:d097d8741f98c629fef38d837810a600957582167d9ea37822215d159988b333",
+        "service:tailscaled.service": "sh:tailscale"
+      },
+      "services": {
+        "nginx.service": false,
+        "paperclip": true
+      },
+      "vulnerabilityLookup": true,
+      "mutedAlerts": [
+        "containers|exited:backup-job",
+        "disk|/srv/media"
+      ]
+    },
+    "*": {
+      "services": {
+        "tailscaled.service": true
+      }
+    }
+  },
+  "customIcons": {
+    "d097d8741f98c629fef38d837810a600957582167d9ea37822215d159988b333": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNg+M/AAAADAQEAyf6S7wAAAABJRU5ErkJggg=="
+  }
+}

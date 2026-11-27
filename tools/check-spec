@@ -44,7 +44,7 @@ for c in commands:
                 errors.append(f"{expected.relative_to(spec)}: {e}")
 
 # Fixtures that are not command output (licence keys, see spec/licence-key.md) are checked separately below.
-NON_COMMAND_FIXTURES = {"licence"}
+NON_COMMAND_FIXTURES = {"licence", "config"}
 for d in (spec / "fixtures").iterdir():
     if d.is_dir() and d.name not in ids and d.name not in NON_COMMAND_FIXTURES:
         errors.append(f"fixtures/{d.name}: no matching command in commands.json")
@@ -218,6 +218,111 @@ for c in integration.get("checks", []):
         errors.append(f"integration/checks.json: {cid} names unknown feature {c.get('feature')!r}")
     if not c.get("about"):
         errors.append(f"integration/checks.json: {cid} needs an 'about'")
+
+# Config transfer (spec/config-transfer.md): the settings catalog, its fixtures, and the standing rule that every saved
+# setting is in the catalog. The source scan below fails when an app saves a preference key or a .json file the
+# catalog does not name, so a new setting cannot ship without deciding whether it transfers (and when the catalog names
+# a key the app no longer has).
+PARTS = {"servers", "hostKeys", "signIn", "preferences", "serverSettings", "customIcons"}
+STORES = {"mac": "defaults", "ios": "defaults", "android": "prefs"}
+catalog = load("config-transfer.json")
+if catalog.get("platforms") != PLATFORMS:
+    errors.append(f"config-transfer.json: platforms must be {PLATFORMS}")
+setting_ids = [s.get("id") for s in catalog.get("settings", [])]
+if len(setting_ids) != len(set(setting_ids)):
+    errors.append("config-transfer.json: duplicate setting ids")
+catalog_keys = {p: set() for p in PLATFORMS}
+for s in catalog.get("settings", []):
+    sid = s.get("id", "?")
+    where = f"config-transfer.json: setting {sid}"
+    if not isinstance(s.get("transfer"), bool):
+        errors.append(f"{where}: needs transfer true or false")
+    if s.get("transfer") is False and not str(s.get("reason", "")).strip():
+        errors.append(f"{where}: is not transferred, so it needs a 'reason'")
+    if s.get("transfer") and s.get("part") not in PARTS:
+        errors.append(f"{where}: is transferred, so it needs a 'part' from {sorted(PARTS)}")
+    if s.get("transfer") and s.get("type") not in ("bool", "int", "string"):
+        errors.append(f"{where}: needs a type: bool, int or string")
+    keys = s.get("keys", {})
+    if sorted(keys) != sorted(PLATFORMS):
+        errors.append(f"{where}: needs a key (or null) for each of {PLATFORMS}")
+    for p, key in keys.items():
+        if key is None:
+            continue
+        store, _, name = str(key).partition(":")
+        expected_store = STORES.get(p)
+        if not name or (expected_store and store != expected_store) or (p == "web" and not store.endswith(".json")):
+            errors.append(f"{where}: {p} key {key!r} must be '{expected_store or '<file>.json'}:<name>'")
+        catalog_keys[p].add(key)
+catalog_files = {p: set() for p in PLATFORMS}
+for f in catalog.get("files", []):
+    fid = f.get("id", "?")
+    if f.get("transfer") is False and not str(f.get("reason", "")).strip():
+        errors.append(f"config-transfer.json: file {fid} is not transferred, so it needs a 'reason'")
+    if f.get("transfer") and f.get("part") not in PARTS:
+        errors.append(f"config-transfer.json: file {fid} is transferred, so it needs a 'part' from {sorted(PARTS)}")
+    if sorted(f.get("paths", {})) != sorted(PLATFORMS):
+        errors.append(f"config-transfer.json: file {fid} needs a path list for each of {PLATFORMS}")
+    for p, paths in f.get("paths", {}).items():
+        catalog_files.setdefault(p, set()).update(Path(x.rstrip("/")).name for x in paths)
+schema_prefs = set(load("config-transfer.schema.json").get("properties", {}).get("preferences", {}).get("properties", {}))
+catalog_prefs = {s["id"] for s in catalog.get("settings", []) if s.get("part") == "preferences" and s.get("transfer")}
+if schema_prefs != catalog_prefs:
+    errors.append(f"config-transfer.schema.json: preferences {sorted(schema_prefs)} differ from the catalog's {sorted(catalog_prefs)}")
+
+repo = spec.parent
+SOURCES = {
+    "mac": ["apple/Apps/RackoonMac/Sources", "apple/Packages/RackoonCore/Sources"],
+    "ios": ["apple/Apps/RackoonIOS/RackoonIOS", "apple/Packages/RackoonCore/Sources"],
+    "android": ["android/app/src/main", "android/core/src/main"],
+    "web": ["web/backend/rackoon/app"],
+}
+SAVED_KEY = {
+    "mac": [r'@AppStorage\("([A-Za-z_][\w.]*)"',
+            r'\b(?:set|bool|string|integer|double|float|object|array|stringArray|dictionary|data|url|removeObject)'
+            r'\([^\n]*?forKey:\s*"([A-Za-z_][\w.]*)"'],
+    "android": [r'\b(?:get|put)(?:Boolean|String|Int|Long|Float|StringSet)\("([a-z_]+)"'],
+    "web": [r'_raw(?:\.get\(|\[)"(\w+)"'],
+}
+SAVED_KEY["ios"] = SAVED_KEY["mac"]
+KEY_CONSTANT = r'static let \w*[Kk]ey\w*\s*=\s*"([A-Za-z_][\w.]*)"'
+for p, dirs in SOURCES.items():
+    files = [f for d in dirs for f in (repo / d).rglob("*") if f.suffix in (".swift", ".kt", ".py") and f.is_file()]
+    text = {f: f.read_text(errors="replace") for f in files}
+    found = set()
+    for f, body in text.items():
+        if p == "web" and f.name != "preferences.py":
+            continue
+        for pattern in SAVED_KEY[p]:
+            found.update(re.findall(pattern, body))
+        if p in ("mac", "ios") and ("UserDefaults" in body or "@AppStorage" in body):
+            found.update(re.findall(KEY_CONSTANT, body))
+    names = {k.partition(":")[2] for k in catalog_keys[p]}
+    for key in sorted(found - names):
+        errors.append(f"config-transfer.json: {p} saves the setting {key!r}, which the catalog does not list "
+                      f"(add it, with transfer true and a part, or false and a reason)")
+    every_literal = set(re.findall(r'"([^"\n]+)"', "\n".join(text.values())))
+    for key in sorted(catalog_keys[p]):
+        if key.partition(":")[2] not in every_literal:
+            errors.append(f"config-transfer.json: {p} key {key!r} is not in that app's source any more")
+    for name in sorted({Path(m).name for m in re.findall(r'"([\w./-]+\.json)"', "\n".join(text.values()))}):
+        if name not in catalog_files.get(p, set()):
+            errors.append(f"config-transfer.json: {p} writes or reads {name!r}, which no catalog file entry names")
+
+config_fixtures = spec / "fixtures" / "config"
+if config_fixtures.is_dir():
+    inputs = sorted(config_fixtures.glob("*.rackoon")) + sorted(config_fixtures.glob("*.qr.json"))
+    if not inputs:
+        errors.append("fixtures/config: no fixtures")
+    for f in inputs:
+        stem = f.name.removesuffix(".rackoon").removesuffix(".qr.json")
+        exp = config_fixtures / f"{stem}.expected.json"
+        try:
+            e = json.loads(exp.read_text())
+            if ("document" in e) == ("error" in e):
+                errors.append(f"fixtures/config/{exp.name}: needs a document or an error")
+        except Exception as ex:
+            errors.append(f"fixtures/config/{exp.name}: {ex}")
 
 for cid in ids:
     if cid not in claimed:

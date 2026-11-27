@@ -1,0 +1,237 @@
+#!/usr/bin/env python3
+"""Writes spec/fixtures/config/ (spec/config-transfer.md): plain documents from each platform, encrypted files with a
+published TEST passphrase, QR part sets with a published unlock code, and documents every reader must refuse or
+trim. Randomness is a fixed seed, so running it again gives the same bytes; review the diff by hand.
+
+    cd web/backend && uv run python ../../tools/config-fixtures
+
+Every host key, server and secret here is made up."""
+
+from __future__ import annotations
+
+import base64
+import hashlib
+import json
+import struct
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "web" / "backend"))
+
+from rackoon.core import config_transfer as ct  # noqa: E402
+
+OUT = ROOT / "spec" / "fixtures" / "config"
+PASSPHRASE = "correct horse battery staple"
+
+
+class Seeded:
+    """Deterministic bytes: sha256(seed | counter) blocks."""
+
+    def __init__(self, seed: str) -> None:
+        self.seed, self.counter, self.buffer = seed.encode(), 0, b""
+
+    def __call__(self, n: int) -> bytes:
+        while len(self.buffer) < n:
+            self.buffer += hashlib.sha256(self.seed + self.counter.to_bytes(8, "big")).digest()
+            self.counter += 1
+        out, self.buffer = self.buffer[:n], self.buffer[n:]
+        return out
+
+
+def wire(*parts: bytes) -> str:
+    return base64.b64encode(b"".join(struct.pack(">I", len(p)) + p for p in parts)).decode()
+
+
+def made_up(seed: str, n: int) -> bytes:
+    return Seeded(seed)(n)
+
+
+ED_HOMELAB = wire(b"ssh-ed25519", made_up("homelab-ed25519", 32))
+ED_HOMELAB_OTHER = wire(b"ssh-ed25519", made_up("impostor-ed25519", 32))
+ECDSA_HOMELAB = wire(b"ecdsa-sha2-nistp256", b"nistp256", b"\x04" + made_up("homelab-ecdsa", 64))
+RSA_HOMELAB = wire(b"ssh-rsa", b"\x01\x00\x01", b"\x00" + made_up("homelab-rsa", 256))
+ED_NAS = wire(b"ssh-ed25519", made_up("nas-ed25519", 32))
+ED_PI = wire(b"ssh-ed25519", made_up("pi-ed25519", 32))
+PNG = base64.b64encode(bytes.fromhex(
+    "89504e470d0a1a0a0000000d4948445200000001000000010806000000"
+    "1f15c4890000000d49444154789c6360f8cfc0000003010100c9fe92ef0000000049454e44ae426082")).decode()
+PNG_ID = hashlib.sha256(base64.b64decode(PNG)).hexdigest()
+PRIVATE_KEY = ("-----BEGIN OPENSSH PRIVATE KEY-----\n"
+               + base64.b64encode(b"openssh-key-v1\0 made-up test key, not a real key " + made_up("key", 48)).decode()
+               + "\n-----END OPENSSH PRIVATE KEY-----\n")
+
+MAC = {
+    "format": "rackoon-config", "version": 1, "exportedAt": "2026-11-27T12:00:00Z",
+    "source": {"platform": "mac", "app": "0.1.0"},
+    "servers": [
+        {"id": "6F1C0D5E-2B7A-4C1D-9E8F-0A1B2C3D4E5F", "name": "homelab", "host": "homelab",
+         "sshConfigAlias": "homelab", "identityFile": "~/.ssh/id_ed25519",
+         "resolved": {"host": "100.64.0.10", "user": "andy", "port": 22}},
+        {"id": "A0B1C2D3-E4F5-4061-8293-A4B5C6D7E8F9", "name": "Backup NAS", "host": "nas.lan", "user": "root",
+         "port": 2222},
+    ],
+    "hostKeys": [
+        {"host": "100.64.0.10", "port": 22, "type": "ssh-ed25519", "key": ED_HOMELAB},
+        {"host": "100.64.0.10", "port": 22, "type": "ecdsa-sha2-nistp256", "key": ECDSA_HOMELAB},
+        {"host": "100.64.0.10", "port": 22, "type": "ssh-rsa", "key": RSA_HOMELAB},
+        {"host": "nas.lan", "port": 2222, "type": "ssh-ed25519", "key": ED_NAS},
+    ],
+    "signIn": {"6F1C0D5E-2B7A-4C1D-9E8F-0A1B2C3D4E5F": {"method": "key", "keyName": "id_ed25519"},
+               "A0B1C2D3-E4F5-4061-8293-A4B5C6D7E8F9": {"method": "system"}},
+    "preferences": {"theme": "automatic", "highlightOutput": True, "readOnly": False, "dockerUnlockMinutes": 60,
+                    "alertNotifications": True, "servicesShowHidden": False, "dashboardDockerShowAll": True,
+                    "vulnerabilityLookupAll": False},
+    "serverSettings": {
+        "6F1C0D5E-2B7A-4C1D-9E8F-0A1B2C3D4E5F": {
+            "icons": {"immich": "immich", "immich|immich-machine-learning": "", "paperless": f"custom:{PNG_ID}",
+                      "service:tailscaled.service": "sh:tailscale"},
+            "services": {"nginx.service": False, "paperclip": True},
+            "vulnerabilityLookup": True,
+            "mutedAlerts": ["containers|exited:backup-job", "disk|/srv/media"]},
+        "*": {"services": {"tailscaled.service": True}},
+    },
+    "customIcons": {PNG_ID: PNG},
+}
+
+ANDROID = {
+    "format": "rackoon-config", "version": 1, "exportedAt": "2026-11-27T12:05:00Z",
+    "source": {"platform": "android", "app": "0.1.0-alpha.3"},
+    "servers": [
+        {"id": "srv-pi", "name": "Pi", "host": "pi.tail1234.ts.net", "user": "pi"},
+        {"id": "srv-vps", "name": "VPS", "host": "203.0.113.7", "user": "deploy", "port": 22},
+    ],
+    "hostKeys": [{"host": "pi.tail1234.ts.net", "port": 22, "type": "ssh-ed25519", "key": ED_PI}],
+    "signIn": {"srv-pi": {"method": "tailscale"}, "srv-vps": {"method": "password"}},
+    "preferences": {"theme": "dracula", "highlightOutput": False, "readOnly": True, "startReadOnly": True,
+                    "autoReadOnly": "idle5", "terminalFontSize": 14, "vulnerabilityLookupAll": True},
+    "serverSettings": {"srv-vps": {"vulnerabilityLookup": True}},
+}
+
+IOS = {
+    "format": "rackoon-config", "version": 1, "exportedAt": "2026-11-27T12:10:00Z",
+    "source": {"platform": "ios", "app": "0.1.0"},
+    "servers": [{"id": "srv-pi", "name": "Pi", "host": "pi.tail1234.ts.net", "user": "pi"}],
+    "hostKeys": [{"host": "pi.tail1234.ts.net", "port": 22, "type": "ssh-ed25519", "key": ED_PI}],
+    "signIn": {"srv-pi": {"method": "key", "keyName": "phone-key"}},
+    "preferences": {"theme": "rackoon-light", "highlightOutput": True, "readOnly": True, "servicesShowHidden": True,
+                    "filesShowHidden": True, "vulnerabilityLookupAll": False},
+    "serverSettings": {"srv-pi": {"icons": {"pihole": "pi-hole"}, "mutedAlerts": ["updates|security"]}},
+}
+
+WEB = {
+    "format": "rackoon-config", "version": 1, "exportedAt": "2026-11-27T12:15:00Z",
+    "source": {"platform": "web", "app": "web-0.1.0"},
+    "servers": [{"id": "0c1d2e3f405162738495a6b7c8d9e0f1", "name": "homelab", "host": "100.64.0.10", "user": "andy"}],
+    "hostKeys": [{"host": "100.64.0.10", "port": 22, "type": "ssh-ed25519", "key": ED_HOMELAB}],
+    "signIn": {"0c1d2e3f405162738495a6b7c8d9e0f1": {"method": "key", "keyName": "rackoon-web"}},
+    "preferences": {"theme": "automatic", "readOnly": True, "autoReadOnly": "idle15", "highlightOutput": True,
+                    "vulnerabilityLookupAll": False},
+    "serverSettings": {"0c1d2e3f405162738495a6b7c8d9e0f1": {"services": {"cockpit.service": False}},
+                       "*": {"services": {"snapd.service": False}}},
+}
+
+SECRETS = {
+    "6F1C0D5E-2B7A-4C1D-9E8F-0A1B2C3D4E5F": {"privateKey": PRIVATE_KEY, "passphrase": "made-up key passphrase",
+                                             "keyName": "id_ed25519"},
+    "A0B1C2D3-E4F5-4061-8293-A4B5C6D7E8F9": {"password": "made-up password é中"},
+}
+
+
+def write(name: str, data: bytes | str) -> None:
+    path = OUT / name
+    path.write_bytes(data if isinstance(data, bytes) else data.encode())
+
+
+def expected(name: str, value: dict[str, object]) -> None:
+    write(f"{name}.expected.json", json.dumps(value, indent=2, ensure_ascii=False) + "\n")
+
+
+def pretty(obj: object) -> str:
+    return json.dumps(obj, indent=2, ensure_ascii=False) + "\n"
+
+
+def canonical(obj: dict[str, object], **kw: bool) -> dict[str, object]:
+    return ct.document_json(ct.read_document(obj, **kw), **kw)  # type: ignore[arg-type]
+
+
+def main() -> None:
+    OUT.mkdir(parents=True, exist_ok=True)
+    for old in OUT.iterdir():
+        old.unlink()
+
+    # Plain documents as each platform writes them.
+    for name, doc in (("mac-plain", MAC), ("android-plain", ANDROID), ("ios-plain", IOS), ("web-plain", WEB)):
+        write(f"{name}.rackoon", pretty(doc))
+        expected(name, {"document": canonical(doc, secrets=False)})
+
+    # A plain file never carries secrets: a reader drops them.
+    with_secrets = {**ANDROID, "secrets": {"srv-vps": {"password": "made-up"}}}
+    write("plain-with-secrets.rackoon", pretty(with_secrets))
+    expected("plain-with-secrets", {"document": canonical(ANDROID, secrets=False)})
+
+    # Unknown fields from a later version 1 are ignored; wrong types and unknown preferences are dropped.
+    later = json.loads(json.dumps(IOS))
+    later["futurePart"] = {"anything": [1, 2, 3]}
+    later["servers"][0]["futureField"] = "ignored"
+    later["preferences"].update({"futurePreference": True, "readOnly": "yes", "terminalFontSize": 99,
+                                 "autoReadOnly": "sometimes"})
+    later["signIn"]["srv-pi"] = {"method": "passkey"}
+    later["serverSettings"]["no-such-server"] = {"icons": {"x": "y"}}
+    write("later-version-1.rackoon", pretty(later))
+    trimmed = json.loads(json.dumps(IOS))
+    del trimmed["preferences"]["readOnly"]
+    del trimmed["signIn"]["srv-pi"]
+    expected("later-version-1", {"document": canonical(trimmed, secrets=False)})
+
+    write("version-2.rackoon", pretty({**IOS, "version": 2}))
+    expected("version-2", {"error": "newerVersion"})
+    write("not-rackoon.rackoon", pretty({"servers": []}))
+    expected("not-rackoon", {"error": "notRackoonConfig"})
+    bad = json.loads(json.dumps(IOS))
+    bad["servers"][0]["host"] = "-oProxyCommand=touch /tmp/pwned"
+    write("dash-host.rackoon", pretty(bad))
+    expected("dash-host", {"error": "damaged"})
+    twice = json.loads(json.dumps(ANDROID))
+    twice["servers"][1]["id"] = "srv-pi"
+    write("duplicate-id.rackoon", pretty(twice))
+    expected("duplicate-id", {"error": "damaged"})
+
+    # Encrypted: the Mac document with secrets, under the published TEST passphrase.
+    full = {**MAC, "secrets": SECRETS}
+    doc = ct.read_document(full, secrets=True)
+    sealed = ct.encrypted_file(doc, PASSPHRASE, Seeded("encrypted"))
+    write("encrypted.rackoon", sealed)
+    expected("encrypted", {"passphrase": PASSPHRASE, "document": ct.document_json(doc)})
+    write("encrypted-wrong-passphrase.rackoon", sealed)
+    expected("encrypted-wrong-passphrase", {"passphrase": "correct horse battery stapl", "error": "wrongPassphrase"})
+    write("encrypted-no-passphrase.rackoon", sealed)
+    expected("encrypted-no-passphrase", {"error": "needsPassphrase"})
+    tampered = json.loads(sealed)
+    ct_bytes = bytearray(base64.b64decode(tampered["ciphertext"]))
+    ct_bytes[10] ^= 1
+    tampered["ciphertext"] = base64.b64encode(bytes(ct_bytes)).decode()
+    write("encrypted-tampered.rackoon", pretty(tampered))
+    expected("encrypted-tampered", {"passphrase": PASSPHRASE, "error": "wrongPassphrase"})
+    slow = json.loads(sealed)
+    slow["kdf"]["iterations"] = 50_000_000
+    write("encrypted-huge-iterations.rackoon", pretty(slow))
+    expected("encrypted-huge-iterations", {"passphrase": PASSPHRASE, "error": "damaged"})
+
+    # QR: the same document; secrets and custom icons never go into a QR.
+    rnd = Seeded("qr")
+    code, parts = ct.qr_export(doc, rnd, max_part_bytes=300)
+    qr_doc = ct.document_json(ct.read_document(full, secrets=False, custom_icons=False), secrets=False,
+                              custom_icons=False)
+    write("mac.qr.json", pretty({"parts": parts}))
+    expected("mac", {"unlockCode": ct.format_unlock_code(code), "document": qr_doc})
+    write("mac-typed-code.qr.json", pretty({"parts": list(reversed(parts))}))
+    expected("mac-typed-code", {"unlockCode": code.lower().replace("0", "o").replace("1", "l"), "document": qr_doc})
+    write("mac-wrong-code.qr.json", pretty({"parts": parts}))
+    wrong = code[:-1] + ("0" if code[-1] != "0" else "1")
+    expected("mac-wrong-code", {"unlockCode": wrong, "error": "wrongUnlockCode"})
+    print(f"wrote {len(list(OUT.iterdir()))} files to {OUT.relative_to(ROOT)}; QR: {len(parts)} parts, code {code}")
+
+
+if __name__ == "__main__":
+    main()

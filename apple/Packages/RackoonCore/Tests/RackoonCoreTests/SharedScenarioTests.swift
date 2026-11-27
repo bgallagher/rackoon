@@ -47,7 +47,7 @@ final class SharedScenarioTests: XCTestCase {
 
     private static let subjects: Set<String> = [
         "shell_quote", "template_fill", "action_policy", "compose_command", "stream_output", "server_input", "docker_ids",
-        "security_checks", "debian_version", "vulnerability_report",
+        "security_checks", "debian_version", "vulnerability_report", "config_codec", "config_merge",
     ]
 
     func testEveryApplicableScenarioHasARunner() throws {
@@ -173,5 +173,21 @@ final class SharedScenarioTests: XCTestCase {
             let doc = try Self.json(specDir.appendingPathComponent("scenarios/\(s.file)"))
             try await VulnerabilityScenarios.report(doc, cases: s.cases.map { ("\(s.file): \($0["name"] as! String)", $0) })
         }
+    }
+
+    /// The config scenarios are read again as `JSONValue`, which keeps `true` and `1` apart.
+    private func configCases(_ subject: String) throws -> [(String, JSONValue)] {
+        try Self.scenarios().filter { $0.subject == subject }.flatMap { s in
+            let doc = try JSONValue.parse(Data(contentsOf: specDir.appendingPathComponent("scenarios/\(s.file)")))
+            return (doc["cases"]?.array ?? []).map { ("\(s.file): \($0["name"]?.string ?? "?")", $0) }
+        }
+    }
+
+    func testConfigCodec() throws {
+        try ConfigScenarios.codec(try configCases("config_codec"))
+    }
+
+    func testConfigMerge() throws {
+        try ConfigScenarios.merge(try configCases("config_merge"))
     }
 }
