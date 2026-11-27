@@ -716,13 +716,13 @@ extension ConfigTransfer {
     }
 
     private static func differences(_ local: ConfigServer, _ incoming: ConfigServer) -> [String] {
-        let here = effective(local)
+        let here = effective(local), there = effective(incoming)
         return serverFields.filter { field in
             switch field {
-            case "name": here.name != incoming.name
-            case "host": here.host.lowercased() != incoming.host.lowercased()
-            case "user": (here.user ?? "") != (incoming.user ?? "")
-            case "port": (here.port ?? 22) != (incoming.port ?? 22)
+            case "name": here.name != there.name
+            case "host": here.host.lowercased() != there.host.lowercased()
+            case "user": (here.user ?? "") != (there.user ?? "")
+            case "port": (here.port ?? 22) != (there.port ?? 22)
             // A Mac-only field the document leaves out is not a change, and an update keeps it.
             case "sshConfigAlias": incoming.sshConfigAlias != nil && (here.sshConfigAlias ?? "") != incoming.sshConfigAlias
             default: incoming.identityFile != nil && (here.identityFile ?? "") != incoming.identityFile
@@ -789,7 +789,7 @@ extension ConfigTransfer {
         }
         for s in fitted where matches[s.id] == nil {
             if let candidate = local.servers.first(where: {
-                !used.contains($0.id) && (address($0) == address(s) || address(effective($0)) == address(s))
+                !used.contains($0.id) && [address($0), address(effective($0))].contains { [address(s), address(effective(s))].contains($0) }
             }) {
                 matches[s.id] = (candidate, "address")
                 used.insert(candidate.id)

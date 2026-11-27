@@ -110,11 +110,11 @@ another.
 1. **Fit the incoming servers to this platform.** Off the Mac, a server with a `resolved` entry takes the host, user
    and port it names (each one it names), and `sshConfigAlias`, `identityFile` and `resolved` are dropped.
 2. **Match** each incoming server to a local one: same id; else the same address (host compared ignoring case, port
-   missing = 22, user missing = empty). A local server with a `resolved` entry (a Mac alias) also matches on the
-   address it resolves to. Each local server matches at most one incoming server, the first.
+   missing = 22, user missing = empty). A server with a `resolved` entry (a Mac's, on either side) also matches
+   on the address it resolves to. Each local server matches at most one incoming server, the first.
 3. Each server is then **new** (no match), **identical** or a **change** listing the fields that differ (`name`,
-   `host`, `user`, `port`, `sshConfigAlias`, `identityFile`), comparing with the local server's resolved address when
-   it has one, with the address rules of step 2, and a missing value equal to an empty one. A Mac-only field
+   `host`, `user`, `port`, `sshConfigAlias`, `identityFile`), comparing both servers through their resolved addresses
+   when they have them, with the address rules of step 2, and a missing value equal to an empty one. A Mac-only field
    (`sshConfigAlias`, `identityFile`) the incoming server leaves out is not a difference. A matched server takes the
    document's sign-in, settings and secret when the user leaves it on Update (the default), and a changed one takes
    **only the fields that differ**; everything else stays as written here. A new host ends a Mac alias link (its

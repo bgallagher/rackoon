@@ -879,6 +879,84 @@
    }
   },
   {
+   "name": "Mac to Mac: an alias compares through what it resolves to on both sides",
+   "platform": "mac",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "mac-homelab",
+      "name": "homelab",
+      "host": "homelab",
+      "sshConfigAlias": "homelab",
+      "identityFile": "~/.ssh/id_ed25519",
+      "resolved": {
+       "host": "100.64.0.10",
+       "user": "andy",
+       "port": 22
+      }
+     }
+    ]
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "other-mac-id",
+      "name": "homelab",
+      "host": "homelab",
+      "sshConfigAlias": "homelab",
+      "identityFile": "~/.ssh/id_ed25519",
+      "resolved": {
+       "host": "100.64.0.10",
+       "user": "andy",
+       "port": 22
+      }
+     }
+    ]
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "other-mac-id",
+      "kind": "identical",
+      "localId": "mac-homelab",
+      "matchedBy": "address"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "mac-homelab",
+      "name": "homelab",
+      "host": "homelab",
+      "sshConfigAlias": "homelab",
+      "identityFile": "~/.ssh/id_ed25519",
+      "resolved": {
+       "host": "100.64.0.10",
+       "user": "andy",
+       "port": 22
+      }
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
    "name": "an update takes only the changed fields and keeps the Mac's key file",
    "platform": "mac",
    "source": "encrypted",

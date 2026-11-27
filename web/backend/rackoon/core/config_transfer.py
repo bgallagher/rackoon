@@ -723,10 +723,10 @@ def _effective(s: ConfigServer) -> ConfigServer:
 
 
 def _differences(local: ConfigServer, incoming: ConfigServer) -> list[str]:
-    here = _effective(local)
+    here, there = _effective(local), _effective(incoming)
     out = []
     for name in SERVER_FIELDS:
-        a, b = here.field_value(name), incoming.field_value(name)
+        a, b = here.field_value(name), there.field_value(name)
         if name in MAC_ONLY and b is None:
             continue  # the document leaves out a Mac-only field: not a change, and an update keeps it
         if name == "host":
@@ -831,7 +831,7 @@ def plan_import(local: ConfigDocument, incoming: ConfigDocument, platform: str) 
         if s.id in matches:
             continue
         for candidate in local.servers:
-            if candidate.id not in used and _address(s) in (_address(candidate), _address(_effective(candidate))):
+            if candidate.id not in used and {_address(s), _address(_effective(s))} & {_address(candidate), _address(_effective(candidate))}:
                 matches[s.id] = (candidate, "address")
                 used.add(candidate.id)
                 break

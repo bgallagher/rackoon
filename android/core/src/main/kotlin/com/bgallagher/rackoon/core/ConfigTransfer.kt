@@ -654,12 +654,13 @@ object ConfigTransfer {
 
     private fun differences(local: ConfigServer, incoming: ConfigServer): List<String> {
         val here = effective(local)
+        val there = effective(incoming)
         return SERVER_FIELDS.filter { field ->
             when (field) {
-                "name" -> here.name != incoming.name
-                "host" -> here.host.lowercase() != incoming.host.lowercase()
-                "user" -> (here.user ?: "") != (incoming.user ?: "")
-                "port" -> (here.port ?: 22) != (incoming.port ?: 22)
+                "name" -> here.name != there.name
+                "host" -> here.host.lowercase() != there.host.lowercase()
+                "user" -> (here.user ?: "") != (there.user ?: "")
+                "port" -> (here.port ?: 22) != (there.port ?: 22)
                 // A Mac-only field the document leaves out is not a change, and an update keeps it.
                 "sshConfigAlias" -> incoming.sshConfigAlias != null && (here.sshConfigAlias ?: "") != incoming.sshConfigAlias
                 else -> incoming.identityFile != null && (here.identityFile ?: "") != incoming.identityFile
@@ -716,7 +717,7 @@ object ConfigTransfer {
         for (s in fitted) localById[s.id]?.let { matches[s.id] = it to "id"; used += s.id }
         for (s in fitted) {
             if (s.id in matches) continue
-            local.servers.firstOrNull { it.id !in used && (address(it) == address(s) || address(effective(it)) == address(s)) }?.let { matches[s.id] = it to "address"; used += it.id }
+            local.servers.firstOrNull { it.id !in used && setOf(address(it), address(effective(it))).any { a -> a == address(s) || a == address(effective(s)) } }?.let { matches[s.id] = it to "address"; used += it.id }
         }
         val plans = fitted.map { s ->
             val (here, how) = matches[s.id] ?: return@map ConfigServerPlan(s, ServerPlanKind.NEW)
