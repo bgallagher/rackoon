@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rackoon.app/spec/config-transfer.schema.json",
+  "title": "rackoon-config document, version 1 (spec/config-transfer.md)",
+  "type": "object",
+  "required": ["format", "version"],
+  "properties": {
+    "format": {"const": "rackoon-config"},
+    "version": {"type": "integer", "minimum": 1},
+    "exportedAt": {"type": "string", "description": "ISO 8601, UTC"},
+    "source": {
+      "type": "object",
+      "properties": {
+        "platform": {"enum": ["mac", "android", "ios", "web"]},
+        "app": {"type": "string"}
+      }
+    },
+    "servers": {"type": "array", "items": {"$ref": "#/$defs/server"}},
+    "hostKeys": {"type": "array", "items": {"$ref": "#/$defs/hostKey"}},
+    "signIn": {"type": "object", "additionalProperties": {"$ref": "#/$defs/signIn"}},
+    "preferences": {
+      "type": "object",
+      "description": "Catalog ids (config-transfer.json, part 'preferences') with their catalog type; wrong types and unknown ids are dropped when read.",
+      "properties": {
+        "theme": {"type": "string", "maxLength": 100},
+        "highlightOutput": {"type": "boolean"},
+        "readOnly": {"type": "boolean"},
+        "startReadOnly": {"type": "boolean"},
+        "autoReadOnly": {"enum": ["never", "idle5", "idle15", "background"]},
+        "dockerUnlockMinutes": {"enum": [0, 15, 60, 480]},
+        "alertNotifications": {"type": "boolean"},
+        "terminalFontSize": {"type": "integer", "minimum": 6, "maximum": 40},
+        "servicesShowHidden": {"type": "boolean"},
+        "filesShowHidden": {"type": "boolean"},
+        "dashboardDockerShowAll": {"type": "boolean"},
+        "vulnerabilityLookupAll": {"type": "boolean"}
+      }
+    },
+    "serverSettings": {"type": "object", "additionalProperties": {"$ref": "#/$defs/serverSettings"}},
+    "customIcons": {
+      "type": "object",
+      "propertyNames": {"pattern": "^[0-9a-f]{64}$"},
+      "additionalProperties": {"type": "string", "description": "base64 PNG"}
+    },
+    "secrets": {
+      "type": "object",
+      "description": "Only inside an encrypted file; dropped from a plain document or a QR transfer.",
+      "additionalProperties": {"$ref": "#/$defs/secret"}
+    }
+  },
+  "$defs": {
+    "server": {
+      "type": "object",
+      "required": ["id", "name", "host"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 100},
+        "name": {"type": "string"},
+        "host": {"type": "string", "minLength": 1},
+        "user": {"type": "string"},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "sshConfigAlias": {"type": "string"},
+        "identityFile": {"type": "string"},
+        "resolved": {
+          "type": "object",
+          "required": ["host"],
+          "properties": {
+            "host": {"type": "string", "minLength": 1},
+            "user": {"type": "string"},
+            "port": {"type": "integer", "minimum": 1, "maximum": 65535}
+          }
+        }
+      }
+    },
+    "hostKey": {
+      "type": "object",
+      "required": ["host", "port", "type", "key"],
+      "properties": {
+        "host": {"type": "string", "minLength": 1},
+        "port": {"type": "integer", "minimum": 1, "maximum": 65535},
+        "type": {"type": "string", "pattern": "^[a-z0-9@.-]+$"},
+        "key": {"type": "string", "description": "base64 of the wire-format public key"}
+      }
+    },
+    "signIn": {
+      "type": "object",
+      "required": ["method"],
+      "properties": {
+        "method": {"enum": ["tailscale", "key", "password", "system"]},
+        "keyName": {"type": "string"}
+      }
+    },
+    "serverSettings": {
+      "type": "object",
+      "properties": {
+        "icons": {"type": "object", "additionalProperties": {"type": "string"}},
+        "services": {"type": "object", "additionalProperties": {"type": "boolean"}},
+        "vulnerabilityLookup": {"type": "boolean"},
+        "mutedAlerts": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "secret": {
+      "type": "object",
+      "properties": {
+        "password": {"type": "string"},
+        "privateKey": {"type": "string"},
+        "passphrase": {"type": "string"},
+        "keyName": {"type": "string"}
+      }
+    }
+  }
+}

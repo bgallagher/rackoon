@@ -82,7 +82,8 @@ def _not_done_on_web() -> set[str]:
 
 def test_every_fixture_folder_has_a_parser() -> None:
     folders = {p.name for p in (SPEC / "fixtures").iterdir() if p.is_dir()}
-    missing = folders - set(GOLDEN) - {"files_list"} - NOT_FOR_WEB - _not_done_on_web()
+    # files_list has its own test; config holds documents, not command output (tests/test_config_transfer.py).
+    missing = folders - set(GOLDEN) - {"files_list", "config"} - NOT_FOR_WEB - _not_done_on_web()
     assert not missing, f"fixtures with no Python parser test: {sorted(missing)}"
 
 

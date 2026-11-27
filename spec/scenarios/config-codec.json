@@ -1,0 +1,1095 @@
+{
+ "feature": "config.format",
+ "subject": "config_codec",
+ "about": "spec/config-transfer.md, the codec: Base45 (fn base45: hex <-> text, or error), unlock code normalisation (fn unlockCode: input -> expect, null when refused), QR part split (fn qrSplit) and collection (fn qrCollect: the parts in scan order -> the payload's hex, or the error code; the payload must start with 0x01 and be at least 45 bytes), host key fingerprints (fn fingerprint) and reading a document (fn readDocument: source plain, encrypted or qr -> the canonical document, or the error code).",
+ "cases": [
+  {
+   "name": "base45 RFC 9285: AB",
+   "fn": "base45",
+   "hex": "4142",
+   "text": "BB8"
+  },
+  {
+   "name": "base45 RFC 9285: Hello!!",
+   "fn": "base45",
+   "hex": "48656c6c6f2121",
+   "text": "%69 VD92EX0"
+  },
+  {
+   "name": "base45 RFC 9285: base-45",
+   "fn": "base45",
+   "hex": "626173652d3435",
+   "text": "UJCLQE7W581"
+  },
+  {
+   "name": "base45 RFC 9285: ietf!",
+   "fn": "base45",
+   "hex": "6965746621",
+   "text": "QED8WEX0"
+  },
+  {
+   "name": "base45 empty",
+   "fn": "base45",
+   "hex": "",
+   "text": ""
+  },
+  {
+   "name": "base45 zero and high bytes",
+   "fn": "base45",
+   "hex": "00ff01",
+   "text": "U5010"
+  },
+  {
+   "name": "base45 refuses value over 65535",
+   "fn": "base45",
+   "text": "GGW",
+   "error": true
+  },
+  {
+   "name": "base45 refuses lower case",
+   "fn": "base45",
+   "text": "bb8",
+   "error": true
+  },
+  {
+   "name": "base45 refuses one symbol left over",
+   "fn": "base45",
+   "text": "BB8A",
+   "error": true
+  },
+  {
+   "name": "base45 refuses last pair over 255",
+   "fn": "base45",
+   "text": "BB8:Z",
+   "error": true
+  },
+  {
+   "name": "unlock code '7TB1A-8NB1H'",
+   "fn": "unlockCode",
+   "input": "7TB1A-8NB1H",
+   "expect": "7TB1A8NB1H"
+  },
+  {
+   "name": "unlock code '7tb1a 8nb1h'",
+   "fn": "unlockCode",
+   "input": "7tb1a 8nb1h",
+   "expect": "7TB1A8NB1H"
+  },
+  {
+   "name": "unlock code '7TBIA-8NBLH'",
+   "fn": "unlockCode",
+   "input": "7TBIA-8NBLH",
+   "expect": "7TB1A8NB1H"
+  },
+  {
+   "name": "unlock code 'ooooo-ooooo'",
+   "fn": "unlockCode",
+   "input": "ooooo-ooooo",
+   "expect": "0000000000"
+  },
+  {
+   "name": "unlock code '7TB1A-8NB1'",
+   "fn": "unlockCode",
+   "input": "7TB1A-8NB1",
+   "expect": null
+  },
+  {
+   "name": "unlock code '7TB1A-8NB1HX'",
+   "fn": "unlockCode",
+   "input": "7TB1A-8NB1HX",
+   "expect": null
+  },
+  {
+   "name": "unlock code '7TB1U-8NB1H'",
+   "fn": "unlockCode",
+   "input": "7TB1U-8NB1H",
+   "expect": null
+  },
+  {
+   "name": "unlock code '7TB1A_8NB1H'",
+   "fn": "unlockCode",
+   "input": "7TB1A_8NB1H",
+   "expect": null
+  },
+  {
+   "name": "unlock code ''",
+   "fn": "unlockCode",
+   "input": "",
+   "expect": null
+  },
+  {
+   "name": "split 10 bytes, at most 4 a part",
+   "fn": "qrSplit",
+   "hex": "0102030405060708090a",
+   "transferId": "ABC123",
+   "maxPartBytes": 4,
+   "parts": [
+    "RK1:ABC123:1/3:X507H0",
+    "RK1:ABC123:2/3:QS00+0",
+    "RK1:ABC123:3/3:J61"
+   ]
+  },
+  {
+   "name": "split 10 bytes into one part",
+   "fn": "qrSplit",
+   "hex": "0102030405060708090a",
+   "transferId": "ABC123",
+   "maxPartBytes": 450,
+   "parts": [
+    "RK1:ABC123:1/1:X507H0QS00+0J61"
+   ]
+  },
+  {
+   "name": "split a payload evenly",
+   "fn": "qrSplit",
+   "hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132",
+   "transferId": "ZZ9XYW",
+   "maxPartBytes": 20,
+   "parts": [
+    "RK1:ZZ9XYW:1/3:X507H0QS00+0J61%H1CT1V+1H0",
+    "RK1:ZZ9XYW:2/3:$C2BO2UZ2423ND3.O3G 3Z24Y0",
+    "RK1:ZZ9XYW:3/3:-J4FV4Y.4895RK51W5K/5*96"
+   ]
+  },
+  {
+   "name": "collect: in order",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:ZZ9XYW:1/3:X507H0QS00+0J61%H1CT1V+1H0",
+    "RK1:ZZ9XYW:2/3:$C2BO2UZ2423ND3.O3G 3Z24Y0",
+    "RK1:ZZ9XYW:3/3:-J4FV4Y.4895RK51W5K/5*96"
+   ],
+   "hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132"
+  },
+  {
+   "name": "collect: any order, repeats are fine",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:ZZ9XYW:3/3:-J4FV4Y.4895RK51W5K/5*96",
+    "RK1:ZZ9XYW:1/3:X507H0QS00+0J61%H1CT1V+1H0",
+    "RK1:ZZ9XYW:3/3:-J4FV4Y.4895RK51W5K/5*96",
+    "RK1:ZZ9XYW:2/3:$C2BO2UZ2423ND3.O3G 3Z24Y0"
+   ],
+   "hex": "0102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f303132"
+  },
+  {
+   "name": "collect: a part from another transfer",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:ZZ9XYW:1/3:X507H0QS00+0J61%H1CT1V+1H0",
+    "RK1:ABC123:2/3:$C2BO2UZ2423ND3.O3G 3Z24Y0"
+   ],
+   "error": "otherTransfer"
+  },
+  {
+   "name": "collect: another total",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:ZZ9XYW:1/3:X507H0QS00+0J61%H1CT1V+1H0",
+    "RK1:ZZ9XYW:2/2:ND3.O3G 3Z249E4SP42$4L35+E5EQ5X$574651"
+   ],
+   "error": "otherTransfer"
+  },
+  {
+   "name": "collect: the same place with other data",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:ZZ9XYW:1/3:X507H0QS00+0J61%H1CT1V+1H0",
+    "RK1:ZZ9XYW:1/3:-70% CC3DVED5QDO$D/3EHFEP2"
+   ],
+   "error": "partConflict"
+  },
+  {
+   "name": "collect: not every part yet",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:ZZ9XYW:1/3:X507H0QS00+0J61%H1CT1V+1H0",
+    "RK1:ZZ9XYW:3/3:-J4FV4Y.4895RK51W5K/5*96"
+   ],
+   "error": "missingParts"
+  },
+  {
+   "name": "collect: another prefix",
+   "fn": "qrCollect",
+   "parts": [
+    "RK2:ZZ9XYW:1/3:X507H0QS00+0J61%H1CT1V+1H0"
+   ],
+   "error": "badPart"
+  },
+  {
+   "name": "collect: a lower-case transfer id",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:zz9xyw:1/3:X507H0QS00+0J61%H1CT1V+1H0"
+   ],
+   "error": "badPart"
+  },
+  {
+   "name": "collect: part number past the total",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:ZZ9XYW:4/3:X507H0QS00+0J61%H1CT1V+1H0"
+   ],
+   "error": "badPart"
+  },
+  {
+   "name": "collect: part number zero",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:ZZ9XYW:0/3:X507H0QS00+0J61%H1CT1V+1H0"
+   ],
+   "error": "badPart"
+  },
+  {
+   "name": "collect: data that is not Base45",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:ZZ9XYW:1/1:bb8"
+   ],
+   "error": "badPart"
+  },
+  {
+   "name": "collect: no data",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:ZZ9XYW:1/1:"
+   ],
+   "error": "badPart"
+  },
+  {
+   "name": "collect: too short for a payload",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:ABC123:1/1:V5000000000000000000000000000000000000000000000000000000000000"
+   ],
+   "error": "badPart"
+  },
+  {
+   "name": "collect: an unknown payload version",
+   "fn": "qrCollect",
+   "parts": [
+    "RK1:ABC123:1/1:HB000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"
+   ],
+   "error": "badPart"
+  },
+  {
+   "name": "fingerprint",
+   "fn": "fingerprint",
+   "key": "AAAAC3NzaC1lZDI1NTE5AAAAIHl4CGY160wfrAqUjGPuUd7dumdvc/PDNuEJ1EUz3H5X",
+   "expect": "SHA256:OTMKW2c4EilSpOiXT5DGMz4xZq0Dp2FEWC7bNenKvms"
+  },
+  {
+   "name": "read: the smallest document",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "read: preferences of the wrong type or out of range are dropped",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "preferences": {
+     "readOnly": 1,
+     "highlightOutput": true,
+     "terminalFontSize": 5,
+     "dockerUnlockMinutes": 30,
+     "theme": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+     "autoReadOnly": "idle15",
+     "startReadOnly": null,
+     "alertNotifications": "true",
+     "unknownSetting": true,
+     "vulnerabilityLookupAll": false,
+     "filesShowHidden": true
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {
+     "highlightOutput": true,
+     "autoReadOnly": "idle15",
+     "vulnerabilityLookupAll": false,
+     "filesShowHidden": true
+    },
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "read: the largest and smallest allowed values",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "preferences": {
+     "terminalFontSize": 40,
+     "dockerUnlockMinutes": 0,
+     "theme": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {
+     "terminalFontSize": 40,
+     "dockerUnlockMinutes": 0,
+     "theme": "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyyy"
+    },
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "read: a whole number is not a flag",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "preferences": {
+     "servicesShowHidden": 0
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "read: secrets are dropped from a plain file",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "secrets": {
+     "s1": {
+      "password": "p"
+     }
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "read: secrets are dropped from a QR transfer",
+   "fn": "readDocument",
+   "source": "qr",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "secrets": {
+     "s1": {
+      "password": "p"
+     }
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "read: secrets are read from an encrypted file",
+   "fn": "readDocument",
+   "source": "encrypted",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "secrets": {
+     "s1": {
+      "password": "p"
+     },
+     "no-such-server": {
+      "password": "q"
+     }
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {},
+    "secrets": {
+     "s1": {
+      "password": "p"
+     }
+    }
+   }
+  },
+  {
+   "name": "read: a secret with neither password nor key is dropped",
+   "fn": "readDocument",
+   "source": "encrypted",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "secrets": {
+     "s1": {
+      "passphrase": "only"
+     }
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "read: custom icons are dropped from a QR transfer",
+   "fn": "readDocument",
+   "source": "qr",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "customIcons": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "iVBORw0KGgo="
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "read: custom icons need a sha256 name and base64",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "customIcons": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "iVBORw0KGgo=",
+     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA": "iVBORw0KGgo=",
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "iVBORw0KGgo=",
+     "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": "not base64!"
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {},
+    "customIcons": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "iVBORw0KGgo="
+    }
+   }
+  },
+  {
+   "name": "read: settings and sign-ins of unknown servers are dropped",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "signIn": {
+     "s1": {
+      "method": "tailscale"
+     },
+     "s2": {
+      "method": "password"
+     }
+    },
+    "serverSettings": {
+     "s1": {
+      "vulnerabilityLookup": false
+     },
+     "s2": {
+      "vulnerabilityLookup": true
+     }
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {
+     "s1": {
+      "method": "tailscale"
+     }
+    },
+    "preferences": {},
+    "serverSettings": {
+     "s1": {
+      "vulnerabilityLookup": false
+     }
+    }
+   }
+  },
+  {
+   "name": "read: every-server rules keep only services",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "serverSettings": {
+     "*": {
+      "services": {
+       "snapd.service": false
+      },
+      "icons": {
+       "x": "y"
+      },
+      "vulnerabilityLookup": true,
+      "mutedAlerts": [
+       "a|b"
+      ]
+     }
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {
+     "*": {
+      "services": {
+       "snapd.service": false
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "read: muted alerts are sorted and repeats dropped",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "serverSettings": {
+     "s1": {
+      "mutedAlerts": [
+       "updates|security",
+       "disk|/srv",
+       "updates|security",
+       7,
+       ""
+      ]
+     }
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {
+     "s1": {
+      "mutedAlerts": [
+       "disk|/srv",
+       "updates|security"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "read: settings of the wrong type are dropped",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "serverSettings": {
+     "s1": {
+      "icons": {
+       "a": "b",
+       "c": 1
+      },
+      "services": {
+       "d": true,
+       "e": "no"
+      },
+      "vulnerabilityLookup": "yes"
+     }
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {
+     "s1": {
+      "icons": {
+       "a": "b"
+      },
+      "services": {
+       "d": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "read: an unknown sign-in method is dropped",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "signIn": {
+     "s1": {
+      "method": "passkey"
+     }
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "read: the same host key twice is kept once",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "one.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIA=="
+     },
+     {
+      "host": "one.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIA=="
+     }
+    ]
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [
+     {
+      "host": "one.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIA=="
+     }
+    ],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "read: an unknown source platform is left out",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "source": {
+     "platform": "toaster",
+     "app": "9"
+    }
+   },
+   "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "source": {
+     "app": "9"
+    },
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "read: a version that is not a number",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": "1"
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: version 0",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 0
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: a server without a host",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one"
+     }
+    ]
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: a user with a space",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan",
+      "user": "a b"
+     }
+    ]
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: a user that would be an ssh option",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan",
+      "user": "-l"
+     }
+    ]
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: port 0",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan",
+      "port": 0
+     }
+    ]
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: a port as text",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan",
+      "port": "22"
+     }
+    ]
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: a resolved address that would be an ssh option",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan",
+      "sshConfigAlias": "one",
+      "resolved": {
+       "host": "-oProxyCommand=id"
+      }
+     }
+    ]
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: a host key that is not base64",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "one.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "not base64!"
+     }
+    ]
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: a host key without a port",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "one.lan",
+      "type": "ssh-ed25519",
+      "key": "AAAA"
+     }
+    ]
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: a host key type with spaces",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "one.lan",
+      "port": 22,
+      "type": "ssh ed25519",
+      "key": "AAAA"
+     }
+    ]
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: servers that is not a list",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": {
+     "s1": {
+      "id": "s1",
+      "name": "one",
+      "host": "one.lan"
+     }
+    }
+   },
+   "error": "damaged"
+  },
+  {
+   "name": "read: a server id that is too long",
+   "fn": "readDocument",
+   "source": "plain",
+   "input": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+      "name": "one",
+      "host": "one.lan"
+     }
+    ]
+   },
+   "error": "damaged"
+  }
+ ]
+}

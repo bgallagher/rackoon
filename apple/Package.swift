@@ -13,10 +13,20 @@ let macProducts: [Product] = [
 let macProducts: [Product] = []
 #endif
 
-// Demo mode's made-up servers, shared by the Mac and iOS apps (CryptoKit, so Apple platforms only).
+// Demo mode's made-up servers, shared by the Mac and iOS apps (CryptoKit, so Apple platforms only), and the config
+// transfer's crypto (CryptoKit, CommonCrypto, Compression), which RackoonCore takes by injection.
 #if os(macOS)
-let appleProducts: [Product] = [.library(name: "RackoonDemo", targets: ["RackoonDemo"])]
+let appleProducts: [Product] = [
+    .library(name: "RackoonDemo", targets: ["RackoonDemo"]),
+    .library(name: "RackoonAppleCrypto", targets: ["RackoonAppleCrypto"]),
+]
+let coreTestAppleDependencies: [Target.Dependency] = ["RackoonAppleCrypto"]
 let appleTargets: [Target] = [
+    .target(
+        name: "RackoonAppleCrypto",
+        dependencies: ["RackoonCore"],
+        path: "Packages/RackoonAppleCrypto/Sources/RackoonAppleCrypto"
+    ),
     .target(
         name: "RackoonDemo",
         dependencies: ["RackoonCore"],
@@ -30,6 +40,7 @@ let appleTargets: [Target] = [
 ]
 #else
 let appleProducts: [Product] = []
+let coreTestAppleDependencies: [Target.Dependency] = []
 let appleTargets: [Target] = []
 #endif
 
@@ -38,7 +49,7 @@ let macTargets: [Target] = [
     .executableTarget(
         name: "RackoonMac",
         dependencies: [
-            "RackoonCore", "RackoonSSHSystem", "RackoonDemo",
+            "RackoonCore", "RackoonSSHSystem", "RackoonDemo", "RackoonAppleCrypto",
             .product(name: "SwiftTerm", package: "SwiftTerm"),
             "RackoonPTY",   // built alongside the app; found next to its executable at run time
         ],
@@ -110,7 +121,8 @@ let package = Package(
         ),
         .testTarget(
             name: "RackoonCoreTests",
-            dependencies: ["RackoonCore"],
+            // On Apple hosts the config transfer tests also run the encrypted fixtures through the real crypto.
+            dependencies: ["RackoonCore"] + coreTestAppleDependencies,
             path: "Packages/RackoonCore/Tests/RackoonCoreTests"
         ),
     ] + appleTargets + macTargets

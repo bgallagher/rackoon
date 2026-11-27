@@ -1,0 +1,49 @@
+{
+  "format": "rackoon-config",
+  "version": 2,
+  "exportedAt": "2026-11-27T12:10:00Z",
+  "source": {
+    "platform": "ios",
+    "app": "0.1.0"
+  },
+  "servers": [
+    {
+      "id": "srv-pi",
+      "name": "Pi",
+      "host": "pi.tail1234.ts.net",
+      "user": "pi"
+    }
+  ],
+  "hostKeys": [
+    {
+      "host": "pi.tail1234.ts.net",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIJ7RMR6AIPjby+2j2Y/EBja9IkMZJUAWH/ZulnXNz6HB"
+    }
+  ],
+  "signIn": {
+    "srv-pi": {
+      "method": "key",
+      "keyName": "phone-key"
+    }
+  },
+  "preferences": {
+    "theme": "rackoon-light",
+    "highlightOutput": true,
+    "readOnly": true,
+    "servicesShowHidden": true,
+    "filesShowHidden": true,
+    "vulnerabilityLookupAll": false
+  },
+  "serverSettings": {
+    "srv-pi": {
+      "icons": {
+        "pihole": "pi-hole"
+      },
+      "mutedAlerts": [
+        "updates|security"
+      ]
+    }
+  }
+}

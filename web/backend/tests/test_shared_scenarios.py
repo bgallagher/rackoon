@@ -10,6 +10,7 @@ from typing import Any
 
 import pytest
 
+from rackoon.core import config_transfer as ct
 from rackoon.core import docker, security, shell, stream, vulnerabilities
 from rackoon.core.models import server_input_problem
 from rackoon.core.policy import ActionPolicy, Confirmation, Intent, NotConfirmed, ReadOnly, Risk
@@ -17,7 +18,7 @@ from rackoon.core.policy import ActionPolicy, Confirmation, Intent, NotConfirmed
 from .support import PLATFORM, SPEC, done_features, load, run_everything
 
 SUBJECTS = {"shell_quote", "template_fill", "action_policy", "compose_command", "stream_output", "server_input",
-            "docker_ids", "security_checks", "debian_version", "vulnerability_report"}
+            "docker_ids", "security_checks", "debian_version", "vulnerability_report", "config_codec", "config_merge"}
 
 
 @dataclass
@@ -201,3 +202,75 @@ def test_debian_version() -> None:
 def test_vulnerability_report() -> None:
     found = cases("vulnerability_report")
     run_vulnerability_report(load("scenarios/vulnerability-report.json"), found)
+
+
+def read_scenario_document(obj: Any, source: str) -> ct.ConfigDocument:
+    return ct.read_document(obj, secrets=source == "encrypted", custom_icons=source != "qr")
+
+
+def test_config_codec() -> None:
+    for name, c in cases("config_codec"):
+        fn = c["fn"]
+        if fn == "base45":
+            if c.get("error"):
+                with pytest.raises(ValueError):
+                    ct.base45_decode(c["text"])
+            else:
+                assert ct.base45_encode(bytes.fromhex(c["hex"])) == c["text"], name
+                assert ct.base45_decode(c["text"]).hex() == c["hex"], name
+        elif fn == "unlockCode":
+            assert ct.normalize_unlock_code(c["input"]) == c["expect"], name
+        elif fn == "qrSplit":
+            assert ct.qr_parts(bytes.fromhex(c["hex"]), c["transferId"], c["maxPartBytes"]) == c["parts"], name
+        elif fn == "qrCollect":
+            collector = ct.QRCollector()
+            try:
+                for part in c["parts"]:
+                    collector.add(part)
+                joined = {"hex": collector.payload().hex()}
+            except ct.ConfigError as e:
+                joined = {"error": e.code}
+            assert joined == {k: c[k] for k in ("hex", "error") if k in c}, name
+        elif fn == "fingerprint":
+            assert ct.fingerprint(c["key"]) == c["expect"], name
+        elif fn == "readDocument":
+            source = c["source"]
+            try:
+                doc = read_scenario_document(c["input"], source)
+                got: dict[str, Any] = {"document": ct.document_json(doc, secrets=source == "encrypted",
+                                                                    custom_icons=source != "qr")}
+            except ct.ConfigError as e:
+                got = {"error": e.code}
+            assert got == {k: c[k] for k in ("document", "error") if k in c}, name
+        else:
+            raise AssertionError(f"{name}: unknown fn {fn}")
+
+
+def test_config_merge() -> None:
+    for name, c in cases("config_merge"):
+        platform = c["platform"]
+        local = ct.read_document(c["local"], secrets=True)
+        incoming = read_scenario_document(c["incoming"], c["source"])
+        plan = ct.plan_import(local, incoming, platform)
+        servers = []
+        for p in plan.servers:
+            entry: dict[str, Any] = {"id": p.incoming.id, "kind": p.kind}
+            if p.local_id is not None:
+                entry["localId"] = p.local_id
+            if p.matched_by is not None:
+                entry["matchedBy"] = p.matched_by
+            if p.changes:
+                entry["changes"] = list(p.changes)
+            servers.append(entry)
+        got = {"servers": servers,
+               "hostKeys": [{"host": h.key.host, "port": h.key.port, "type": h.key.type, "status": h.status}
+                            for h in plan.host_keys],
+               "preferences": list(plan.preferences), "readOnlyTurnsOn": plan.read_only_turns_on,
+               "removed": list(plan.removed), "secrets": list(plan.secrets)}
+        assert got == c["plan"], name
+        choices = c.get("choices", {})
+        result = ct.apply_import(local, incoming, plan, ct.ImportChoices(
+            replace=choices.get("replace", False), keep=frozenset(choices.get("keep", [])),
+            apply_preferences=choices.get("applyPreferences", True),
+            trust_host_keys=choices.get("trustHostKeys", True)), platform)
+        assert ct.document_json(result) == c["result"], name

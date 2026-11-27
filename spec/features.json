@@ -501,6 +501,36 @@
         "ios": {"status": "na", "reason": "App Store rules do not allow an outside payment link"},
         "web": {"status": "na", "reason": "self-hosted builds are free"}
       }
+    },
+    {
+      "id": "config.format", "title": "Config transfer format: the rackoon-config document, encrypted files, QR parts and the import plan (spec/config-transfer.md)",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.ConfigTransferTests", "RackoonCoreTests.SharedScenarioTests/testConfigCodec", "RackoonCoreTests.SharedScenarioTests/testConfigMerge"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.ConfigTransferTests", "com.bgallagher.rackoon.core.SharedScenarioTests/configCodec", "com.bgallagher.rackoon.core.SharedScenarioTests/configMerge"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.ConfigTransferTests", "RackoonCoreTests.SharedScenarioTests/testConfigCodec", "RackoonCoreTests.SharedScenarioTests/testConfigMerge"]},
+        "web": {"status": "done", "tests": ["tests.test_config_transfer", "tests.test_shared_scenarios/test_config_codec", "tests.test_shared_scenarios/test_config_merge"]}
+      }
+    },
+    {
+      "id": "config.file", "title": "Export and import the whole configuration as a file, plain or encrypted with a passphrase, with a merging import preview",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "planned", "reason": "stage C2 (docs/config-transfer.md)"},
+        "android": {"status": "planned", "reason": "after the Mac and iPhone (docs/config-transfer.md)"},
+        "ios": {"status": "planned", "reason": "stage C3 (docs/config-transfer.md)"},
+        "web": {"status": "planned", "reason": "after the Mac and iPhone (docs/config-transfer.md)"}
+      }
+    },
+    {
+      "id": "config.qr", "title": "Move the configuration to a phone by scanning QR codes shown with an unlock code",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "planned", "reason": "stage C2: show the codes (docs/config-transfer.md)"},
+        "android": {"status": "planned", "reason": "scanning needs a QR library; after the Mac and iPhone"},
+        "ios": {"status": "planned", "reason": "stage C3: scan the codes (docs/config-transfer.md)"},
+        "web": {"status": "planned", "reason": "showing codes for a phone to scan; after the Mac and iPhone"}
+      }
     }
   ]
 }

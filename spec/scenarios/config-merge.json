@@ -1,0 +1,2415 @@
+{
+ "feature": "config.format",
+ "subject": "config_merge",
+ "about": "spec/config-transfer.md, importing: each case reads 'local' (this device's configuration) and 'incoming' (read as 'source': plain, encrypted or qr) on 'platform', plans the import (servers in the document's order with their kind, local id, how they matched and the changed fields; host keys with their status; the changed preference ids, sorted; whether Read-only turns on; the local servers Replace everything removes; the incoming ids that bring a secret), applies 'choices' (replace, keep: incoming ids, applyPreferences, trustHostKeys; defaults false, [], true, true) and compares the canonical result.",
+ "cases": [
+  {
+   "name": "a new server is added after the local ones, with its sign-in and settings",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ]
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "b",
+      "name": "beta",
+      "host": "beta.lan",
+      "user": "admin",
+      "port": 2222
+     }
+    ],
+    "signIn": {
+     "b": {
+      "method": "password"
+     }
+    },
+    "serverSettings": {
+     "b": {
+      "vulnerabilityLookup": true
+     }
+    },
+    "secrets": {
+     "b": {
+      "password": "made-up"
+     }
+    }
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "b",
+      "kind": "new"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [
+     "a"
+    ],
+    "secrets": [
+     "b"
+    ]
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     },
+     {
+      "id": "b",
+      "name": "beta",
+      "host": "beta.lan",
+      "user": "admin",
+      "port": 2222
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {
+     "b": {
+      "method": "password"
+     }
+    },
+    "preferences": {},
+    "serverSettings": {
+     "b": {
+      "vulnerabilityLookup": true
+     }
+    },
+    "secrets": {
+     "b": {
+      "password": "made-up"
+     }
+    }
+   }
+  },
+  {
+   "name": "the same id with other fields is a change naming them",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "signIn": {
+     "a": {
+      "method": "tailscale"
+     }
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "Alpha",
+      "host": "ALPHA.lan",
+      "user": "admin",
+      "port": 2222
+     }
+    ],
+    "signIn": {
+     "a": {
+      "method": "key",
+      "keyName": "k"
+     }
+    }
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "a",
+      "kind": "change",
+      "localId": "a",
+      "matchedBy": "id",
+      "changes": [
+       "name",
+       "user",
+       "port"
+      ]
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "Alpha",
+      "host": "ALPHA.lan",
+      "user": "admin",
+      "port": 2222
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {
+     "a": {
+      "method": "key",
+      "keyName": "k"
+     }
+    },
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "Keep mine leaves the server, its sign-in and its settings alone",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "signIn": {
+     "a": {
+      "method": "tailscale"
+     }
+    },
+    "serverSettings": {
+     "a": {
+      "icons": {
+       "x": "one"
+      }
+     }
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "Alpha",
+      "host": "alpha.lan",
+      "user": "admin"
+     }
+    ],
+    "signIn": {
+     "a": {
+      "method": "password"
+     }
+    },
+    "serverSettings": {
+     "a": {
+      "icons": {
+       "x": "two"
+      }
+     }
+    },
+    "secrets": {
+     "a": {
+      "password": "made-up"
+     }
+    }
+   },
+   "choices": {
+    "keep": [
+     "a"
+    ]
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "a",
+      "kind": "change",
+      "localId": "a",
+      "matchedBy": "id",
+      "changes": [
+       "name",
+       "user"
+      ]
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": [
+     "a"
+    ]
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {
+     "a": {
+      "method": "tailscale"
+     }
+    },
+    "preferences": {},
+    "serverSettings": {
+     "a": {
+      "icons": {
+       "x": "one"
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "matched by address: the local id is kept and the document's sign-in, settings and secret are filed under it",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "local-pi",
+      "name": "Pi",
+      "host": "pi.lan",
+      "user": "pi"
+     }
+    ],
+    "serverSettings": {
+     "local-pi": {
+      "icons": {
+       "pihole": "pi-hole"
+      },
+      "mutedAlerts": [
+       "disk|/"
+      ]
+     }
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "their-pi",
+      "name": "Pi",
+      "host": "PI.LAN",
+      "user": "pi",
+      "port": 22
+     }
+    ],
+    "signIn": {
+     "their-pi": {
+      "method": "key",
+      "keyName": "pi-key"
+     }
+    },
+    "serverSettings": {
+     "their-pi": {
+      "icons": {
+       "unbound": "unbound"
+      },
+      "mutedAlerts": [
+       "updates|security"
+      ]
+     }
+    },
+    "secrets": {
+     "their-pi": {
+      "privateKey": "made-up key",
+      "keyName": "pi-key"
+     }
+    }
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "their-pi",
+      "kind": "identical",
+      "localId": "local-pi",
+      "matchedBy": "address"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": [
+     "their-pi"
+    ]
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "local-pi",
+      "name": "Pi",
+      "host": "pi.lan",
+      "user": "pi"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {
+     "local-pi": {
+      "method": "key",
+      "keyName": "pi-key"
+     }
+    },
+    "preferences": {},
+    "serverSettings": {
+     "local-pi": {
+      "icons": {
+       "pihole": "pi-hole",
+       "unbound": "unbound"
+      },
+      "mutedAlerts": [
+       "disk|/",
+       "updates|security"
+      ]
+     }
+    },
+    "secrets": {
+     "local-pi": {
+      "privateKey": "made-up key",
+      "keyName": "pi-key"
+     }
+    }
+   }
+  },
+  {
+   "name": "a missing port is 22 and a missing user is empty when matching",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "l1",
+      "name": "box",
+      "host": "box",
+      "port": 22
+     },
+     {
+      "id": "l2",
+      "name": "box as root",
+      "host": "box",
+      "user": "root"
+     }
+    ]
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "r1",
+      "name": "box",
+      "host": "box",
+      "user": ""
+     },
+     {
+      "id": "r2",
+      "name": "box as root",
+      "host": "box",
+      "user": "root",
+      "port": 22
+     }
+    ]
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "r1",
+      "kind": "identical",
+      "localId": "l1",
+      "matchedBy": "address"
+     },
+     {
+      "id": "r2",
+      "kind": "identical",
+      "localId": "l2",
+      "matchedBy": "address"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "l1",
+      "name": "box",
+      "host": "box",
+      "port": 22
+     },
+     {
+      "id": "l2",
+      "name": "box as root",
+      "host": "box",
+      "user": "root"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "off the Mac an ssh config alias becomes its resolved address",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "phone",
+      "name": "homelab",
+      "host": "100.64.0.10",
+      "user": "andy"
+     }
+    ]
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "mac",
+      "name": "homelab",
+      "host": "homelab",
+      "sshConfigAlias": "homelab",
+      "identityFile": "~/.ssh/id_ed25519",
+      "resolved": {
+       "host": "100.64.0.10",
+       "user": "andy",
+       "port": 22
+      }
+     }
+    ],
+    "signIn": {
+     "mac": {
+      "method": "system"
+     }
+    }
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "mac",
+      "kind": "identical",
+      "localId": "phone",
+      "matchedBy": "address"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "phone",
+      "name": "homelab",
+      "host": "100.64.0.10",
+      "user": "andy"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "off the Mac an alias with no resolved address keeps its host",
+   "platform": "android",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "nas",
+      "name": "nas",
+      "host": "nas",
+      "sshConfigAlias": "nas",
+      "identityFile": "~/.ssh/nas"
+     }
+    ]
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "nas",
+      "kind": "new"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "nas",
+      "name": "nas",
+      "host": "nas"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "a resolved address fills in only what it names",
+   "platform": "web",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "h",
+      "name": "h",
+      "host": "h",
+      "user": "andy",
+      "port": 2200,
+      "sshConfigAlias": "h",
+      "resolved": {
+       "host": "10.0.0.5"
+      }
+     }
+    ]
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "h",
+      "kind": "new"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "h",
+      "name": "h",
+      "host": "10.0.0.5",
+      "user": "andy",
+      "port": 2200
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "the Mac keeps the alias, the key file and the resolved address",
+   "platform": "mac",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "mac",
+      "name": "homelab",
+      "host": "homelab",
+      "sshConfigAlias": "homelab",
+      "identityFile": "~/.ssh/id_ed25519",
+      "resolved": {
+       "host": "100.64.0.10",
+       "user": "andy",
+       "port": 22
+      }
+     }
+    ]
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "mac",
+      "kind": "new"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "mac",
+      "name": "homelab",
+      "host": "homelab",
+      "sshConfigAlias": "homelab",
+      "identityFile": "~/.ssh/id_ed25519",
+      "resolved": {
+       "host": "100.64.0.10",
+       "user": "andy",
+       "port": 22
+      }
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "each local server matches one incoming server only, the first",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ]
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "x",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     },
+     {
+      "id": "y",
+      "name": "alpha again",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ]
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "x",
+      "kind": "identical",
+      "localId": "a",
+      "matchedBy": "address"
+     },
+     {
+      "id": "y",
+      "kind": "new"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     },
+     {
+      "id": "y",
+      "name": "alpha again",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "an id match wins over an earlier address match",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     },
+     {
+      "id": "c",
+      "name": "gamma",
+      "host": "gamma.lan"
+     }
+    ]
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "z",
+      "name": "gamma",
+      "host": "gamma.lan"
+     },
+     {
+      "id": "c",
+      "name": "gamma moved",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ]
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "z",
+      "kind": "new"
+     },
+     {
+      "id": "c",
+      "kind": "change",
+      "localId": "c",
+      "matchedBy": "id",
+      "changes": [
+       "name",
+       "host",
+       "user"
+      ]
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [
+     "a"
+    ],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     },
+     {
+      "id": "c",
+      "name": "gamma moved",
+      "host": "alpha.lan",
+      "user": "root"
+     },
+     {
+      "id": "z",
+      "name": "gamma",
+      "host": "gamma.lan"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "settings merge: icons and services replaced by key, mutes joined, the lookup taken",
+   "platform": "mac",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "serverSettings": {
+     "a": {
+      "icons": {
+       "x": "one",
+       "y": "keep"
+      },
+      "services": {
+       "s1": true
+      },
+      "vulnerabilityLookup": true,
+      "mutedAlerts": [
+       "disk|/"
+      ]
+     }
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "serverSettings": {
+     "a": {
+      "icons": {
+       "x": "two"
+      },
+      "services": {
+       "s1": false,
+       "s2": true
+      },
+      "vulnerabilityLookup": false,
+      "mutedAlerts": [
+       "updates|security",
+       "disk|/"
+      ]
+     }
+    }
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "a",
+      "kind": "identical",
+      "localId": "a",
+      "matchedBy": "id"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {
+     "a": {
+      "icons": {
+       "x": "two",
+       "y": "keep"
+      },
+      "services": {
+       "s1": false,
+       "s2": true
+      },
+      "vulnerabilityLookup": false,
+      "mutedAlerts": [
+       "disk|/",
+       "updates|security"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "a lookup choice the document does not make stays",
+   "platform": "mac",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "serverSettings": {
+     "a": {
+      "vulnerabilityLookup": true
+     }
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "serverSettings": {
+     "a": {
+      "icons": {
+       "x": "two"
+      }
+     }
+    }
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "a",
+      "kind": "identical",
+      "localId": "a",
+      "matchedBy": "id"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {
+     "a": {
+      "icons": {
+       "x": "two"
+      },
+      "vulnerabilityLookup": true
+     }
+    }
+   }
+  },
+  {
+   "name": "an import can turn Read-only on",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "preferences": {
+     "readOnly": false,
+     "theme": "automatic"
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "preferences": {
+     "readOnly": true,
+     "theme": "automatic"
+    }
+   },
+   "plan": {
+    "servers": [],
+    "hostKeys": [],
+    "preferences": [
+     "readOnly"
+    ],
+    "readOnlyTurnsOn": true,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {
+     "readOnly": true,
+     "theme": "automatic"
+    },
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "an import never turns Read-only off",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "preferences": {
+     "readOnly": true
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "preferences": {
+     "readOnly": false,
+     "highlightOutput": false
+    }
+   },
+   "plan": {
+    "servers": [],
+    "hostKeys": [],
+    "preferences": [
+     "highlightOutput",
+     "readOnly"
+    ],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {
+     "readOnly": true,
+     "highlightOutput": false
+    },
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "Read-only is not set here: the document's on is taken",
+   "platform": "android",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "preferences": {
+     "readOnly": true
+    }
+   },
+   "plan": {
+    "servers": [],
+    "hostKeys": [],
+    "preferences": [
+     "readOnly"
+    ],
+    "readOnlyTurnsOn": true,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {
+     "readOnly": true
+    },
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "preferences the document lacks stay as they are",
+   "platform": "android",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "preferences": {
+     "theme": "dracula",
+     "terminalFontSize": 12,
+     "autoReadOnly": "never"
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "preferences": {
+     "theme": "automatic",
+     "dockerUnlockMinutes": 60
+    }
+   },
+   "plan": {
+    "servers": [],
+    "hostKeys": [],
+    "preferences": [
+     "dockerUnlockMinutes",
+     "theme"
+    ],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {
+     "theme": "automatic",
+     "terminalFontSize": 12,
+     "autoReadOnly": "never",
+     "dockerUnlockMinutes": 60
+    },
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "Keep my preferences keeps them and the every-server rules",
+   "platform": "mac",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "preferences": {
+     "theme": "dracula",
+     "readOnly": false
+    },
+    "serverSettings": {
+     "*": {
+      "services": {
+       "snapd.service": true
+      }
+     }
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "preferences": {
+     "theme": "automatic",
+     "readOnly": true
+    },
+    "serverSettings": {
+     "*": {
+      "services": {
+       "snapd.service": false,
+       "x": true
+      }
+     }
+    }
+   },
+   "choices": {
+    "applyPreferences": false
+   },
+   "plan": {
+    "servers": [],
+    "hostKeys": [],
+    "preferences": [
+     "readOnly",
+     "theme"
+    ],
+    "readOnlyTurnsOn": true,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {
+     "theme": "dracula",
+     "readOnly": false
+    },
+    "serverSettings": {
+     "*": {
+      "services": {
+       "snapd.service": true
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "applied preferences bring the every-server rules, merged by service",
+   "platform": "mac",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "serverSettings": {
+     "*": {
+      "services": {
+       "snapd.service": true,
+       "cups.service": false
+      }
+     }
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "serverSettings": {
+     "*": {
+      "services": {
+       "snapd.service": false
+      }
+     }
+    }
+   },
+   "plan": {
+    "servers": [],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {
+     "*": {
+      "services": {
+       "snapd.service": false,
+       "cups.service": false
+      }
+     }
+    }
+   }
+  },
+  {
+   "name": "host keys: already trusted, a different key blocked, another type skipped, a new address added",
+   "platform": "mac",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "hostKeys": [
+     {
+      "host": "alpha.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     },
+     {
+      "host": "beta.lan",
+      "port": 2222,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     }
+    ]
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     },
+     {
+      "id": "b",
+      "name": "beta",
+      "host": "beta.lan",
+      "user": "admin",
+      "port": 2222
+     }
+    ],
+    "hostKeys": [
+     {
+      "host": "ALPHA.LAN",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     },
+     {
+      "host": "beta.lan",
+      "port": 2222,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIC"
+     },
+     {
+      "host": "beta.lan",
+      "port": 2222,
+      "type": "ecdsa-sha2-nistp256",
+      "key": "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAAAFBAMDAwM="
+     },
+     {
+      "host": "gamma.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIC"
+     }
+    ]
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "a",
+      "kind": "identical",
+      "localId": "a",
+      "matchedBy": "id"
+     },
+     {
+      "id": "b",
+      "kind": "new"
+     }
+    ],
+    "hostKeys": [
+     {
+      "host": "ALPHA.LAN",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "status": "trusted"
+     },
+     {
+      "host": "beta.lan",
+      "port": 2222,
+      "type": "ssh-ed25519",
+      "status": "blocked"
+     },
+     {
+      "host": "beta.lan",
+      "port": 2222,
+      "type": "ecdsa-sha2-nistp256",
+      "status": "skipped"
+     },
+     {
+      "host": "gamma.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "status": "add"
+     }
+    ],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     },
+     {
+      "id": "b",
+      "name": "beta",
+      "host": "beta.lan",
+      "user": "admin",
+      "port": 2222
+     }
+    ],
+    "hostKeys": [
+     {
+      "host": "alpha.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     },
+     {
+      "host": "beta.lan",
+      "port": 2222,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     },
+     {
+      "host": "gamma.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIC"
+     }
+    ],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "a blocked key stays blocked when Replace everything is chosen",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "hostKeys": [
+     {
+      "host": "alpha.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     }
+    ]
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "hostKeys": [
+     {
+      "host": "alpha.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIC"
+     }
+    ]
+   },
+   "choices": {
+    "replace": true
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "a",
+      "kind": "identical",
+      "localId": "a",
+      "matchedBy": "id"
+     }
+    ],
+    "hostKeys": [
+     {
+      "host": "alpha.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "status": "blocked"
+     }
+    ],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     }
+    ],
+    "hostKeys": [
+     {
+      "host": "alpha.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     }
+    ],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "a one-key platform takes the best type for a new address",
+   "platform": "android",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-rsa",
+      "key": "AAAAB3NzaC1yc2EAAAADAQABAAAABQAEBAQE"
+     },
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ecdsa-sha2-nistp256",
+      "key": "AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAAAFBAMDAwM="
+     },
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     },
+     {
+      "host": "o.lan",
+      "port": 22,
+      "type": "ssh-rsa",
+      "key": "AAAAB3NzaC1yc2EAAAADAQABAAAABQAEBAQE"
+     },
+     {
+      "host": "p.lan",
+      "port": 22,
+      "type": "ssh-dss",
+      "key": "AAAA"
+     },
+     {
+      "host": "p.lan",
+      "port": 22,
+      "type": "ssh-rsa",
+      "key": "AAAAB3NzaC1yc2EAAAADAQABAAAABQAEBAQE"
+     }
+    ]
+   },
+   "plan": {
+    "servers": [],
+    "hostKeys": [
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-rsa",
+      "status": "skipped"
+     },
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ecdsa-sha2-nistp256",
+      "status": "skipped"
+     },
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "status": "add"
+     },
+     {
+      "host": "o.lan",
+      "port": 22,
+      "type": "ssh-rsa",
+      "status": "add"
+     },
+     {
+      "host": "p.lan",
+      "port": 22,
+      "type": "ssh-dss",
+      "status": "skipped"
+     },
+     {
+      "host": "p.lan",
+      "port": 22,
+      "type": "ssh-rsa",
+      "status": "add"
+     }
+    ],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     },
+     {
+      "host": "o.lan",
+      "port": 22,
+      "type": "ssh-rsa",
+      "key": "AAAAB3NzaC1yc2EAAAADAQABAAAABQAEBAQE"
+     },
+     {
+      "host": "p.lan",
+      "port": 22,
+      "type": "ssh-rsa",
+      "key": "AAAAB3NzaC1yc2EAAAADAQABAAAABQAEBAQE"
+     }
+    ],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "the Mac adds every type for a new address",
+   "platform": "mac",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-rsa",
+      "key": "AAAAB3NzaC1yc2EAAAADAQABAAAABQAEBAQE"
+     },
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     }
+    ]
+   },
+   "plan": {
+    "servers": [],
+    "hostKeys": [
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-rsa",
+      "status": "add"
+     },
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "status": "add"
+     }
+    ],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-rsa",
+      "key": "AAAAB3NzaC1yc2EAAAADAQABAAAABQAEBAQE"
+     },
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     }
+    ],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "the same address on another port is another address",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     }
+    ]
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "n.lan",
+      "port": 2222,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIC"
+     }
+    ]
+   },
+   "plan": {
+    "servers": [],
+    "hostKeys": [
+     {
+      "host": "n.lan",
+      "port": 2222,
+      "type": "ssh-ed25519",
+      "status": "add"
+     }
+    ],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     },
+     {
+      "host": "n.lan",
+      "port": 2222,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIC"
+     }
+    ],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "unticked Trust these host keys adds none",
+   "platform": "ios",
+   "source": "plain",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     }
+    ]
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "hostKeys": [
+     {
+      "host": "m.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIC"
+     }
+    ]
+   },
+   "choices": {
+    "trustHostKeys": false
+   },
+   "plan": {
+    "servers": [],
+    "hostKeys": [
+     {
+      "host": "m.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "status": "add"
+     }
+    ],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [
+     {
+      "host": "n.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     }
+    ],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "Replace everything: the document's servers in its order, matched ones keep their id, the rest removed",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     },
+     {
+      "id": "b",
+      "name": "beta",
+      "host": "beta.lan",
+      "user": "admin",
+      "port": 2222
+     },
+     {
+      "id": "c",
+      "name": "gamma",
+      "host": "gamma.lan"
+     }
+    ],
+    "signIn": {
+     "a": {
+      "method": "password"
+     },
+     "b": {
+      "method": "tailscale"
+     }
+    },
+    "serverSettings": {
+     "a": {
+      "icons": {
+       "x": "one"
+      }
+     },
+     "b": {
+      "mutedAlerts": [
+       "disk|/"
+      ]
+     },
+     "*": {
+      "services": {
+       "s": true
+      }
+     }
+    },
+    "preferences": {
+     "readOnly": true,
+     "theme": "dracula",
+     "terminalFontSize": 12
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "new",
+      "name": "delta",
+      "host": "delta.lan"
+     },
+     {
+      "id": "b",
+      "name": "Beta",
+      "host": "beta.lan",
+      "user": "admin",
+      "port": 2222
+     },
+     {
+      "id": "their-gamma",
+      "name": "gamma",
+      "host": "gamma.lan"
+     }
+    ],
+    "signIn": {
+     "b": {
+      "method": "key",
+      "keyName": "k"
+     }
+    },
+    "serverSettings": {
+     "their-gamma": {
+      "icons": {
+       "y": "two"
+      }
+     }
+    },
+    "preferences": {
+     "readOnly": false,
+     "theme": "automatic"
+    },
+    "secrets": {
+     "their-gamma": {
+      "password": "made-up"
+     }
+    }
+   },
+   "choices": {
+    "replace": true,
+    "keep": [
+     "b"
+    ]
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "new",
+      "kind": "new"
+     },
+     {
+      "id": "b",
+      "kind": "change",
+      "localId": "b",
+      "matchedBy": "id",
+      "changes": [
+       "name"
+      ]
+     },
+     {
+      "id": "their-gamma",
+      "kind": "identical",
+      "localId": "c",
+      "matchedBy": "address"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [
+     "readOnly",
+     "theme"
+    ],
+    "readOnlyTurnsOn": false,
+    "removed": [
+     "a"
+    ],
+    "secrets": [
+     "their-gamma"
+    ]
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "new",
+      "name": "delta",
+      "host": "delta.lan"
+     },
+     {
+      "id": "b",
+      "name": "Beta",
+      "host": "beta.lan",
+      "user": "admin",
+      "port": 2222
+     },
+     {
+      "id": "c",
+      "name": "gamma",
+      "host": "gamma.lan"
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {
+     "b": {
+      "method": "key",
+      "keyName": "k"
+     }
+    },
+    "preferences": {
+     "readOnly": true,
+     "theme": "automatic",
+     "terminalFontSize": 12
+    },
+    "serverSettings": {
+     "c": {
+      "icons": {
+       "y": "two"
+      }
+     }
+    },
+    "secrets": {
+     "c": {
+      "password": "made-up"
+     }
+    }
+   }
+  },
+  {
+   "name": "custom icons are added to the ones here",
+   "platform": "mac",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "customIcons": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "iVBORw0KGgo="
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "customIcons": {
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "iVBORw0KGgoAAAA="
+    }
+   },
+   "plan": {
+    "servers": [],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {},
+    "customIcons": {
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "iVBORw0KGgo=",
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "iVBORw0KGgoAAAA="
+    }
+   }
+  },
+  {
+   "name": "a QR transfer brings no secrets and no custom icons",
+   "platform": "ios",
+   "source": "qr",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "b",
+      "name": "beta",
+      "host": "beta.lan",
+      "user": "admin",
+      "port": 2222
+     }
+    ],
+    "secrets": {
+     "b": {
+      "password": "made-up"
+     }
+    },
+    "customIcons": {
+     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "iVBORw0KGgo="
+    }
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "b",
+      "kind": "new"
+     }
+    ],
+    "hostKeys": [],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "b",
+      "name": "beta",
+      "host": "beta.lan",
+      "user": "admin",
+      "port": 2222
+     }
+    ],
+    "hostKeys": [],
+    "signIn": {},
+    "preferences": {},
+    "serverSettings": {}
+   }
+  },
+  {
+   "name": "importing the same configuration twice changes nothing",
+   "platform": "ios",
+   "source": "encrypted",
+   "local": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     },
+     {
+      "id": "b",
+      "name": "beta",
+      "host": "beta.lan",
+      "user": "admin",
+      "port": 2222
+     }
+    ],
+    "hostKeys": [
+     {
+      "host": "alpha.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     }
+    ],
+    "signIn": {
+     "a": {
+      "method": "tailscale"
+     }
+    },
+    "preferences": {
+     "readOnly": true,
+     "theme": "automatic"
+    },
+    "serverSettings": {
+     "a": {
+      "mutedAlerts": [
+       "disk|/"
+      ]
+     }
+    }
+   },
+   "incoming": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     },
+     {
+      "id": "b",
+      "name": "beta",
+      "host": "beta.lan",
+      "user": "admin",
+      "port": 2222
+     }
+    ],
+    "hostKeys": [
+     {
+      "host": "alpha.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     }
+    ],
+    "signIn": {
+     "a": {
+      "method": "tailscale"
+     }
+    },
+    "preferences": {
+     "readOnly": true,
+     "theme": "automatic"
+    },
+    "serverSettings": {
+     "a": {
+      "mutedAlerts": [
+       "disk|/"
+      ]
+     }
+    }
+   },
+   "plan": {
+    "servers": [
+     {
+      "id": "a",
+      "kind": "identical",
+      "localId": "a",
+      "matchedBy": "id"
+     },
+     {
+      "id": "b",
+      "kind": "identical",
+      "localId": "b",
+      "matchedBy": "id"
+     }
+    ],
+    "hostKeys": [
+     {
+      "host": "alpha.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "status": "trusted"
+     }
+    ],
+    "preferences": [],
+    "readOnlyTurnsOn": false,
+    "removed": [],
+    "secrets": []
+   },
+   "result": {
+    "format": "rackoon-config",
+    "version": 1,
+    "servers": [
+     {
+      "id": "a",
+      "name": "alpha",
+      "host": "alpha.lan",
+      "user": "root"
+     },
+     {
+      "id": "b",
+      "name": "beta",
+      "host": "beta.lan",
+      "user": "admin",
+      "port": 2222
+     }
+    ],
+    "hostKeys": [
+     {
+      "host": "alpha.lan",
+      "port": 22,
+      "type": "ssh-ed25519",
+      "key": "AAAAC3NzaC1lZDI1NTE5AAAAIAEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEB"
+     }
+    ],
+    "signIn": {
+     "a": {
+      "method": "tailscale"
+     }
+    },
+    "preferences": {
+     "readOnly": true,
+     "theme": "automatic"
+    },
+    "serverSettings": {
+     "a": {
+      "mutedAlerts": [
+       "disk|/"
+      ]
+     }
+    }
+   }
+  }
+ ]
+}

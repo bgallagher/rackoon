@@ -1,0 +1,56 @@
+{
+  "document": {
+    "format": "rackoon-config",
+    "version": 1,
+    "exportedAt": "2026-11-27T12:05:00Z",
+    "source": {
+      "platform": "android",
+      "app": "0.1.0-alpha.3"
+    },
+    "servers": [
+      {
+        "id": "srv-pi",
+        "name": "Pi",
+        "host": "pi.tail1234.ts.net",
+        "user": "pi"
+      },
+      {
+        "id": "srv-vps",
+        "name": "VPS",
+        "host": "203.0.113.7",
+        "user": "deploy",
+        "port": 22
+      }
+    ],
+    "hostKeys": [
+      {
+        "host": "pi.tail1234.ts.net",
+        "port": 22,
+        "type": "ssh-ed25519",
+        "key": "AAAAC3NzaC1lZDI1NTE5AAAAIJ7RMR6AIPjby+2j2Y/EBja9IkMZJUAWH/ZulnXNz6HB"
+      }
+    ],
+    "signIn": {
+      "srv-pi": {
+        "method": "tailscale"
+      },
+      "srv-vps": {
+        "method": "password"
+      }
+    },
+    "preferences": {
+      "theme": "dracula",
+      "highlightOutput": false,
+      "readOnly": true,
+      "startReadOnly": true,
+      "autoReadOnly": "idle5",
+      "terminalFontSize": 14,
+      "vulnerabilityLookupAll": true
+    },
+    "serverSettings": {
+      "srv-vps": {
+        "vulnerabilityLookup": true
+      }
+    }
+  }
+}
