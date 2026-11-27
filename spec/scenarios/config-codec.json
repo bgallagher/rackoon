@@ -554,7 +554,7 @@
    }
   },
   {
-   "name": "read: custom icons need a sha256 name and base64",
+   "name": "read: custom icons need a 16 to 64 character lower-case hex name and base64",
    "fn": "readDocument",
    "source": "plain",
    "input": {
@@ -562,9 +562,12 @@
     "version": 1,
     "customIcons": {
      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "iVBORw0KGgo=",
-     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA": "iVBORw0KGgo=",
-     "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb": "iVBORw0KGgo=",
-     "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc": "not base64!"
+     "dddddddddddddddddddddddddddddddd": "iVBORw0KGgo=",
+     "eeeeeeeeeeeeeeee": "iVBORw0KGgo=",
+     "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA": "iVBORw0KGgo=",
+     "bbbbbbbbbbbbbbb": "iVBORw0KGgo=",
+     "fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff": "iVBORw0KGgo=",
+     "cccccccccccccccccccccccccccccccc": "not base64!"
     }
    },
    "document": {
@@ -576,7 +579,9 @@
     "preferences": {},
     "serverSettings": {},
     "customIcons": {
-     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "iVBORw0KGgo="
+     "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa": "iVBORw0KGgo=",
+     "dddddddddddddddddddddddddddddddd": "iVBORw0KGgo=",
+     "eeeeeeeeeeeeeeee": "iVBORw0KGgo="
     }
    }
   },

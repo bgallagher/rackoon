@@ -56,7 +56,7 @@ ED_PI = wire(b"ssh-ed25519", made_up("pi-ed25519", 32))
 PNG = base64.b64encode(bytes.fromhex(
     "89504e470d0a1a0a0000000d4948445200000001000000010806000000"
     "1f15c4890000000d49444154789c6360f8cfc0000003010100c9fe92ef0000000049454e44ae426082")).decode()
-PNG_ID = hashlib.sha256(base64.b64decode(PNG)).hexdigest()
+PNG_ID = hashlib.sha256(base64.b64decode(PNG)).hexdigest()[:32]   # as the apps name custom icons
 PRIVATE_KEY = ("-----BEGIN OPENSSH PRIVATE KEY-----\n"
                + base64.b64encode(b"openssh-key-v1\0 made-up test key, not a real key " + made_up("key", 48)).decode()
                + "\n-----END OPENSSH PRIVATE KEY-----\n")

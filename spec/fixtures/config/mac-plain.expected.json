@@ -78,7 +78,7 @@
         "icons": {
           "immich": "immich",
           "immich|immich-machine-learning": "",
-          "paperless": "custom:d097d8741f98c629fef38d837810a600957582167d9ea37822215d159988b333",
+          "paperless": "custom:d097d8741f98c629fef38d837810a600",
           "service:tailscaled.service": "sh:tailscale"
         },
         "services": {
@@ -98,7 +98,7 @@
       }
     },
     "customIcons": {
-      "d097d8741f98c629fef38d837810a600957582167d9ea37822215d159988b333": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNg+M/AAAADAQEAyf6S7wAAAABJRU5ErkJggg=="
+      "d097d8741f98c629fef38d837810a600": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNg+M/AAAADAQEAyf6S7wAAAABJRU5ErkJggg=="
     }
   }
 }

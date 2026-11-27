@@ -152,7 +152,7 @@ public struct ConfigDocument: Sendable, Equatable {
     /// Catalog ids (spec/config-transfer.json, part `preferences`) with values of the catalog's type.
     public var preferences: [String: JSONValue] = [:]
     public var serverSettings: [String: ConfigServerSettings] = [:]
-    /// sha256 hex -> base64 PNG.
+    /// The hex of a `custom:` icon id -> base64 PNG.
     public var customIcons: [String: String] = [:]
     public var secrets: [String: ConfigSecret] = [:]
     public var exportedAt: String?
@@ -270,8 +270,9 @@ extension ConfigTransfer {
         return s
     }
 
+    /// The hex of a `custom:` icon id, as `AppIconRef` accepts it.
     private static func isCustomIconID(_ s: String) -> Bool {
-        s.count == 64 && s.unicodeScalars.allSatisfy { ("0"..."9").contains($0) || ("a"..."f").contains($0) }
+        (16...64).contains(s.count) && s.unicodeScalars.allSatisfy { ("0"..."9").contains($0) || ("a"..."f").contains($0) }
     }
 
     /// Reads a parsed document. `secrets` is true only for an encrypted file; a QR transfer passes `customIcons: false`.

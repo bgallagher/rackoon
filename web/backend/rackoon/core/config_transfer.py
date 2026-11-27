@@ -279,7 +279,7 @@ def _read_settings(raw: Any, everywhere: bool) -> ConfigServerSettings:
     return s
 
 
-CUSTOM_ICON_ID = re.compile(r"[0-9a-f]{64}")
+CUSTOM_ICON_ID = re.compile(r"[0-9a-f]{16,64}")
 
 
 def read_document(obj: Any, *, secrets: bool, custom_icons: bool = True) -> ConfigDocument:

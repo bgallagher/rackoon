@@ -39,7 +39,7 @@
     "serverSettings": {"type": "object", "additionalProperties": {"$ref": "#/$defs/serverSettings"}},
     "customIcons": {
       "type": "object",
-      "propertyNames": {"pattern": "^[0-9a-f]{64}$"},
+      "propertyNames": {"pattern": "^[0-9a-f]{16,64}$"},
       "additionalProperties": {"type": "string", "description": "base64 PNG"}
     },
     "secrets": {

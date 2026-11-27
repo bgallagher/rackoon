@@ -75,7 +75,7 @@ data class ConfigDocument(
     /** Catalog ids (spec/config-transfer.json, part `preferences`) with values of the catalog's type. */
     val preferences: Map<String, JsonPrimitive> = emptyMap(),
     val serverSettings: Map<String, ConfigServerSettings> = emptyMap(),
-    /** sha256 hex -> base64 PNG. */
+    /** The hex of a `custom:` icon id -> base64 PNG. */
     val customIcons: Map<String, String> = emptyMap(),
     val secrets: Map<String, ConfigSecret> = emptyMap(),
     val exportedAt: String? = null,
@@ -281,7 +281,7 @@ object ConfigTransfer {
     }
 
     private val keyType = Regex("[a-z0-9@.-]+")
-    private val customIconId = Regex("[0-9a-f]{64}")
+    private val customIconId = Regex("[0-9a-f]{16,64}")
 
     private fun readHostKey(raw: JsonElement, index: Int): ConfigHostKey {
         val place = "host key ${index + 1}"

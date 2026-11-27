@@ -43,7 +43,8 @@ document whose `version` is greater than 1 is refused ("made by a newer Rackoon"
   (`<stack id>[|<service>]` or `service:<id>`) to an icon id (`""` = the letter); `services` maps a service id to shown
   or hidden; `vulnerabilityLookup` is the per-server opt-in; `mutedAlerts` are alert ids with the server id taken off
   (`<source>|<key>`). The entry `"*"` holds rules for every server and only uses `services`.
-- `customIcons`: images the user added, keyed by the sha256 hex their `custom:` icon id names. Files only, never a QR.
+- `customIcons`: images the user added, keyed by the lower-case hex their `custom:` icon id names (16 to 64
+  characters; the apps use the first 32 of the PNG's SHA-256). Files only, never a QR.
 - `secrets`: per server `password`, or `privateKey` (OpenSSH or PEM text) with an optional `passphrase`, and `keyName`.
   **Only inside an encrypted file.** A reader drops `secrets` from a plain document and from a QR transfer, and drops
   `customIcons` from a QR transfer.
