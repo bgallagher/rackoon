@@ -92,7 +92,10 @@ def test_keys_generate_import_and_delete(tmp_path: Path) -> None:
         keys.import_key("old", encrypted)
     imported = keys.import_key("old", encrypted, "secret phrase")
     assert imported.key_type == "ssh-rsa" and imported.source == "imported"
-    assert "ENCRYPTED" not in keys.private_key(imported.id) and "aes" not in keys.private_key(imported.id)
+    # Stored without its passphrase: it opens with none. (A substring test for "aes" read the key's random base64
+    # body, where those letters turn up by chance, and failed now and then.)
+    assert "ENCRYPTED" not in keys.private_key(imported.id)
+    assert asyncssh.import_private_key(keys.private_key(imported.id)).public_data == rsa.public_data
     with pytest.raises(KeyError_, match="already"):
         keys.import_key("again", encrypted, "secret phrase")
     with pytest.raises(KeyError_):
