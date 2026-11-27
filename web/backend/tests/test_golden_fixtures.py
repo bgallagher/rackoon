@@ -8,10 +8,11 @@ from typing import Any
 
 import pytest
 
-from rackoon.core import docker, docker_states, overview, remote_files, services, stack_files, unraid, updates
+from rackoon.core import (docker, docker_states, overview, remote_files, security, services, stack_files, unraid,
+                          updates, vulnerabilities)
 from rackoon.core.jsonmodel import to_json
 
-from .support import SPEC, assert_json_equals, expected, fixtures, out
+from .support import SPEC, assert_json_equals, done_features, expected, fixtures, load, out
 
 # Not parsed by the web core: supporter licence keys are `na` for web in spec/features.json (self-hosted is free).
 NOT_FOR_WEB = {"licence"}
@@ -68,12 +69,20 @@ GOLDEN: dict[str, Callable[[str], Any]] = {
     "docker_states": lambda t: docker_states.parse(t).to_golden(),
     "services": lambda t: to_json(services.parse(t)),
     "unraid": _unraid,
+    "security": lambda t: to_json(security.parse(t)),
+    "security_packages": lambda t: to_json(vulnerabilities.parse_inventory(t)),
 }
+
+
+def _not_done_on_web() -> set[str]:
+    """Commands whose feature is not done for web yet (planned): their fixtures need a Python parser only once it is."""
+    done = done_features()
+    return {c for f in load("features.json")["features"] if f["id"] not in done for c in f["commands"]}
 
 
 def test_every_fixture_folder_has_a_parser() -> None:
     folders = {p.name for p in (SPEC / "fixtures").iterdir() if p.is_dir()}
-    missing = folders - set(GOLDEN) - {"files_list"} - NOT_FOR_WEB
+    missing = folders - set(GOLDEN) - {"files_list"} - NOT_FOR_WEB - _not_done_on_web()
     assert not missing, f"fixtures with no Python parser test: {sorted(missing)}"
 
 

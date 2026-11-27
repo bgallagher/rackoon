@@ -80,6 +80,7 @@ fun RackoonRoot(vm: AppViewModel) {
     val settings by vm.settings.collectAsStateWithLifecycle()
     val bookmarksOpen by vm.bookmarksOpen.collectAsStateWithLifecycle()
     val updatesOpen by vm.updatesOpen.collectAsStateWithLifecycle()
+    val securityOpen by vm.securityOpen.collectAsStateWithLifecycle()
     val morePage by vm.morePage.collectAsStateWithLifecycle()
     val reboot by vm.reboot.collectAsStateWithLifecycle()
     val editorFile by vm.editorFile.collectAsStateWithLifecycle()
@@ -99,6 +100,7 @@ fun RackoonRoot(vm: AppViewModel) {
             bookmarksOpen -> BookmarksScreen(vm, readOnly, onBack = { vm.showBookmarks(false) })
             morePage != null -> MorePageScreen(vm, morePage!!)
             updatesOpen -> UpdatesScreen(vm, readOnly, selected?.name.orEmpty(), onBack = { vm.showUpdates(false) })
+            securityOpen && selected != null -> SecurityScreen(vm, selected!!.id, selected!!.name, selected!!.user, onBack = { vm.showSecurity(false) })
             appearance -> AppearanceScreen(themeId, onPick = vm::setTheme, onBack = { vm.showAppearance(false) })
             add != null -> AddServerScreen(add!!, vm::editAdd, vm::submitAdd, vm::cancelAdd, vm::trustAndConnect, vm::declineTrust)
             firstRun -> FirstRunScreen(vm::dismissFirstRun)
@@ -294,6 +296,8 @@ private fun MoreScreen(vm: AppViewModel, serverName: String, updatesNote: String
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         MoreSection("SERVER · ${serverName.uppercase()}") {
             MoreRow("Updates", updatesNote) { vm.showUpdates(true) }
+            MoreDivider()
+            MoreRow("Security", "Common hardening checks and open ports") { vm.showSecurity(true) }
             MoreDivider()
             MoreRow("Bookmarks", "Links to your services") { vm.showBookmarks(true) }
             MoreDivider()

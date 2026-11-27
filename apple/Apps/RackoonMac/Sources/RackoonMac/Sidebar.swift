@@ -46,7 +46,7 @@ enum Screen: String, CaseIterable, Identifiable {
     /// Screens that exist today. The rest are shown as "Soon" so the layout matches the design.
     var isAvailable: Bool {
         switch self {
-        case .dashboard, .overview, .docker, .services, .updates, .bookmarks, .files, .terminal, .command, .alerts: true
+        case .dashboard, .overview, .docker, .services, .updates, .bookmarks, .files, .terminal, .command, .alerts, .security: true
         default: false
         }
     }

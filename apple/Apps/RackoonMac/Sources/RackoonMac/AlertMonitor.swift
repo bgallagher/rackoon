@@ -9,7 +9,8 @@ import UserNotifications
 /// server's live poll, the others' once-a-minute poll), the services scan, and Unraid's array reading. Every 5 minutes it
 /// also checks each answering server in the background: the services scan, a light container check (`docker_states`,
 /// through sudo only while Docker is unlocked), Unraid's array, and every 6 hours the TLS certificates of the https
-/// bookmarks found on its containers. Everything is read-only. The book is saved as alerts.json on this Mac.
+/// bookmarks found on its containers, and hourly the Security checks (listed, never notified). Everything is read-only.
+/// The book is saved as alerts.json on this Mac.
 @MainActor @Observable
 final class AlertMonitor {
     static let shared = AlertMonitor(directory: Demo.isOn ? Demo.alertSettings : nil)
@@ -32,6 +33,9 @@ final class AlertMonitor {
     static let tick: Duration = .seconds(15)
     static let sweepInterval: TimeInterval = 5 * 60
     static let certificateInterval: TimeInterval = 6 * 3600
+    /// The Security reading in the background sweep: hourly is plenty for settings that rarely change, and the screen
+    /// reads again whenever it opens.
+    static let securityInterval: TimeInterval = 3600
 
     init(directory: URL? = nil) {
         let dir = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -107,6 +111,10 @@ final class AlertMonitor {
                 let nas = NASStore.shared.model(for: row.server)
                 if let snapshot = nas.snapshot, let at = nas.updatedAt, isNew(id, .storage, at) { apply(.storage, AlertRules.storage(snapshot, sustainedCPU: nas.sustainedCPU)) }
             }
+            if let security = SecurityStore.shared.existingModel(for: row.server), let at = security.checkedAt,
+               row.state.overview != nil, isNew(id, .security, at) {
+                apply(.security, AlertRules.security(security.findings(SecurityModel.context(row.state.overview))))
+            }
             if let (checks, at) = certificates[id], isNew(id, .certificates, at) {
                 apply(.certificates, AlertRules.certificates(checks, now: now))
             }
@@ -136,6 +144,10 @@ final class AlertMonitor {
         await ServicesStore.shared.model(for: server).refresh()
         if let o = row.state.overview, ServerKind.detect(o.os) == .unraid {
             await NASStore.shared.model(for: server).refresh()
+        }
+        let security = SecurityStore.shared.model(for: server)
+        if !security.deep, certificatesToo || Date().timeIntervalSince(security.checkedAt ?? .distantPast) >= Self.securityInterval {
+            await security.refresh()
         }
         let docker = DockerStatesSession(transport: dockerTransport(for: server))
         guard let reading = await docker.read() else { return }

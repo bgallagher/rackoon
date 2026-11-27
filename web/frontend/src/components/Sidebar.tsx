@@ -162,6 +162,7 @@ export function Sidebar(props: { route: string; selected?: string }) {
       {server && nav(`/servers/${server.id}/docker`, "Docker", props.route.startsWith(`/servers/${server.id}/docker`))}
       {server && nav(`/servers/${server.id}/bookmarks`, "Bookmarks", props.route.startsWith(`/servers/${server.id}/bookmarks`))}
       {server && nav(`/servers/${server.id}/services`, "Services", props.route.startsWith(`/servers/${server.id}/services`))}
+      {server && nav(`/servers/${server.id}/security`, "Security", props.route.startsWith(`/servers/${server.id}/security`))}
       {server && nav(`/servers/${server.id}/commands`, "Commands", props.route.startsWith(`/servers/${server.id}/commands`))}
       {server && nav(`/servers/${server.id}/files`, "Files", props.route.startsWith(`/servers/${server.id}/files`))}
       {server && (

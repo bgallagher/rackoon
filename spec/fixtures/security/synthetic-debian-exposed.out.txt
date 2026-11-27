@@ -1,0 +1,59 @@
+##uid
+0
+##os
+id=debian
+like=
+version=12
+##sshd
+installed=yes
+active=1
+##sshd_effective
+port 2222
+permitrootlogin yes
+passwordauthentication yes
+kbdinteractiveauthentication no
+permitemptypasswords no
+maxauthtries 10
+x11forwarding yes
+##sshd_files
+#file /etc/ssh/sshd_config
+Port 2222
+PermitRootLogin yes
+##tailscale_ssh
+##firewall
+ufw=inactive
+firewalld=inactive
+nftables=active
+##guards
+fail2ban=inactive
+crowdsec=inactive
+sshguard=inactive
+##listen
+tcp   LISTEN 0      128          0.0.0.0:2222        0.0.0.0:*
+tcp   LISTEN 0      4096         0.0.0.0:6379        0.0.0.0:*
+tcp   LISTEN 0      4096               *:2375              *:*
+tcp   LISTEN 0      4096         0.0.0.0:3306        0.0.0.0:*
+tcp   LISTEN 0      4096            [::]:3306           [::]:*
+tcp   LISTEN 0      4096    192.168.1.20:9000        0.0.0.0:*
+##docker
+installed=yes
+portainer	192.168.1.20:9000->9000/tcp
+mariadb	0.0.0.0:3306->3306/tcp, [::]:3306->3306/tcp
+cache	0.0.0.0:6379->6379/tcp
+agent	
+##docker_inspect
+/portainer|false|bridge||/var/run/docker.sock;/srv/portainer;
+/mariadb|false|bridge||/srv/db;
+/cache|true|host|host|
+/agent|false|bridge||/;
+##unattended
+package=
+##uid0
+root
+toor
+##shadow_empty
+checked
+backup
+##aslr
+0
+##ntp

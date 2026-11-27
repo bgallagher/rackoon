@@ -15,6 +15,16 @@ import com.bgallagher.rackoon.core.AptPrompt
 import com.bgallagher.rackoon.core.UpdatesPresentation
 import com.bgallagher.rackoon.core.UpdatesSession
 import com.bgallagher.rackoon.core.UpdatesState
+import com.bgallagher.rackoon.core.OSV
+import com.bgallagher.rackoon.core.PackageInventory
+import com.bgallagher.rackoon.core.PendingPackage
+import com.bgallagher.rackoon.core.SecurityContext
+import com.bgallagher.rackoon.core.SecurityFinding
+import com.bgallagher.rackoon.core.SecurityRules
+import com.bgallagher.rackoon.core.SecuritySession
+import com.bgallagher.rackoon.core.SecuritySnapshot
+import com.bgallagher.rackoon.core.VulnerabilityFinding
+import com.bgallagher.rackoon.core.VulnerabilityLookup
 import com.bgallagher.rackoon.core.Bookmark
 import com.bgallagher.rackoon.core.BookmarkEditor
 import com.bgallagher.rackoon.core.BookmarkPlan
@@ -400,6 +410,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun remove(server: Server) {
+        if (server.id in _lookup.value.servers) setVulnerabilityLookup(server.id, false)
         c.terminals.closeAll(server.id)
         c.secrets.remove(server.id)
         c.snapshots.remove(server.id)
@@ -426,6 +437,7 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
         logsJob = viewModelScope.launch { followed.state.collect { _logs.value = it } }
         clearDockerActions()
         clearUpdatesState()
+        _security.value = SecurityUi(); _securityOpen.value = false
         rebootJob?.cancel(); _reboot.value = null
         val updatesSession = live!!.updates
         updatesJob?.cancel()
@@ -1079,6 +1091,98 @@ class AppViewModel(application: Application) : AndroidViewModel(application) {
     fun closeUpdatesOutput() {
         val o = _updatesOutput.value ?: return
         if (!o.isRunning) _updatesOutput.value = null
+    }
+
+    // MARK: Security (docs/security-plan.md): read when the screen opens (if the last reading is over 5 minutes old) and on
+    // Check Now; the opt-in vulnerability lookup sends package names and versions to OSV.dev only when the user turned it on.
+
+    data class SecurityUi(
+        val snapshot: SecuritySnapshot? = null,
+        val checkedAt: Long? = null,
+        val error: String? = null,
+        val loading: Boolean = false,
+        val vulnerabilities: List<VulnerabilityFinding>? = null,
+        val vulnerabilitiesAt: Long? = null,
+        val vulnerabilityError: String? = null,
+        val lookingUp: Boolean = false,
+        val lookupSupported: Boolean = true,
+    )
+
+    data class LookupSetting(val all: Boolean, val servers: Set<String>) {
+        fun isOn(id: String) = all || id in servers
+    }
+
+    private val _securityOpen = MutableStateFlow(false)
+    val securityOpen: StateFlow<Boolean> = _securityOpen.asStateFlow()
+    private val _security = MutableStateFlow(SecurityUi())
+    val security: StateFlow<SecurityUi> = _security.asStateFlow()
+    private val _lookup = MutableStateFlow(LookupSetting(c.prefs.osvLookupAll, c.prefs.osvLookupServers))
+    val vulnerabilityLookup: StateFlow<LookupSetting> = _lookup.asStateFlow()
+
+    fun showSecurity(show: Boolean) {
+        _securityOpen.value = show
+        if (show) {
+            loadSecurity()
+            val id = _selectedId.value
+            if (id != null && _lookup.value.isOn(id) && _security.value.vulnerabilities == null) lookUpVulnerabilities()
+        }
+    }
+
+    fun loadSecurity(force: Boolean = false) {
+        val l = live ?: return
+        val s = _security.value
+        if (s.loading) return
+        if (!force && s.checkedAt != null && System.currentTimeMillis() - s.checkedAt < 5 * 60_000) return
+        _security.value = s.copy(loading = true)
+        viewModelScope.launch {
+            val next = try {
+                _security.value.copy(snapshot = SecuritySession.read(l.transport), checkedAt = System.currentTimeMillis(), error = null)
+            } catch (e: Exception) {
+                _security.value.copy(error = e.message ?: e.toString())
+            }
+            if (live === l) _security.value = next.copy(loading = false)
+        }
+    }
+
+    /** The findings for the last reading, with what the Overview poll knows (security updates, reboot flag). */
+    fun securityFindings(): List<SecurityFinding> {
+        val snapshot = _security.value.snapshot ?: return emptyList()
+        val o = (_overview.value as? OverviewUi.Ready)?.state?.overview
+        return SecurityRules.evaluate(snapshot, SecurityContext(o?.securityUpdates, o?.rebootRequired))
+    }
+
+    fun lookUpVulnerabilities() {
+        val l = live ?: return
+        if (_security.value.lookingUp) return
+        _security.value = _security.value.copy(lookingUp = true)
+        viewModelScope.launch {
+            var next = _security.value
+            try {
+                val inventory = PackageInventory.read(l.transport)
+                next = if (OSV.ecosystem(inventory.os.id, inventory.os.version) == null) {
+                    next.copy(lookupSupported = false, vulnerabilities = null, vulnerabilityError = null)
+                } else {
+                    val pending = l.updates.refresh().snapshot?.packages.orEmpty().map { PendingPackage(it.name, it.newVersion) }
+                    val found = VulnerabilityLookup.run(inventory, pending, c.osv, c.osvCache)
+                    next.copy(lookupSupported = true, vulnerabilities = found, vulnerabilitiesAt = System.currentTimeMillis(), vulnerabilityError = null)
+                }
+            } catch (e: Exception) {
+                next = next.copy(vulnerabilityError = e.message ?: e.toString())
+            }
+            if (live === l) _security.value = next.copy(lookingUp = false)
+        }
+    }
+
+    /** Turns the lookup on or off for one server (`serverId`) or for every server (null). */
+    fun setVulnerabilityLookup(serverId: String?, on: Boolean) {
+        val cur = _lookup.value
+        val next = if (serverId == null) cur.copy(all = on) else cur.copy(servers = if (on) cur.servers + serverId else cur.servers - serverId)
+        _lookup.value = next
+        c.prefs.osvLookupAll = next.all
+        c.prefs.osvLookupServers = next.servers
+        val id = _selectedId.value ?: return
+        if (next.isOn(id)) { if (on) lookUpVulnerabilities() }
+        else _security.value = _security.value.copy(vulnerabilities = null, vulnerabilitiesAt = null, vulnerabilityError = null)
     }
 
     private fun clearUpdatesState() {

@@ -1,0 +1,79 @@
+{
+  "feature": "security.checks",
+  "subject": "security_checks",
+  "about": "SecurityRules.evaluate over a spec/fixtures/security fixture with what the Overview poll knows ('context': pendingSecurityUpdates and rebootRequired, null = not known). 'expect' maps a finding id (check id, plus ':<port or container>' for one finding per item) to its severity: critical, warning, info, unknown or pass. 'absent' lists finding ids that must not appear. A setting an unreadable sshd drop-in could set first is unknown, never a pass.",
+  "cases": [
+    {
+      "name": "hardened Ubuntu: keys only, ufw and fail2ban, Docker ports on loopback and Tailscale only",
+      "fixture": "synthetic-ubuntu-hardened",
+      "context": {"pendingSecurityUpdates": 0, "rebootRequired": false},
+      "expect": {
+        "ssh.server": "pass",
+        "ssh.root_login": "pass",
+        "ssh.password_auth": "pass",
+        "ssh.empty_passwords": "pass",
+        "ssh.max_auth_tries": "pass",
+        "ssh.x11_forwarding": "pass",
+        "ssh.tailscale": "info",
+        "exposure.firewall": "pass",
+        "exposure.listening": "info",
+        "brute_force.guard": "pass",
+        "updates.security_pending": "pass",
+        "updates.automatic": "pass",
+        "updates.reboot": "pass",
+        "accounts.extra_root": "pass",
+        "accounts.empty_password": "unknown",
+        "system.aslr": "pass",
+        "system.time_sync": "pass"
+      },
+      "absent": ["exposure.docker_bypass", "docker.unchecked", "docker.tcp_api", "exposure.sensitive_port:5432"]
+    },
+    {
+      "name": "default Ubuntu: an unreadable cloud-init drop-in makes the sshd checks unknown, no firewall, Docker refuses the user",
+      "fixture": "synthetic-ubuntu-default",
+      "context": {"pendingSecurityUpdates": 3, "rebootRequired": true},
+      "expect": {
+        "ssh.root_login": "unknown",
+        "ssh.password_auth": "unknown",
+        "ssh.empty_passwords": "unknown",
+        "ssh.x11_forwarding": "info",
+        "exposure.firewall": "warning",
+        "exposure.listening": "info",
+        "brute_force.guard": "warning",
+        "updates.security_pending": "warning",
+        "updates.automatic": "info",
+        "updates.reboot": "warning",
+        "docker.unchecked": "unknown",
+        "system.time_sync": "info"
+      },
+      "absent": ["ssh.tailscale", "exposure.docker_bypass"]
+    },
+    {
+      "name": "exposed Debian as root: sshd -T says root and passwords, databases and Docker's API on every interface",
+      "fixture": "synthetic-debian-exposed",
+      "context": {"pendingSecurityUpdates": null, "rebootRequired": null},
+      "expect": {
+        "ssh.root_login": "critical",
+        "ssh.password_auth": "warning",
+        "ssh.empty_passwords": "pass",
+        "ssh.max_auth_tries": "info",
+        "ssh.x11_forwarding": "info",
+        "exposure.firewall": "info",
+        "exposure.sensitive_port:3306": "warning",
+        "exposure.sensitive_port:6379": "warning",
+        "brute_force.guard": "warning",
+        "updates.security_pending": "unknown",
+        "updates.automatic": "info",
+        "accounts.extra_root": "critical",
+        "accounts.empty_password": "critical",
+        "docker.tcp_api": "critical",
+        "docker.container:portainer": "info",
+        "docker.container:cache": "warning",
+        "docker.container:agent": "warning",
+        "system.aslr": "warning",
+        "system.time_sync": "unknown"
+      },
+      "absent": ["updates.reboot", "docker.container:mariadb", "exposure.docker_bypass", "docker.unchecked"]
+    }
+  ]
+}

@@ -403,6 +403,36 @@
       }
     },
     {
+      "id": "security.checks", "title": "Security screen: core hardening checks and listening ports, with a disclaimer (docs/security-plan.md)",
+      "commands": ["security"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.SecurityTests", "RackoonCoreTests.SharedScenarioTests", "RackoonMacTests.SecurityModelTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.SecurityTests", "com.bgallagher.rackoon.core.SharedScenarioTests/securityChecks"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.SecurityTests", "RackoonCoreTests.SharedScenarioTests/testSecurityChecks", "RackoonIOSUITests.SecurityFlowTests"]},
+        "web": {"status": "done", "tests": ["tests.test_security_core/test_listener_scopes", "tests.test_shared_scenarios/test_security_checks", "tests.test_golden_fixtures/test_golden[security]", "tests.test_security_api/test_findings_ports_and_the_disclaimer"]}
+      }
+    },
+    {
+      "id": "security.cves", "title": "Known vulnerabilities in installed packages (opt-in OSV lookup)",
+      "commands": ["security_packages"],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.VulnerabilityTests", "RackoonCoreTests.SharedScenarioTests"]},
+        "android": {"status": "done", "tests": ["com.bgallagher.rackoon.core.VulnerabilityTests", "com.bgallagher.rackoon.core.SharedScenarioTests/vulnerabilityReport", "com.bgallagher.rackoon.core.SharedScenarioTests/debianVersion"]},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.VulnerabilityTests", "RackoonIOSUITests.SecurityFlowTests/testTheVerdictThenTheOptInVulnerabilityLookup"]},
+        "web": {"status": "done", "tests": ["tests.test_vulnerabilities_core/test_shared_scenarios_whatever_features_json_says", "tests.test_shared_scenarios/test_vulnerability_report", "tests.test_shared_scenarios/test_debian_version", "tests.test_golden_fixtures/test_golden[security_packages]", "tests.test_security_api/test_vulnerability_lookup_is_opt_in_and_reports_from_osv"]}
+      }
+    },
+    {
+      "id": "security.alerts", "title": "Security findings in Alerts (listed and counted, never notified), a Security page on the Dashboard, and Check Deeper with sudo",
+      "commands": [],
+      "platforms": {
+        "mac": {"status": "done", "tests": ["RackoonCoreTests.AlertsTests", "RackoonCoreTests.SecurityTests"]},
+        "android": {"status": "planned", "reason": "Android has no Alerts, Dashboard or sudo password flow yet"},
+        "ios": {"status": "done", "tests": ["RackoonCoreTests.AlertsTests/testSecurityFindingsAreListedAndCountedButNeverNotify", "RackoonCoreTests.SecurityTests"]},
+        "web": {"status": "done", "tests": ["tests.test_w7_core/test_security_findings_are_listed_and_counted_but_never_notify", "tests.test_security_api/test_security_findings_reach_alerts_but_never_notify", "tests.test_security_api/test_check_deeper_needs_a_password_checks_it_and_keeps_nothing", "tests.test_security_api/test_the_dashboard_lists_every_answering_server"]}
+      }
+    },
+    {
       "id": "alerts", "title": "Alerts across every server, with history",
       "commands": ["docker_states"],
       "platforms": {

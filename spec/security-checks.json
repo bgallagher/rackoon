@@ -1,0 +1,189 @@
+{
+  "about" : "The Security screen's checks (docs/security-plan.md): id, group, title, why it matters and advice a person acts on themselves. Rackoon never changes the server. Each core's rules emit findings with these ids (plus ':<item>' for one finding per port or container); spec/scenarios/security-checks.json says which severity each fixture gives.",
+  "checks" : [
+    {
+      "advice" : "Nothing to do if this server is reached another way (for example Tailscale SSH or a console).",
+      "group" : "ssh",
+      "id" : "ssh.server",
+      "title" : "SSH server",
+      "why" : "Every other SSH check reads the OpenSSH server's settings."
+    },
+    {
+      "advice" : "Set PermitRootLogin to no (or prohibit-password) in /etc/ssh/sshd_config.d/ and reload ssh.",
+      "group" : "ssh",
+      "id" : "ssh.root_login",
+      "title" : "Root login with a password",
+      "why" : "A root password that can be guessed over SSH gives away the whole server."
+    },
+    {
+      "advice" : "Once your key logins work, set PasswordAuthentication no and KbdInteractiveAuthentication no, then reload ssh.",
+      "group" : "ssh",
+      "id" : "ssh.password_auth",
+      "title" : "Password logins",
+      "why" : "Passwords can be guessed by bots that scan for SSH all day; keys cannot."
+    },
+    {
+      "advice" : "Set PermitEmptyPasswords no (the default) and give every account a password or lock it.",
+      "group" : "ssh",
+      "id" : "ssh.empty_passwords",
+      "title" : "Empty passwords",
+      "why" : "An account without a password could log in with nothing at all."
+    },
+    {
+      "advice" : "Leave MaxAuthTries at 6 or lower.",
+      "group" : "ssh",
+      "id" : "ssh.max_auth_tries",
+      "title" : "Login attempts per connection",
+      "why" : "More attempts per connection make guessing cheaper."
+    },
+    {
+      "advice" : "Set X11Forwarding no unless you run graphical programs over SSH.",
+      "group" : "ssh",
+      "id" : "ssh.x11_forwarding",
+      "title" : "X11 forwarding",
+      "why" : "Forwarding graphical programs is rarely needed on a server and widens what a login can reach."
+    },
+    {
+      "advice" : "Review the ssh rules in your tailnet policy file; the sshd checks here cover only logins that reach sshd.",
+      "group" : "ssh",
+      "id" : "ssh.tailscale",
+      "title" : "Tailscale SSH",
+      "why" : "Logins over Tailscale SSH follow your tailnet's SSH policy, not sshd's settings."
+    },
+    {
+      "advice" : "Turn on ufw (or another firewall) with rules for only the ports you mean to offer.",
+      "group" : "exposure",
+      "id" : "exposure.firewall",
+      "title" : "Firewall",
+      "why" : "Without a firewall every listening service is reachable from any network the server is on."
+    },
+    {
+      "advice" : "Bind services to 127.0.0.1 or the Tailscale address when only you need them.",
+      "group" : "exposure",
+      "id" : "exposure.listening",
+      "title" : "Services listening on every interface",
+      "why" : "A service bound to every interface is reachable from every network the server is on, unless a firewall stops it."
+    },
+    {
+      "advice" : "Bind it to 127.0.0.1 (or a Docker network without published ports) and reach it over Tailscale or an SSH tunnel.",
+      "group" : "exposure",
+      "id" : "exposure.sensitive_port",
+      "title" : "Database or cache open to the network",
+      "why" : "Databases and caches are often reachable without a password and are a common target."
+    },
+    {
+      "advice" : "Publish ports on 127.0.0.1 or the Tailscale address (\"127.0.0.1:8080:80\"), or filter in the DOCKER-USER chain.",
+      "group" : "exposure",
+      "id" : "exposure.docker_bypass",
+      "title" : "Docker ports bypass ufw",
+      "why" : "Docker writes its own iptables rules ahead of ufw's, so a port Docker publishes on every interface is open even if ufw denies it."
+    },
+    {
+      "advice" : "With password logins on, install fail2ban (its sshd jail is on by default on Debian and Ubuntu) or turn passwords off.",
+      "group" : "brute_force",
+      "id" : "brute_force.guard",
+      "title" : "Brute-force protection",
+      "why" : "fail2ban, CrowdSec or sshguard block addresses that keep failing to log in."
+    },
+    {
+      "advice" : "Install them from the Updates screen.",
+      "group" : "updates",
+      "id" : "updates.security_pending",
+      "title" : "Security updates waiting",
+      "why" : "Known holes stay open until the fix is installed."
+    },
+    {
+      "advice" : "Install unattended-upgrades and turn it on with dpkg-reconfigure unattended-upgrades.",
+      "group" : "updates",
+      "id" : "updates.automatic",
+      "title" : "Automatic security updates",
+      "why" : "unattended-upgrades installs security fixes without waiting for you."
+    },
+    {
+      "advice" : "Reboot when it suits you (Reboot… on the Overview).",
+      "group" : "updates",
+      "id" : "updates.reboot",
+      "title" : "Reboot needed",
+      "why" : "A new kernel or system library is not in use until the server restarts."
+    },
+    {
+      "advice" : "Check who created it; remove it or give it its own user id.",
+      "group" : "accounts",
+      "id" : "accounts.extra_root",
+      "title" : "Second root account",
+      "why" : "Any account with user id 0 is root; an unexpected one is a classic sign of a break-in."
+    },
+    {
+      "advice" : "Lock it (sudo passwd -l <name>) or give it a password.",
+      "group" : "accounts",
+      "id" : "accounts.empty_password",
+      "title" : "Account with an empty password",
+      "why" : "An account with an empty password can log in on the console, and over SSH wherever empty passwords are allowed."
+    },
+    {
+      "advice" : "Remove the -H tcp://… listener from the Docker daemon, or use 2376 with client certificates.",
+      "group" : "docker",
+      "id" : "docker.tcp_api",
+      "title" : "Docker API on the network",
+      "why" : "Port 2375 is Docker's API without TLS: anyone who reaches it controls the server as root."
+    },
+    {
+      "advice" : "Drop the setting unless the app needs it; tools such as Portainer, Watchtower and Traefik need the socket by design.",
+      "group" : "docker",
+      "id" : "docker.container",
+      "title" : "Container with host access",
+      "why" : "Privileged containers, host networking or PID, and the Docker socket or / mounted inside give a container root on the host."
+    },
+    {
+      "advice" : "Unlock Docker with sudo on the Docker screen, then check again.",
+      "group" : "docker",
+      "id" : "docker.unchecked",
+      "title" : "Containers not checked",
+      "why" : "Docker would not list the containers for the ssh user."
+    },
+    {
+      "advice" : "Set kernel.randomize_va_space = 2 in /etc/sysctl.d/ (the default).",
+      "group" : "system",
+      "id" : "system.aslr",
+      "title" : "Address space layout randomisation",
+      "why" : "ASLR makes memory bugs much harder to exploit."
+    },
+    {
+      "advice" : "Turn on systemd-timesyncd or chrony (timedatectl set-ntp true).",
+      "group" : "system",
+      "id" : "system.time_sync",
+      "title" : "Clock synchronised",
+      "why" : "Certificates, logs and two-factor codes depend on the right time."
+    }
+  ],
+  "groups" : [
+    {
+      "id" : "ssh",
+      "title" : "SSH"
+    },
+    {
+      "id" : "exposure",
+      "title" : "Firewall and exposure"
+    },
+    {
+      "id" : "brute_force",
+      "title" : "Brute-force protection"
+    },
+    {
+      "id" : "updates",
+      "title" : "Updates"
+    },
+    {
+      "id" : "accounts",
+      "title" : "Accounts"
+    },
+    {
+      "id" : "docker",
+      "title" : "Docker"
+    },
+    {
+      "id" : "system",
+      "title" : "Kernel and time"
+    }
+  ]
+}

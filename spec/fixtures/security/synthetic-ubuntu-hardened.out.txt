@@ -1,0 +1,57 @@
+##uid
+1000
+##os
+id=ubuntu
+like=debian
+version=24.04
+##sshd
+installed=yes
+active=1
+##sshd_effective
+##sshd_files
+#file /etc/ssh/sshd_config
+Include /etc/ssh/sshd_config.d/*.conf
+KbdInteractiveAuthentication no
+X11Forwarding yes
+#file /etc/ssh/sshd_config.d/10-hardening.conf
+PermitRootLogin no
+PasswordAuthentication no
+MaxAuthTries 3
+X11Forwarding no
+##tailscale_ssh
+"RunSSH": true
+##firewall
+ENABLED=yes
+ufw=active
+firewalld=inactive
+nftables=inactive
+##guards
+fail2ban=active
+crowdsec=inactive
+sshguard=inactive
+##listen
+udp   UNCONN 0      0          127.0.0.54:53         0.0.0.0:*
+udp   UNCONN 0      0       127.0.0.53%lo:53         0.0.0.0:*
+udp   UNCONN 0      0        100.100.40.7:41641      0.0.0.0:*
+tcp   LISTEN 0      4096       127.0.0.1:5432        0.0.0.0:*
+tcp   LISTEN 0      4096    100.100.40.7:8080        0.0.0.0:*
+tcp   LISTEN 0      4096         0.0.0.0:22          0.0.0.0:*
+tcp   LISTEN 0      4096            [::]:22             [::]:*
+tcp   LISTEN 0      4096 [fd7a:115c:a1e0::1]:8080       [::]:*
+##docker
+installed=yes
+paperless	100.100.40.7:8080->8000/tcp
+paperless-db	127.0.0.1:5432->5432/tcp
+##docker_inspect
+/paperless|false|paperless_default||/srv/paperless/data;/srv/paperless/media;
+/paperless-db|false|paperless_default||/srv/paperless/pg;
+##unattended
+package=install ok installed
+APT::Periodic::Unattended-Upgrade "1";
+##uid0
+root
+##shadow_empty
+##aslr
+2
+##ntp
+yes

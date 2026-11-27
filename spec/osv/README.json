@@ -1,0 +1,3 @@
+{
+  "about": "Synthetic OSV.dev API responses (ids in 2099 so they can never be mistaken for real advisories) for the vulnerability lookup's shared scenarios: a querybatch response in the order of the queries the core builds, and full records as GET /v1/vulns/<id> returns them. Shapes follow https://google.github.io/osv.dev/post-v1-querybatch/ and the OSV schema."
+}

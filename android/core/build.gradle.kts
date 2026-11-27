@@ -29,7 +29,7 @@ dependencies {
 // module as a resource, so there is no second copy in Kotlin that could drift.
 tasks.processResources {
     from(rootProject.projectDir.parentFile.resolve("spec")) {
-        include("commands.json", "command-library.json", "attention-rules.json")
+        include("commands.json", "command-library.json", "attention-rules.json", "security-checks.json")
         into("spec")
     }
 }

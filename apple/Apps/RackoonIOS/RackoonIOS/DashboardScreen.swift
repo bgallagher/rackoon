@@ -36,6 +36,8 @@ struct DashboardScreen: View {
                             }
                         case .docker:
                             DockerPage(servers: servers)
+                        case .security:
+                            SecurityPage(servers: servers)
                         case .bookmarks:
                             BookmarksPage(servers: servers)
                         }

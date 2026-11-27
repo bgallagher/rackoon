@@ -5,12 +5,45 @@ import { Card, Empty, Meter, Notice, Spinner, StatusDot } from "../components/ui
 import { useApp } from "../context";
 import { ago, bytes, fraction, percent } from "../format";
 import { useNow, usePoll } from "../hooks";
-import type { FleetDocker, FleetRow } from "../types";
+import type { FleetDocker, FleetRow, FleetSecurity } from "../types";
 import { AlertsView } from "./Alerts";
 import { BookmarkRow, groupsOf } from "./Bookmarks";
 
 const PAGES: [string, string][] = [["health", "Health"], ["servers", "Servers"], ["docker", "Docker"], ["bookmarks", "Bookmarks"],
-  ["alerts", "Alerts"]];
+  ["security", "Security"], ["alerts", "Alerts"]];
+
+/** What each answering server's Security checks found: only what needs the user, with the disclaimer. */
+function SecurityPage() {
+  const now = useNow();
+  const { data, error } = usePoll(() => api.get<FleetSecurity>("/api/fleet/security"), 60_000, []);
+  if (!data) return error ? <Notice tone="danger">{error}</Notice> : <Spinner />;
+  const all = data.servers.flatMap((s) => s.toFix);
+  const critical = all.filter((f) => f.severity === "critical").length;
+  return (
+    <>
+      <div className="totals">
+        <div className="total"><span className="total-label">Critical</span><span className="total-value">{critical}</span></div>
+        <div className="total"><span className="total-label">Warnings</span><span className="total-value">{all.length - critical}</span></div>
+        <div className="total"><span className="total-label">Ports open to other networks</span>
+          <span className="total-value">{data.servers.reduce((n, s) => n + s.exposedPorts, 0)}</span></div>
+        <div className="total"><span className="total-label">Servers checked</span><span className="total-value">{data.checked} / {data.total}</span></div>
+      </div>
+      <p className="dim">{data.disclaimer}</p>
+      {data.servers.length === 0 && <Empty title="No server is answering right now" />}
+      {data.servers.map((s) => (
+        <Card key={s.server.id} title={s.server.name} actions={
+          <span className="dim">{s.updatedAt ? `checked ${ago(s.updatedAt, now)}${s.deep ? " with sudo" : ""} · ` : ""}
+            <a href={`#/servers/${s.server.id}/security`}>Open Security</a></span>}>
+          {s.error ? <p className="dim">{s.error}</p>
+            : s.toFix.length === 0 ? <p className="dim">Nothing obvious to fix.</p>
+            : <ul className="security-list">{s.toFix.map((f) => (
+              <li key={f.id}><span className={`badge ${f.severity === "critical" ? "badge-danger" : "badge-warn"}`}>{f.severity}</span>{" "}
+                <strong>{f.title}</strong> <span className="dim">{f.summary}</span></li>))}</ul>}
+        </Card>
+      ))}
+    </>
+  );
+}
 
 /** Every answering server's Docker (the backend skips unanswering and untrusted ones), polled while this page shows. */
 function useFleetDocker() {
@@ -142,6 +175,7 @@ export function DashboardScreen(props: { page?: string }) {
       </nav>
       {page === "docker" && <DockerPage />}
       {page === "bookmarks" && <BookmarksPage />}
+      {page === "security" && <SecurityPage />}
       {page === "alerts" && <AlertsView />}
       {(page === "health" || page === "servers") && <Totals />}
       {page === "health" && <Card title="Health">

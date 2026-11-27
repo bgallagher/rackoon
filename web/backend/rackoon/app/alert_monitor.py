@@ -31,7 +31,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
-from rackoon.core import alerts, docker_states
+from rackoon.core import alerts, docker_states, security
 from rackoon.core.alerts import AlertBook, CertificateCheck, ServerAlert, Source
 from rackoon.core.models import Server, Severity
 from rackoon.core.unraid import is_unraid
@@ -48,6 +48,7 @@ log = logging.getLogger("rackoon.alerts")
 EVALUATE_EVERY = 15.0
 SWEEP_EVERY = 300.0
 CERTS_EVERY = 6 * 3600.0
+SECURITY_EVERY = 3600.0  # hardening settings rarely change; the page reads again whenever it opens
 FIRST_SWEEP_AFTER = 10.0
 
 
@@ -280,6 +281,16 @@ class AlertMonitor:
             if o is not None and entry.connection == "ok":
                 await self.record(server, Source.OVERVIEW, alerts.overview(o, None, is_unraid(o.os)))
 
+    async def record_security(self, server: Server) -> None:
+        """Critical and warning Security findings (listed, never notified: Source.SECURITY.notifies)."""
+        from .security_api import context_of
+        reading = self.rackoon.security_checks.readings.get(server.id)
+        entry = self.rackoon.monitor.entries.get(server.id)
+        if reading is None or reading.snapshot is None or entry is None or entry.state.overview is None:
+            return
+        found = security.evaluate(reading.snapshot, context_of(entry.state.overview))
+        await self.record(server, Source.SECURITY, alerts.security_findings(found))
+
     async def sweep(self, server: Server) -> None:
         """The slower checks of one answering server."""
         entry = self.rackoon.monitor.entries.get(server.id)
@@ -308,6 +319,11 @@ class AlertMonitor:
                 if nas.value is not None:
                     await self.record(server, Source.STORAGE, alerts.storage(
                         nas.value, self.rackoon.nas.sustained_cpu(server.id)))
+            checks = self.rackoon.security_checks
+            last = checks.readings.get(server.id)
+            if last is None or (not last.deep and self.clock() - last.at >= SECURITY_EVERY):
+                await checks.read(server.id, base, force=True)
+            await self.record_security(server)
             if self.clock() - self.last_certs.get(server.id, 0) >= CERTS_EVERY:
                 self.last_certs[server.id] = self.clock()
                 await self.check_certificates(server)

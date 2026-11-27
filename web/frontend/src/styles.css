@@ -442,3 +442,28 @@ button.tab { background: none; border: 0; border-bottom: 2px solid transparent; 
   .command-list { position: static; max-height: none; }
   .files th:nth-child(n+4), .files td:nth-child(n+4):not(:last-child) { display: none; }
 }
+
+/* Security (docs/security-plan.md) */
+.security-page .row-gap { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.security-section { margin-top: 18px; }
+.security-section h2 { font-size: 15px; margin: 0 0 4px; }
+.security-section h3 { font-size: 11px; letter-spacing: .5px; text-transform: uppercase; color: var(--text-2); margin: 14px 0 4px; }
+.security-section h3 a { text-transform: none; letter-spacing: 0; margin-left: 8px; }
+.security-list { list-style: none; margin: 6px 0 0; padding: 0; border: 1px solid var(--border); border-radius: 10px; }
+.security-list > li { padding: 9px 14px; border-top: 1px solid var(--border); }
+.security-list > li:first-child { border-top: 0; }
+.security-row summary { cursor: pointer; display: flex; gap: 10px; align-items: baseline; list-style: none; }
+.security-row summary::-webkit-details-marker { display: none; }
+.security-detail { margin: 8px 0 2px 28px; font-size: 12.5px; }
+.security-detail dt { font-size: 10px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--text-2); margin-top: 6px; }
+.security-detail dd { margin: 2px 0 0; }
+.sev { display: inline-flex; width: 18px; height: 18px; border-radius: 99px; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex: none; }
+.sev-danger { background: var(--danger-fill); color: var(--danger-label); }
+.sev-warn { background: var(--warn-fill); color: var(--warn-label); }
+.sev-ok { background: var(--ok); color: var(--bg, #fff); }
+.sev-idle { background: var(--selection); color: var(--text-2); }
+.security-port { display: grid; grid-template-columns: 92px 1fr auto; gap: 12px; align-items: baseline; }
+.security-port > span:nth-child(2) { display: flex; flex-direction: column; }
+.security-passed { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; list-style: none; padding: 10px 0 0; margin: 0; }
+.security-passed li { display: flex; flex-direction: column; font-size: 12px; }
+.vuln-group .security-list { margin-top: 4px; }

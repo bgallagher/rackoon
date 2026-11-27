@@ -42,6 +42,8 @@ class DemoConnection(private val world: DemoWorld) : ServerConnection {
             command == SpecCommands.script("overview") -> CommandResult(world.overviewOutput())
             command == SpecCommands.script("docker") -> CommandResult(world.dockerOutput())
             command == SpecCommands.script("updates") -> CommandResult(world.updatesOutput())
+            command == SpecCommands.script("security") -> CommandResult(DemoSecurity.output(world.hostname))
+            command == SpecCommands.script("security_packages") -> CommandResult(DemoSecurity.packages(world.hostname))
             command == SpecCommands.script("boot_id") -> CommandResult(world.bootId + "\n")
             command == SpecCommands.script("reboot") -> { world.reboot(); CommandResult("##rebooting\n") }
             command.startsWith("timeout 20 docker manifest inspect") -> CommandResult(if (command.contains("nope") || command.contains("missing")) "notfound\n" else "found\n")

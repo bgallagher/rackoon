@@ -33,6 +33,10 @@ final class AppModel {
     /// Per server, kept while the app runs so a running command, a scan or a transfer survives leaving its screen.
     @ObservationIgnored private var commandsModels: [String: CommandsModel] = [:]
     @ObservationIgnored private var servicesModels: [String: ServicesModel] = [:]
+    @ObservationIgnored private var securityModels: [String: SecurityModel] = [:]
+    /// Whether the vulnerability lookup may send each server's package list to OSV.dev (off by default; memory only in
+    /// demo mode).
+    private(set) var vulnerabilityLookup: VulnerabilityLookupSettings
     @ObservationIgnored private var filesModels: [String: FilesModel] = [:]
     /// Which services to show (and watch for alerts), saved on this device; a temporary folder in demo mode.
     private(set) var visibility: ServiceVisibilityStore
@@ -68,6 +72,7 @@ final class AppModel {
         makeVault = vault
         self.vault = vault(on)
         visibility = Self.visibilityStore(demo: on, dataDirectory: dataDirectory, network: network)
+        vulnerabilityLookup = VulnerabilityLookupSettings(defaults: on ? nil : defaults)
         fleet = makeFleet()
         alerts = makeAlerts()
         self.vault.load(servers.servers)
@@ -96,6 +101,7 @@ final class AppModel {
             dependencies: AlertMonitor.Dependencies(
                 rows: { [unowned self] in self.alertRows },
                 services: { [unowned self] server in try? self.servicesModel(for: server).get() },
+                security: { [unowned self] server in try? self.securityModel(for: server).get() },
                 isWatched: { [unowned self] service, id in self.visibility.isVisible(service, server: id) },
                 dockerTransport: { [unowned self] server in
                     guard case .success(let base) = self.readyTransport(for: server) else { return nil }
@@ -174,6 +180,7 @@ final class AppModel {
         vault = makeVault(on)
         vault.load(servers.servers)
         visibility = Self.visibilityStore(demo: on, dataDirectory: dataDirectory, network: network)
+        vulnerabilityLookup = VulnerabilityLookupSettings(defaults: on ? nil : defaults)
         fleet = makeFleet()
         alerts = makeAlerts()
         alerts.start()
@@ -181,6 +188,7 @@ final class AppModel {
 
     /// Drops the Commands, Services and Files models of one server (or of every server), stopping what they run.
     private func forgetToolModels(_ id: String? = nil) {
+        for key in Array(securityModels.keys) where id == nil || key == id { securityModels[key] = nil }
         for key in Array(servicesModels.keys) where id == nil || key == id {
             servicesModels[key]?.stop()
             servicesModels[key] = nil
@@ -283,6 +291,7 @@ final class AppModel {
         docker.forget(id)
         updatesModels[id] = nil
         forgetToolModels(id)
+        vulnerabilityLookup.forget(serverID: id)
         visibility.forget(serverID: id)
         alerts.forget(serverID: id)
         reboots[id]?.cancel()
@@ -369,6 +378,19 @@ final class AppModel {
             return model
         }
     }
+
+    /// The server's Security model (made on first use), or why there is none yet.
+    func securityModel(for server: Server) -> Result<SecurityModel, FleetModel.BlockedReason> {
+        if let model = securityModels[server.id] { return .success(model) }
+        return readyTransport(for: server).map { transport in
+            let model = SecurityModel(transport: transport, osv: isDemo ? DemoOSVClient() : URLSessionOSVClient())
+            securityModels[server.id] = model
+            return model
+        }
+    }
+
+    /// The Security model if one was made, without making one (alerts).
+    func existingSecurityModel(_ id: String) -> SecurityModel? { securityModels[id] }
 
     /// The Services model if one was made, without making one (search).
     func existingServicesModel(_ id: String) -> ServicesModel? { servicesModels[id] }

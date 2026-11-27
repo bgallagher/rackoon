@@ -22,12 +22,16 @@ extension AttentionItem.Severity {
 /// Where an alert's reading comes from. A reading only resolves alerts of its own source, so a check that did not run
 /// never clears another check's alerts.
 public enum AlertSource: String, Sendable, Codable, CaseIterable {
-    case connection, overview, services, containers, storage, certificates
+    case connection, overview, services, containers, storage, certificates, security
+
+    /// Whether a new alert from this source may raise a notification. Security findings are listed and counted but never
+    /// notify: they describe how a server is set up, which rarely changes suddenly (docs/security-plan.md, stage S4).
+    public var notifies: Bool { self != .security }
 }
 
 /// What an alert is about, for grouping and filters.
 public enum AlertCategory: String, Sendable, Codable, CaseIterable {
-    case connection, disk, containers, services, updates, storage, certificates
+    case connection, disk, containers, services, updates, storage, certificates, security
 
     public var title: String {
         switch self {
@@ -38,6 +42,7 @@ public enum AlertCategory: String, Sendable, Codable, CaseIterable {
         case .updates: "Updates"
         case .storage: "Storage"
         case .certificates: "Certificates"
+        case .security: "Security"
         }
     }
 }
@@ -119,7 +124,8 @@ public struct AlertBook: Sendable, Codable, Equatable {
     @discardableResult
     public mutating func apply(server: String, serverName: String, source: AlertSource, signals: [AlertSignal], at now: Date) -> [ServerAlert] {
         let baselineKey = "\(server)|\(source.rawValue)"
-        let firstReading = !baselined.contains(baselineKey)
+        // A source that never notifies behaves like a first reading every time: listed, never raised.
+        let firstReading = !baselined.contains(baselineKey) || !source.notifies
         baselined.insert(baselineKey)
         var raised: [ServerAlert] = []
         var seen = Set<String>()
@@ -346,6 +352,27 @@ public enum AlertRules {
             return AlertSignal(key: "cert:\(check.host)", category: .certificates,
                                severity: days <= certificateCriticalDays ? .critical : .warning,
                                title: "Certificate expires soon: \(check.host)", detail: "It expires in \(Self.days(days)).", fix: fix)
+        }
+    }
+
+    /// Security checks that already raise alerts of their own (the Overview's security-update count and reboot flag), so
+    /// the Security source leaves them out.
+    public static let securityChecksCoveredElsewhere: Set<String> = ["updates.security_pending", "updates.reboot"]
+
+    /// Critical and warning Security findings (docs/security-plan.md, stage S4). Listed and counted, never notified
+    /// (`AlertSource.notifies`). Info, unknown and passed findings stay on the Security screen.
+    public static func security(_ findings: [SecurityFinding]) -> [AlertSignal] {
+        findings.compactMap { f in
+            guard !securityChecksCoveredElsewhere.contains(f.check) else { return nil }
+            let severity: AlertSeverity
+            switch f.severity {
+            case .critical: severity = .critical
+            case .warning: severity = .warning
+            case .info, .unknown, .pass: return nil
+            }
+            let title = SecurityChecks.check(f.check)?.title ?? f.check
+            return AlertSignal(key: f.id, category: .security, severity: severity, title: title, detail: f.summary,
+                               fix: AlertFix("security", target: f.id))
         }
     }
 

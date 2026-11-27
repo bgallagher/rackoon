@@ -1,0 +1,7 @@
+##os
+id=debian
+like=
+version=
+codename=trixie
+##packages
+bash	5.2.37-1	bash	5.2.37-1

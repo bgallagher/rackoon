@@ -176,6 +176,8 @@ public final class DemoTransport: SSHTransport, @unchecked Sendable {
         if command == ServerSession.overviewCommand { return CommandResult(stdout: overview()) }
         if command == DockerSession.command { return CommandResult(stdout: docker()) }
         if command == ServicesSession.command { return CommandResult(stdout: DemoServices.output(for: profile)) }
+        if command == SecuritySession.command { return CommandResult(stdout: DemoSecurity.output(for: profile)) }
+        if command == PackageInventory.command { return CommandResult(stdout: DemoSecurity.packages(for: profile)) }
         if command == DockerStatesSession.command { return CommandResult(stdout: dockerStates()) }
         if let status = DemoServices.read(command) { return CommandResult(stdout: status) }
         if command == UpdatesSession.command || command.contains("apt-get") && !command.contains("autoremove") { return try await updates.run(command, timeout: timeout) }

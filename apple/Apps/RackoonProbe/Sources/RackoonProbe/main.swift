@@ -74,6 +74,37 @@ if args.count > 2, args[2] == "watch-check" {
     }
     exit(0)
 }
+if args.count > 2, args[2] == "policy-check" {
+    // Which approval policy offers the Apple Watch (lid closed) AND leaves a context the Secure Enclave key accepts.
+    // Throwaway in-memory keys only. usage: rackoon-probe local policy-check [companion|either|any]...
+    var flags: SecAccessControlCreateFlags = [.privateKeyUsage, .or, .biometryAny, .devicePasscode]
+    if #available(macOS 15.0, *) { flags.insert(.companion) }
+    guard let access = SecAccessControlCreateWithFlags(nil, kSecAttrAccessibleWhenUnlockedThisDeviceOnly, flags, nil) else { exit(1) }
+    var trials: [(String, LAPolicy)] = [("any", .deviceOwnerAuthentication)]
+    if #available(macOS 15.0, *) {
+        trials = [("companion", .deviceOwnerAuthenticationWithCompanion), ("either", .deviceOwnerAuthenticationWithBiometricsOrCompanion)] + trials
+    }
+    let wanted = Set(args.dropFirst(3))
+    for (name, policy) in trials where wanted.isEmpty || wanted.contains(name) {
+        print("\n\(name): approve with your Watch if it is offered, else cancel")
+        let started = Date()
+        do {
+            let key = try SecureEnclave.P256.KeyAgreement.PrivateKey(accessControl: access)
+            let ephemeral = P256.KeyAgreement.PrivateKey()
+            let context = LAContext()
+            _ = try await context.evaluatePolicy(policy, localizedReason: "test approval '\(name)' (Rackoon check)")
+            print("   approved after \(String(format: "%.1f", Date().timeIntervalSince(started))) s; using the key")
+            let unlocked = try SecureEnclave.P256.KeyAgreement.PrivateKey(dataRepresentation: key.dataRepresentation, authenticationContext: context)
+            let a = try unlocked.sharedSecretFromKeyAgreement(with: ephemeral.publicKey)
+            let b = try ephemeral.sharedSecretFromKeyAgreement(with: key.publicKey)
+            print(a == b ? "   PASS (no second prompt expected)" : "   FAIL: secrets differ")
+        } catch {
+            let ns = error as NSError
+            print("   FAIL or cancelled after \(String(format: "%.1f", Date().timeIntervalSince(started))) s: \(ns.domain) \(ns.code) \(ns.localizedDescription)")
+        }
+    }
+    exit(0)
+}
 if args.count > 2, args[2] == "unlock-check" {
     // Only the app's real unlock path (SecureEnclaveSealer): one prompt expected. usage: rackoon-probe local unlock-check
     do {

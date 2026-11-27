@@ -41,7 +41,7 @@ from rackoon.core import server_list
 
 from . import security
 from .actions import ActionCenter, ActionError
-from . import alerts_api, docker_api, files_api, system_api, updates_api
+from . import alerts_api, docker_api, files_api, security_api, system_api, updates_api
 from .alert_monitor import AlertMonitor
 from .connections import CheckResult, Connections, Scanner, Transport, TrustError, key_id_of
 from .docker_hub import DockerHub
@@ -187,6 +187,7 @@ class Rackoon:
         self.reboots = updates_api.RebootWatch(self._transport_by_id, self.monitor.refresh, clock)
         self.services = system_api.ServicesStore(self.store.root / "services", clock)
         self.nas = system_api.NASStore(clock)
+        self.security_checks = security_api.SecurityStore(self.store.root / "security", clock, self.demo)
         self.monitor.nas_for = self.nas.snapshot
         self.monitor.heat_for = self.nas.sustained_cpu
         self.alerts = AlertMonitor(self, clock)
@@ -556,6 +557,8 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
             rackoon.docker.forget(server_id)
             rackoon.elevation.lock(server_id)
             rackoon.reboots.forget(server_id)
+            rackoon.security_checks.readings.pop(server_id, None)
+            rackoon.security_checks.vulns.pop(server_id, None)
             await rackoon.connections.forget(server_id)
             store.delete_snapshot(server_id)
         return _server_json(new, store.keys_dir)
@@ -571,6 +574,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
         rackoon.elevation.lock(server_id)
         rackoon.reboots.forget(server_id)
         rackoon.services.forget(server_id)
+        rackoon.security_checks.forget(server_id)
         rackoon.alerts.forget(server_id)
         await rackoon.connections.forget(server_id)
         store.delete_snapshot(server_id)
@@ -889,6 +893,7 @@ def create_app(settings: Settings, scanner: Scanner | None = None,
     docker_api.register(app, rackoon, authenticated, identify, lambda r: _same_origin(r, rackoon), find)
     updates_api.register(app, rackoon, authenticated, find)
     system_api.register(app, rackoon, authenticated, find)
+    security_api.register(app, rackoon, authenticated, find)
     files_api.register(app, rackoon, authenticated, find)
     alerts_api.register(app, rackoon, authenticated, find)
 

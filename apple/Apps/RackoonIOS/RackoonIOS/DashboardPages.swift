@@ -2,12 +2,13 @@ import RackoonCore
 import SwiftUI
 
 enum DashboardPage: String, CaseIterable, Identifiable {
-    case health, docker, bookmarks
+    case health, docker, security, bookmarks
     var id: String { rawValue }
     var title: String {
         switch self {
         case .health: "Health"
         case .docker: "Docker"
+        case .security: "Security"
         case .bookmarks: "Bookmarks"
         }
     }
@@ -193,5 +194,55 @@ struct BookmarksPage: View {
             }
         }
         .modifier(DockerAttachment(models: answering.map(\.1)))
+    }
+}
+
+/// What each answering server's Security checks found: only what needs the user (critical and warning), with the
+/// disclaimer. Reads each server when the page shows unless its reading is under five minutes old.
+struct SecurityPage: View {
+    @Environment(AppModel.self) private var model
+    let servers: [Server]
+
+    var body: some View {
+        let t = model.tokens
+        let rows: [(Server, SecurityModel)] = servers.compactMap { server in
+            guard Liveness(model.fleet.state(for: server.id)) == .up, case .success(let s) = model.securityModel(for: server) else { return nil }
+            return (server, s)
+        }
+        VStack(alignment: .leading, spacing: 12) {
+            Text("A short list of common checks, not a complete security review, and it can be wrong. A clean result means \"nothing obvious found\", not \"secure\".")
+                .font(.caption).foregroundStyle(t.secondary)
+            if rows.isEmpty {
+                ContentUnavailableView("No server is answering right now", systemImage: "shield")
+            }
+            ForEach(rows, id: \.0.id) { server, security in
+                let toFix = security.findings(SecurityModel.context(model.fleet.state(for: server.id).overview))
+                    .filter { $0.severity == .critical || $0.severity == .warning }
+                    .sorted { $0.severity < $1.severity }
+                NavigationLink { SecurityScreen(serverID: server.id) } label: {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(server.name).font(.headline)
+                            Spacer()
+                            if security.snapshot == nil { ProgressView() } else {
+                                Text(toFix.isEmpty ? "Nothing obvious to fix" : "\(toFix.count) to fix")
+                                    .font(.caption.weight(.semibold)).foregroundStyle(toFix.isEmpty ? t.secondary : t.warn)
+                            }
+                        }
+                        ForEach(toFix) { f in
+                            Label(SecurityChecks.check(f.check)?.title ?? f.check,
+                                  systemImage: f.severity == .critical ? "xmark.octagon.fill" : "exclamationmark.triangle.fill")
+                                .font(.caption).foregroundStyle(f.severity == .critical ? t.danger : t.warn)
+                        }
+                        if let error = security.error { Text(error).font(.caption).foregroundStyle(t.secondary).lineLimit(2) }
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(t.card, in: RoundedRectangle(cornerRadius: 14))
+                }
+                .buttonStyle(.plain)
+                .onAppear { security.load() }
+            }
+        }
     }
 }

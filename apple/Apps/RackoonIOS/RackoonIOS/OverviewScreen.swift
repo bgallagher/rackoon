@@ -104,6 +104,10 @@ private struct PlacesSection: View {
                 Label("Services", systemImage: "gearshape.2")
             }
             .accessibilityIdentifier("openServices")
+            NavigationLink { SecurityScreen(serverID: server.id) } label: {
+                Label("Security", systemImage: "shield")
+            }
+            .accessibilityIdentifier("openSecurity")
             NavigationLink { BookmarksScreen(serverID: server.id) } label: {
                 Label("Bookmarks", systemImage: "bookmark")
             }

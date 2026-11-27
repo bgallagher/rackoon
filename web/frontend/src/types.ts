@@ -598,3 +598,77 @@ export interface SearchItem {
   tone: string | null;
   link: string | null;
 }
+
+// --- Security (docs/security-plan.md) -----------------------------------------------------------------------------
+
+export type SecuritySeverity = "critical" | "warning" | "info" | "unknown" | "pass";
+
+export interface SecurityFinding {
+  id: string;
+  check: string;
+  severity: SecuritySeverity;
+  summary: string;
+  evidence: string | null;
+  group: string | null;
+  groupTitle: string;
+  title: string;
+  why: string;
+  advice: string;
+}
+
+export interface SecurityPort {
+  id: string;
+  port: number;
+  proto: string;
+  scope: "all" | "public" | "lan" | "tailscale" | "loopback";
+  addresses: string[];
+  containers: string[];
+  service: string | null;
+  flags: string[];
+}
+
+export interface VulnerabilityFinding {
+  id: string;
+  package: string;
+  installed: string;
+  fixed: string | null;
+  status: "fix_waiting" | "fix_released" | "no_fix";
+  severity: string;
+  summary: string;
+  aliases: string[];
+  binaries: string[];
+}
+
+export interface SecurityState {
+  serverId: string;
+  status: "ready" | "failed" | "loading";
+  error: string | null;
+  updatedAt: number | null;
+  deep: boolean;
+  isRoot: boolean | null;
+  user: string | null;
+  disclaimer: string;
+  dockerUnlocked: boolean;
+  findings: SecurityFinding[];
+  ports: SecurityPort[];
+  vulnerabilities: {
+    enabled: boolean;
+    all: boolean;
+    thisServer: boolean;
+    privacyNote: string;
+    limits: string;
+    supported: boolean;
+    running: boolean;
+    error: string | null;
+    updatedAt: number | null;
+    findings: VulnerabilityFinding[] | null;
+  };
+}
+
+export interface FleetSecurity {
+  servers: { server: { id: string; name: string }; updatedAt: number | null; deep: boolean; error: string | null;
+    toFix: SecurityFinding[]; exposedPorts: number; unknown: number }[];
+  checked: number;
+  total: number;
+  disclaimer: string;
+}

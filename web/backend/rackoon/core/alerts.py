@@ -12,7 +12,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 from urllib.parse import urlsplit
 
-from . import attention, connection_failure, unraid_view
+from . import attention, connection_failure, security, unraid_view
 from .docker_states import DockerStatesReading
 from .models import Severity
 from .overview import Overview
@@ -33,6 +33,12 @@ class Source(enum.Enum):
     CONTAINERS = "containers"
     STORAGE = "storage"
     CERTIFICATES = "certificates"
+    SECURITY = "security"
+
+    @property
+    def notifies(self) -> bool:
+        """Security findings are listed and counted but never notify (docs/security-plan.md, stage S4)."""
+        return self is not Source.SECURITY
 
 
 class Category(enum.Enum):
@@ -43,6 +49,7 @@ class Category(enum.Enum):
     UPDATES = "updates"
     STORAGE = "storage"
     CERTIFICATES = "certificates"
+    SECURITY = "security"
 
     @property
     def title(self) -> str:
@@ -120,7 +127,8 @@ class AlertBook:
         """Records one reading. Returns the alerts worth a notification: new ones (warning or worse) and ones that
         just became critical, never on the source's first reading and never muted ones."""
         baseline = f"{server}|{source.value}"
-        first = baseline not in self.baselined
+        # A source that never notifies behaves like a first reading every time: listed, never raised.
+        first = baseline not in self.baselined or not source.notifies
         self.baselined.add(baseline)
         raised: list[ServerAlert] = []
         seen: set[str] = set()
@@ -362,6 +370,23 @@ def certificates(checks: list[CertificateCheck], now: float) -> list[Signal]:
             out.append(Signal(f"cert:{c.host}", Category.CERTIFICATES,
                               Severity.CRITICAL if days <= CERT_CRITICAL_DAYS else Severity.WARNING,
                               f"Certificate expires soon: {c.host}", f"It expires in {_days(days)}.", fix))
+    return out
+
+
+# Security checks that already raise alerts of their own (the Overview's security-update count and reboot flag).
+SECURITY_CHECKS_COVERED_ELSEWHERE = frozenset({"updates.security_pending", "updates.reboot"})
+
+
+def security_findings(findings: list[security.SecurityFinding]) -> list[Signal]:
+    """Critical and warning Security findings: listed and counted, never notified (Source.SECURITY.notifies)."""
+    titles = {c.id: c.title for c in security.checks()}
+    severities = {security.Severity.CRITICAL: Severity.CRITICAL, security.Severity.WARNING: Severity.WARNING}
+    out = []
+    for f in findings:
+        level = severities.get(f.severity)
+        if level is None or f.check in SECURITY_CHECKS_COVERED_ELSEWHERE:
+            continue
+        out.append(Signal(f.id, Category.SECURITY, level, titles.get(f.check, f.check), f.summary, Fix("security", f.id)))
     return out
 
 
