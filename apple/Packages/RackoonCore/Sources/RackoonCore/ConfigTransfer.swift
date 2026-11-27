@@ -705,17 +705,54 @@ extension ConfigTransfer {
     private struct Address: Equatable { let host: String, user: String, port: Int }
     private static func address(_ s: ConfigServer) -> Address { Address(host: s.host.lowercased(), user: s.user ?? "", port: s.port ?? 22) }
 
+    /// Where a local server really connects: its `resolved` host, user and port when it has them (a Mac alias).
+    static func effective(_ s: ConfigServer) -> ConfigServer {
+        guard let r = s.resolved else { return s }
+        var e = s
+        e.host = r.host
+        e.user = r.user ?? s.user
+        e.port = r.port ?? s.port
+        return e
+    }
+
     private static func differences(_ local: ConfigServer, _ incoming: ConfigServer) -> [String] {
-        serverFields.filter { field in
+        let here = effective(local)
+        return serverFields.filter { field in
             switch field {
-            case "name": local.name != incoming.name
-            case "host": local.host.lowercased() != incoming.host.lowercased()
-            case "user": (local.user ?? "") != (incoming.user ?? "")
-            case "port": (local.port ?? 22) != (incoming.port ?? 22)
-            case "sshConfigAlias": (local.sshConfigAlias ?? "") != (incoming.sshConfigAlias ?? "")
-            default: (local.identityFile ?? "") != (incoming.identityFile ?? "")
+            case "name": here.name != incoming.name
+            case "host": here.host.lowercased() != incoming.host.lowercased()
+            case "user": (here.user ?? "") != (incoming.user ?? "")
+            case "port": (here.port ?? 22) != (incoming.port ?? 22)
+            // A Mac-only field the document leaves out is not a change, and an update keeps it.
+            case "sshConfigAlias": incoming.sshConfigAlias != nil && (here.sshConfigAlias ?? "") != incoming.sshConfigAlias
+            default: incoming.identityFile != nil && (here.identityFile ?? "") != incoming.identityFile
             }
         }
+    }
+
+    /// The local server with only the changed fields taken from the document. A new host ends a Mac alias link, and a
+    /// changed address makes the old `resolved` stale.
+    public static func updated(_ local: ConfigServer, with incoming: ConfigServer, changes: [String]) -> ConfigServer {
+        var s = local
+        for field in changes {
+            switch field {
+            case "name": s.name = incoming.name
+            case "host": s.host = incoming.host
+            case "user": s.user = incoming.user
+            case "port": s.port = incoming.port
+            case "sshConfigAlias": s.sshConfigAlias = incoming.sshConfigAlias
+            case "identityFile": s.identityFile = incoming.identityFile
+            default: break
+            }
+        }
+        if changes.contains("host"), !changes.contains("sshConfigAlias") {
+            s.sshConfigAlias = nil
+            // The user and port the alias gave become explicit.
+            s.user = s.user ?? local.resolved?.user
+            s.port = s.port ?? local.resolved?.port
+        }
+        if changes.contains(where: { ["host", "user", "port"].contains($0) }) { s.resolved = nil }
+        return s
     }
 
     private static func rank(_ type: String) -> Int { hostKeyOrder.firstIndex(of: type) ?? hostKeyOrder.count }
@@ -751,7 +788,9 @@ extension ConfigTransfer {
             used.insert(s.id)
         }
         for s in fitted where matches[s.id] == nil {
-            if let candidate = local.servers.first(where: { !used.contains($0.id) && address($0) == address(s) }) {
+            if let candidate = local.servers.first(where: {
+                !used.contains($0.id) && (address($0) == address(s) || address(effective($0)) == address(s))
+            }) {
                 matches[s.id] = (candidate, "address")
                 used.insert(candidate.id)
             }
@@ -800,10 +839,8 @@ extension ConfigTransfer {
         if choices.replace {
             let here = Dictionary(uniqueKeysWithValues: local.servers.map { ($0.id, $0) })
             result.servers = plan.servers.map { p in
-                if p.kind == .identical, let id = p.localID, let s = here[id] { return s }
-                var s = p.incoming
-                s.id = p.resultID
-                return s
+                guard let id = p.localID, let s = here[id] else { return p.incoming }
+                return updated(s, with: p.incoming, changes: p.changes)
             }
             for p in plan.servers {
                 let source = p.incoming.id, target = p.resultID
@@ -817,12 +854,11 @@ extension ConfigTransfer {
         }
 
         let taken = plan.servers.filter { $0.kind == .new || !choices.keep.contains($0.incoming.id) }
-        var updated: [String: ConfigServer] = [:]
-        for p in taken where p.kind == .change { if let id = p.localID { updated[id] = p.incoming } }
+        var changed: [String: ConfigServerPlan] = [:]
+        for p in taken where p.kind == .change { if let id = p.localID { changed[id] = p } }
         result.servers = local.servers.map { s in
-            guard var u = updated[s.id] else { return s }
-            u.id = s.id
-            return u
+            guard let p = changed[s.id] else { return s }
+            return updated(s, with: p.incoming, changes: p.changes)
         } + plan.servers.filter { $0.kind == .new }.map(\.incoming)
         result.signIn = local.signIn
         result.serverSettings = local.serverSettings

@@ -110,12 +110,16 @@ another.
 1. **Fit the incoming servers to this platform.** Off the Mac, a server with a `resolved` entry takes the host, user
    and port it names (each one it names), and `sshConfigAlias`, `identityFile` and `resolved` are dropped.
 2. **Match** each incoming server to a local one: same id; else the same address (host compared ignoring case, port
-   missing = 22, user missing = empty). Each local server matches at most one incoming server, the first.
-3. Each server is then **new** (no match), **identical** (name, host, user, port, alias and key file all equal, with
-   the address rules of step 2 and a missing value equal to an empty one) or a **change** listing the fields that
-   differ (`name`, `host`, `user`, `port`, `sshConfigAlias`, `identityFile`). A matched server takes the document's
-   sign-in, settings and secret, and a changed one also its fields, when the user leaves it on Update (the default);
-   an identical one keeps its own fields as written here. Keep mine leaves the local server, its sign-in and its
+   missing = 22, user missing = empty). A local server with a `resolved` entry (a Mac alias) also matches on the
+   address it resolves to. Each local server matches at most one incoming server, the first.
+3. Each server is then **new** (no match), **identical** or a **change** listing the fields that differ (`name`,
+   `host`, `user`, `port`, `sshConfigAlias`, `identityFile`), comparing with the local server's resolved address when
+   it has one, with the address rules of step 2, and a missing value equal to an empty one. A Mac-only field
+   (`sshConfigAlias`, `identityFile`) the incoming server leaves out is not a difference. A matched server takes the
+   document's sign-in, settings and secret when the user leaves it on Update (the default), and a changed one takes
+   **only the fields that differ**; everything else stays as written here. A new host ends a Mac alias link (its
+   `sshConfigAlias` is dropped unless the document sets one, and the user and port the alias resolved to are kept as
+   explicit values). Keep mine leaves the local server, its sign-in and its
    settings alone.
 4. **Ids**: a server that matched keeps its local id; everything the document files under the incoming id (sign-in,
    settings, secrets) is moved to the local id. New servers keep their incoming id.
@@ -139,8 +143,8 @@ another.
    `ssh-ed25519`, `ecdsa-sha2-nistp256`, `ecdsa-sha2-nistp384`, `ecdsa-sha2-nistp521`, `ssh-rsa`, then any other type
    in the document's order; the rest are skipped.
 10. **Replace everything** (after the app has saved a plain backup of what is here): the servers become the
-    document's, in its order and fitted to this platform, matched ones keeping their local id (rule 4) and identical
-    ones their own fields; local servers
+    document's, in its order and fitted to this platform, matched ones keeping their local id (rule 4) and updated as in
+    rule 3; local servers
     with no match are removed (the app forgets their sign-in, secrets and settings). Sign-ins, settings and the `"*"`
     rules are the document's, not merged. Preferences are applied as in rule 8, so `readOnly` is still
     `local OR incoming`. Host keys follow rule 9 in both modes: an import never removes a trusted key and never

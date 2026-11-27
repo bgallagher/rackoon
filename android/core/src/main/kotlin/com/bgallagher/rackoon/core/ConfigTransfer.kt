@@ -648,15 +648,43 @@ object ConfigTransfer {
     private data class Address(val host: String, val user: String, val port: Int)
     private fun address(s: ConfigServer) = Address(s.host.lowercase(), s.user ?: "", s.port ?: 22)
 
-    private fun differences(local: ConfigServer, incoming: ConfigServer): List<String> = SERVER_FIELDS.filter { field ->
-        when (field) {
-            "name" -> local.name != incoming.name
-            "host" -> local.host.lowercase() != incoming.host.lowercase()
-            "user" -> (local.user ?: "") != (incoming.user ?: "")
-            "port" -> (local.port ?: 22) != (incoming.port ?: 22)
-            "sshConfigAlias" -> (local.sshConfigAlias ?: "") != (incoming.sshConfigAlias ?: "")
-            else -> (local.identityFile ?: "") != (incoming.identityFile ?: "")
+    /** Where a local server really connects: its `resolved` host, user and port when it has them (a Mac alias). */
+    private fun effective(s: ConfigServer): ConfigServer =
+        s.resolved?.let { r -> s.copy(host = r.host, user = r.user ?: s.user, port = r.port ?: s.port) } ?: s
+
+    private fun differences(local: ConfigServer, incoming: ConfigServer): List<String> {
+        val here = effective(local)
+        return SERVER_FIELDS.filter { field ->
+            when (field) {
+                "name" -> here.name != incoming.name
+                "host" -> here.host.lowercase() != incoming.host.lowercase()
+                "user" -> (here.user ?: "") != (incoming.user ?: "")
+                "port" -> (here.port ?: 22) != (incoming.port ?: 22)
+                // A Mac-only field the document leaves out is not a change, and an update keeps it.
+                "sshConfigAlias" -> incoming.sshConfigAlias != null && (here.sshConfigAlias ?: "") != incoming.sshConfigAlias
+                else -> incoming.identityFile != null && (here.identityFile ?: "") != incoming.identityFile
+            }
         }
+    }
+
+    /** The local server with only the changed fields taken from the document. A new host ends a Mac alias link, and a changed address makes the old `resolved` stale. */
+    fun updated(local: ConfigServer, incoming: ConfigServer, changes: List<String>): ConfigServer {
+        var s = local
+        for (field in changes) s = when (field) {
+            "name" -> s.copy(name = incoming.name)
+            "host" -> s.copy(host = incoming.host)
+            "user" -> s.copy(user = incoming.user)
+            "port" -> s.copy(port = incoming.port)
+            "sshConfigAlias" -> s.copy(sshConfigAlias = incoming.sshConfigAlias)
+            "identityFile" -> s.copy(identityFile = incoming.identityFile)
+            else -> s
+        }
+        if ("host" in changes && "sshConfigAlias" !in changes) {
+            // The user and port the alias gave become explicit.
+            s = s.copy(sshConfigAlias = null, user = s.user ?: local.resolved?.user, port = s.port ?: local.resolved?.port)
+        }
+        if (changes.any { it == "host" || it == "user" || it == "port" }) s = s.copy(resolved = null)
+        return s
     }
 
     private fun rank(type: String): Int = HOST_KEY_ORDER.indexOf(type).takeIf { it >= 0 } ?: HOST_KEY_ORDER.size
@@ -688,7 +716,7 @@ object ConfigTransfer {
         for (s in fitted) localById[s.id]?.let { matches[s.id] = it to "id"; used += s.id }
         for (s in fitted) {
             if (s.id in matches) continue
-            local.servers.firstOrNull { it.id !in used && address(it) == address(s) }?.let { matches[s.id] = it to "address"; used += it.id }
+            local.servers.firstOrNull { it.id !in used && (address(it) == address(s) || address(effective(it)) == address(s)) }?.let { matches[s.id] = it to "address"; used += it.id }
         }
         val plans = fitted.map { s ->
             val (here, how) = matches[s.id] ?: return@map ConfigServerPlan(s, ServerPlanKind.NEW)
@@ -737,9 +765,7 @@ object ConfigTransfer {
 
         if (choices.replace) {
             val here = local.servers.associateBy { it.id }
-            val servers = plan.servers.map { p ->
-                if (p.kind == ServerPlanKind.IDENTICAL && p.localId != null) here.getValue(p.localId) else p.incoming.copy(id = p.resultId)
-            }
+            val servers = plan.servers.map { p -> p.localId?.let { updated(here.getValue(it), p.incoming, p.changes) } ?: p.incoming }
             for (p in plan.servers) {
                 fit(incoming.signIn[p.incoming.id], platform)?.let { signIn[p.resultId] = it }
                 incoming.serverSettings[p.incoming.id]?.let { settings[p.resultId] = it }
@@ -751,8 +777,9 @@ object ConfigTransfer {
         }
 
         val taken = plan.servers.filter { it.kind == ServerPlanKind.NEW || it.incoming.id !in choices.keep }
-        val updated = taken.filter { it.kind == ServerPlanKind.CHANGE && it.localId != null }.associate { it.localId!! to it.incoming }
-        val servers = local.servers.map { s -> updated[s.id]?.copy(id = s.id) ?: s } + plan.servers.filter { it.kind == ServerPlanKind.NEW }.map { it.incoming }
+        val changed = taken.filter { it.kind == ServerPlanKind.CHANGE && it.localId != null }.associateBy { it.localId!! }
+        val servers = local.servers.map { s -> changed[s.id]?.let { updated(s, it.incoming, it.changes) } ?: s } +
+            plan.servers.filter { it.kind == ServerPlanKind.NEW }.map { it.incoming }
         signIn += local.signIn
         settings += local.serverSettings
         for (p in taken) {

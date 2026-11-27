@@ -710,10 +710,25 @@ def _address(s: ConfigServer) -> tuple[str, str, int]:
     return (s.host.lower(), s.user or "", s.port or 22)
 
 
+MAC_ONLY = ("sshConfigAlias", "identityFile")
+
+
+def _effective(s: ConfigServer) -> ConfigServer:
+    """Where a local server really connects: its `resolved` host, user and port when it has them (a Mac alias)."""
+    if s.resolved is None:
+        return s
+    r = s.resolved
+    return replace(s, host=r.host, user=r.user if r.user is not None else s.user,
+                   port=r.port if r.port is not None else s.port)
+
+
 def _differences(local: ConfigServer, incoming: ConfigServer) -> list[str]:
+    here = _effective(local)
     out = []
     for name in SERVER_FIELDS:
-        a, b = local.field_value(name), incoming.field_value(name)
+        a, b = here.field_value(name), incoming.field_value(name)
+        if name in MAC_ONLY and b is None:
+            continue  # the document leaves out a Mac-only field: not a change, and an update keeps it
         if name == "host":
             same = a.lower() == b.lower()
         elif name == "port":
@@ -816,7 +831,7 @@ def plan_import(local: ConfigDocument, incoming: ConfigDocument, platform: str) 
         if s.id in matches:
             continue
         for candidate in local.servers:
-            if candidate.id not in used and _address(candidate) == _address(s):
+            if candidate.id not in used and _address(s) in (_address(candidate), _address(_effective(candidate))):
                 matches[s.id] = (candidate, "address")
                 used.add(candidate.id)
                 break
@@ -834,6 +849,24 @@ def plan_import(local: ConfigDocument, incoming: ConfigDocument, platform: str) 
     removed = tuple(s.id for s in local.servers if s.id not in used)
     return ImportPlan(tuple(plans), tuple(plan_host_keys(local.host_keys, incoming.host_keys, platform)), prefs,
                       turns_on, removed, tuple(sid for sid in (s.id for s in fitted) if sid in incoming.secrets))
+
+
+def updated_server(local: ConfigServer, incoming: ConfigServer, changes: Iterable[str]) -> ConfigServer:
+    """The local server with only the changed fields taken from the document. A new host ends a Mac alias link, and
+    a changed address makes the old `resolved` stale."""
+    values = {name: incoming.field_value(name) for name in changes}
+    s = replace(local, name=values.get("name", local.name), host=values.get("host", local.host),
+                user=values.get("user", local.user), port=values.get("port", local.port),
+                ssh_config_alias=values.get("sshConfigAlias", local.ssh_config_alias),
+                identity_file=values.get("identityFile", local.identity_file))
+    if "host" in values and "sshConfigAlias" not in values:
+        s = replace(s, ssh_config_alias=None)
+        if local.resolved is not None:  # the user and port the alias gave become explicit
+            s = replace(s, user=s.user if s.user is not None else local.resolved.user,
+                        port=s.port if s.port is not None else local.resolved.port)
+    if values.keys() & {"host", "user", "port"}:
+        s = replace(s, resolved=None)
+    return s
 
 
 def _merge_settings(here: ConfigServerSettings | None, new: ConfigServerSettings) -> ConfigServerSettings:
@@ -865,8 +898,8 @@ def apply_import(local: ConfigDocument, incoming: ConfigDocument, plan: ImportPl
     if choices.replace:
         # Every server is the document's (matched ones keep their local id), in the document's order.
         here = {s.id: s for s in local.servers}
-        result.servers = [here[p.local_id] if p.kind == "identical" and p.local_id is not None
-                          else replace(p.incoming, id=p.result_id) for p in plan.servers]
+        result.servers = [p.incoming if p.local_id is None
+                          else updated_server(here[p.local_id], p.incoming, p.changes) for p in plan.servers]
         for p in plan.servers:
             source, target = p.incoming.id, p.result_id
             if (sign_in := fit_sign_in(incoming.sign_in.get(source), platform)) is not None:
@@ -881,8 +914,9 @@ def apply_import(local: ConfigDocument, incoming: ConfigDocument, plan: ImportPl
         return result
 
     taken = [p for p in plan.servers if p.kind == "new" or p.incoming.id not in choices.keep]
-    updated = {p.local_id: p.incoming for p in taken if p.local_id is not None and p.kind == "change"}
-    result.servers = [replace(updated[s.id], id=s.id) if s.id in updated else s for s in local.servers]
+    updated = {p.local_id: p for p in taken if p.local_id is not None and p.kind == "change"}
+    result.servers = [updated_server(s, updated[s.id].incoming, updated[s.id].changes) if s.id in updated else s
+                      for s in local.servers]
     result.servers += [p.incoming for p in plan.servers if p.kind == "new"]
     result.sign_in = dict(local.sign_in)
     result.server_settings = {k: v for k, v in local.server_settings.items()}
